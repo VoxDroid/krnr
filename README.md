@@ -11,6 +11,9 @@ Quick start (dev):
 Database:
 
 - The database file is created under your home directory in `.krnr/krnr.db` by default.
+- You can override the data directory and DB path using environment variables:
+  - `KRNR_HOME` — set the data directory
+  - `KRNR_DB` — set the full path to the DB file (takes precedence)
 - The schema and migrations are embedded and are applied automatically on first run.
 
 Tests:
@@ -25,4 +28,4 @@ go test ./...
 go test ./internal/db -v
 ```
 
-See `PROJECT_OVERVIEW.md` and `docs/database.md` for design notes and schema.
+See `PROJECT_OVERVIEW.md`, `docs/config.md` and `docs/database.md` for design notes and schema.

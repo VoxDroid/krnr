@@ -45,9 +45,9 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [ ] Implement `export`, `import` commands
 - Acceptance: `krnr --help` lists correct commands; each command has basic integration tests
 
-### 6) Config & paths
-- [ ] Implement `internal/config/paths.go` to resolve `~/.krnr` or Windows path
-- [ ] Add config loading & init helper
+### 6) Config & paths (completed)
+- [x] Implement `internal/config/paths.go` to resolve `~/.krnr` or Windows path
+- [x] Add config loading & init helper (`EnsureDataDir`)
 - Acceptance: Config directory created and respected cross-platform
 
 ### 7) Importer & exporter (completed)
