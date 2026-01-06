@@ -1,9 +1,20 @@
 name: Release
 
+# Ensure workflow has rights to create releases via the GITHUB_TOKEN when used
+permissions:
+  contents: write
+
 on:
   push:
     tags:
       - 'v*'
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v0.1.0)'
+        required: false
 
 jobs:
   package:
@@ -22,7 +33,16 @@ jobs:
       - name: Verify VERSION matches tag
         id: verify_version
         run: |
-          TAG_NAME="${{ github.ref_name }}"
+          # Support both push (tag push) and release.created events
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_NAME="${{ github.event.release.tag_name }}"
+          elif [ -n "${{ github.event.inputs.tag || '' }}" ]; then
+            # workflow_dispatch may pass a tag input
+            TAG_NAME="${{ github.event.inputs.tag }}"
+          else
+            TAG_NAME="${{ github.ref_name }}"
+          fi
+
           STRIPPED_TAG="${TAG_NAME#v}"
           FILE_VERSION=$(cat VERSION 2>/dev/null || echo "")
           FILE_STRIPPED="${FILE_VERSION#v}"
@@ -33,11 +53,14 @@ jobs:
             exit 1
           fi
 
+          # Export tag for later steps
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
       - name: Run release script
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ steps.verify_version.outputs.tag_name }}
         run: |
-          bash ./scripts/release.sh "${{ github.ref_name }}"
+          bash ./scripts/release.sh "${{ steps.verify_version.outputs.tag_name }}"
 
       - name: Create GitHub release (uses PERSONAL_TOKEN if set, else GITHUB_TOKEN)
         id: create_release
@@ -45,7 +68,7 @@ jobs:
           RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ steps.verify_version.outputs.tag_name }}
           COMMIT_TITLE: "$(git log -1 --pretty=%s ${{ github.sha }})"
         run: |
           if [ -z "$RELEASE_TOKEN" ]; then
