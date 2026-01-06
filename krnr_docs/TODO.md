@@ -32,10 +32,10 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [ ] Add search/list/tagging operations
 - Acceptance: Unit tests for CRUD operations pass
 
-### 4) Execution engine (cross-platform) (in-progress)
-- [ ] Implement `internal/executor/executor.go` (interface)
-- [ ] Implement `executor_unix.go` and `executor_windows.go` for shell invocation
-- [ ] Implement flags: `--dry-run`, `--confirm`, `--verbose`
+### 4) Execution engine (cross-platform) (completed)
+- [x] Implement `internal/executor/executor.go` (implementation)
+- [x] Implement `executor_unix.go` and `executor_windows.go` for shell invocation
+- [x] Implement flags/options: `--dry-run`, `--confirm`, `--verbose`
 - Acceptance: Commands execute and stream stdout/stderr properly on Windows and Unix (tests or manual verification)
 
 ### 5) CLI commands (Cobra)
