@@ -17,13 +17,26 @@ jobs:
         with:
           go-version: '1.22'
 
+      - name: Debug Go environment (helpful for cache issues)
+        run: |
+          echo "--- go version ---"
+          go version
+          echo "--- go env ---"
+          go env
+          echo "GOMODCACHE: $GOMODCACHE"
+          echo "GOCACHE: $GOCACHE"
+
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
+          # Use setup-go populated environment variables to avoid GOPATH/GOMODCACHE mismatch
           path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          # Include Go version in the key to avoid cross-toolchain cache corruption
+          key: ${{ runner.os }}-go-1.22-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-1.22-
 
       - name: Install tooling
         run: |
