@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -30,24 +32,74 @@ jobs:
       - name: Make scripts executable
         run: chmod +x ./scripts/*.sh
 
-      - name: Verify VERSION matches tag
+      - name: Verify VERSION matches tag (or detect version commit)
         id: verify_version
         run: |
-          # Support both push (tag push) and release.created events
+          set -euo pipefail
+
+          # 1) Resolve TAG_NAME depending on event
           if [ "${{ github.event_name }}" = "release" ]; then
             TAG_NAME="${{ github.event.release.tag_name }}"
           elif [ -n "${{ github.event.inputs.tag || '' }}" ]; then
-            # workflow_dispatch may pass a tag input
             TAG_NAME="${{ github.event.inputs.tag }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG_NAME=""
+            echo "Scanning commits for version tag pattern..."
+
+            # Prefer using the event payload (no external network required)
+            if [ -f "$GITHUB_EVENT_PATH" ] && command -v jq >/dev/null 2>&1; then
+              TAG_NAME=$(jq -r '.commits[]?.message' "$GITHUB_EVENT_PATH" 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+            fi
+
+            # Fallback: search last 10 commit messages from git
+            if [ -z "$TAG_NAME" ]; then
+              TAG_NAME=$(git --no-pager log -n 10 --pretty=format:%s | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+            fi
+
+            if [ -z "$TAG_NAME" ]; then
+              echo "No version-style commit message found in this push. Skipping release." >&2
+              # export empty tag_name so downstream steps can check
+              echo "tag_name=" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            # ensure it starts with v
+            if [[ "$TAG_NAME" != v* ]]; then
+              TAG_NAME="v$TAG_NAME"
+            fi
           else
             TAG_NAME="${{ github.ref_name }}"
           fi
 
           STRIPPED_TAG="${TAG_NAME#v}"
-          FILE_VERSION=$(cat VERSION 2>/dev/null || echo "")
+
+          # Read raw VERSION content (for comparison)
+          RAW_VERSION=$(cat VERSION 2>/dev/null || echo "")
+          echo "Raw VERSION file content:" >&2
+          echo "${RAW_VERSION}" >&2
+
+          # Try to extract a semver from common formats (JSON/TOML/YAML/plain)
+          FILE_VERSION=""
+          if command -v jq >/dev/null 2>&1; then
+            FILE_VERSION=$(jq -r '.version // .Version // empty' VERSION 2>/dev/null || true)
+          fi
+          if [ -z "$FILE_VERSION" ]; then
+            FILE_VERSION=$(echo "$RAW_VERSION" | sed -n 's/.*version[[:space:]]*[:=][[:space:]]*["'\''']\{0,1\}\(v\?[0-9]\+\.[0-9]\+\.[0-9]\+[^"]*\)["'\''']\{0,1\}.*/\1/ip' | head -n1 || true)
+          fi
+          if [ -z "$FILE_VERSION" ]; then
+            FILE_VERSION=$(echo "$RAW_VERSION" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+([\-\+\.0-9A-Za-z_]*)' | head -n1 || true)
+          fi
+
+          if [ -z "$FILE_VERSION" ]; then
+            echo "Could not extract semver from VERSION file; file content was:" >&2
+            echo "${RAW_VERSION}" >&2
+            exit 1
+          fi
+
           FILE_STRIPPED="${FILE_VERSION#v}"
-          echo "Tag: $TAG_NAME (stripped: $STRIPPED_TAG)"
+          echo "Detected tag: $TAG_NAME (stripped: $STRIPPED_TAG)"
           echo "VERSION file: $FILE_VERSION (stripped: $FILE_STRIPPED)"
+
           if [ "$FILE_STRIPPED" != "$STRIPPED_TAG" ]; then
             echo "VERSION mismatch: tag $TAG_NAME vs VERSION file $FILE_VERSION"
             exit 1
@@ -57,12 +109,14 @@ jobs:
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Run release script
+        if: ${{ steps.verify_version.outputs.tag_name != '' }}
         env:
           VERSION: ${{ steps.verify_version.outputs.tag_name }}
         run: |
           bash ./scripts/release.sh "${{ steps.verify_version.outputs.tag_name }}"
 
       - name: Create GitHub release (uses PERSONAL_TOKEN if set, else GITHUB_TOKEN)
+        if: ${{ steps.verify_version.outputs.tag_name != '' }}
         id: create_release
         env:
           RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
@@ -70,12 +124,13 @@ jobs:
           REPO: ${{ github.repository }}
           TAG_NAME: ${{ steps.verify_version.outputs.tag_name }}
           COMMIT_TITLE: "$(git log -1 --pretty=%s ${{ github.sha }})"
+          COMMITISH: ${{ github.sha }}
         run: |
           if [ -z "$RELEASE_TOKEN" ]; then
             RELEASE_TOKEN="$GITHUB_TOKEN"
           fi
           echo "Using token owner to create release"
-          PAYLOAD=$(jq -n --arg tag "$TAG_NAME" --arg name "$TAG_NAME" --arg body "$COMMIT_TITLE" '{ tag_name: $tag, name: $name, body: $body }')
+          PAYLOAD=$(jq -n --arg tag "$TAG_NAME" --arg name "$TAG_NAME" --arg body "$COMMIT_TITLE" --arg commitish "$COMMITISH" '{ tag_name: $tag, name: $name, body: $body, target_commitish: $commitish }')
           RESP=$(curl -s -X POST -H "Authorization: token $RELEASE_TOKEN" -H "Content-Type: application/json" -d "$PAYLOAD" "https://api.github.com/repos/$REPO/releases")
           UPLOAD_URL=$(echo "$RESP" | jq -r .upload_url)
           RELEASE_ID=$(echo "$RESP" | jq -r .id)
@@ -83,6 +138,7 @@ jobs:
           echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
 
       - name: Upload artifacts to release
+        if: ${{ steps.verify_version.outputs.tag_name != '' }}
         env:
           RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
