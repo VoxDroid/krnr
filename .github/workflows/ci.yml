@@ -32,19 +32,27 @@ jobs:
           echo "GOMODCACHE: $GOMODCACHE"
           echo "GOCACHE: $GOCACHE"
 
-      - name: Cache Go modules
+      - name: Cache Go build cache only (avoid GOMODCACHE tar restore issues)
         id: go-cache
         uses: actions/cache@v4
         continue-on-error: true
         with:
-          # Use setup-go populated environment variables to avoid GOPATH/GOMODCACHE mismatch
+          # Cache only the Go build cache (safer to restore across environments)
           path: |
             ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          # Include Go version and job name to avoid cross-job cache reuse
-          key: ${{ runner.os }}-go-1.22-${{ github.job }}-v2-${{ hashFiles('**/go.sum') }}
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-1.22-${{ github.job }}-gocache-v3-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-1.22-${{ github.job }}-
+            ${{ runner.os }}-go-1.22-${{ github.job }}-gocache-v3-
+
+      - name: Populate Go module cache
+        run: |
+          echo "Running 'go mod download' to populate module cache in a fresh runner"
+          go mod download
+
+      - name: Cache info
+        run: |
+          echo "Cache hit: ${{ steps.go-cache.outputs.cache-hit }}"
 
       - name: Install tooling
         run: |
@@ -81,22 +89,31 @@ jobs:
           echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
           echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
 
-      - name: Cache Go modules (matrix-specific)
+      - name: Cache Go build cache (matrix-specific)
         id: go-cache
         uses: actions/cache@v4
         continue-on-error: true
         with:
           path: |
             ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          key: ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-v2-${{ hashFiles('**/go.sum') }}
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-gocache-v3-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-v2-
+            ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-gocache-v3-
+
+      - name: Populate Go module cache
+        run: |
+          echo "Running 'go mod download' to populate module cache in a fresh runner"
+          go mod download
+
+      - name: Cache info
+        run: |
+          echo "Cache hit: ${{ steps.go-cache.outputs.cache-hit }}"
 
       - name: Prepare build artifact path
         run: |
           mkdir -p dist
-          if [ "${{ matrix.os }}" = "windows" ]; then ext=".exe"; else ext=""; fi
+          if [ "${{ matrix.os }}" = "windows"; then ext=".exe"; else ext=""; fi
           echo "BINARY=dist/krnr-${{ matrix.os }}-${{ matrix.arch }}${ext}" >> $GITHUB_ENV
 
       - name: Build
