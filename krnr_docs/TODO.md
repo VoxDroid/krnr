@@ -83,10 +83,11 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] `docs/roadmap.md` (priority features)
 - Acceptance: Docs provide enough info to onboard new devs
 
-### 13) Cross-platform build & packaging
-- [ ] Add `scripts/build.sh` for cross-compile targets (windows/linux/macos)
-- [ ] Document release process in `README.md`
-- Acceptance: Binaries built for all platforms
+### 13) Cross-platform build & packaging (completed)
+- [x] Add `scripts/build.sh` for cross-compile targets (windows/linux/macos)
+- [x] Add `scripts/release.sh` + `release.yml` workflow to package & upload releases
+- [x] Document release process in `README.md`
+- Acceptance: Binaries built for all platforms and packaged for releases
 
 ### 14) Security & safety
 - [ ] Confirm no background auto-runs; document safety defaults

@@ -66,5 +66,17 @@ docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v1.55.2 golangci
 
 Continuous Integration
 
-This repository includes a GitHub Actions workflow (`.github/workflows/ci.yml`) which runs on push and pull requests. It performs formatting, linting (uses the official golangci-lint action), unit tests, and produces cross-platform build artifacts for Linux, macOS, and Windows (amd64 and arm64). Artifacts are attached to the workflow run for download.
+This repository includes a GitHub Actions workflow (`.github/workflows/ci.yml`) which runs on push and pull requests. It performs formatting, linting (with a local or Docker fallback), unit tests, and produces cross-platform build artifacts for Linux, macOS, and Windows (amd64 and arm64). Artifacts are attached to the workflow run for download.
+
+Release packaging
+
+A release workflow (`.github/workflows/release.yml`) will run when you push a tag like `v1.2.3`. It builds platform binaries, packages them into `.tar.gz` / `.zip` archives, generates a SHA256 sums file, and attaches the artifacts to a GitHub Release.
+
+To create a local release build (without the workflow), run:
+
+```bash
+./scripts/release.sh v0.1.0
+```
+
+This will create archives under `dist/`.
 
