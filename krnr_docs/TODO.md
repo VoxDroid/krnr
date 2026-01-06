@@ -41,7 +41,8 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 ### 5) CLI commands (Cobra) (completed)
 - [x] `cmd/root.go` with base flags and config
 - [x] Implement `save`, `run`, `list`, `describe` commands (basic implementations)
-- [ ] Implement `edit`, `delete`, `export`, `import` commands
+- [x] Implement `edit`, `delete` commands (basic implementations)
+- [ ] Implement `export`, `import` commands
 - Acceptance: `krnr --help` lists correct commands; each command has basic integration tests
 
 ### 6) Config & paths

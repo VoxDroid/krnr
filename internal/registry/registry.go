@@ -116,3 +116,24 @@ func (r *Repository) DeleteCommandSet(name string) error {
 	}
 	return trx.Commit()
 }
+
+// ReplaceCommands replaces all commands for a given command set with the provided
+// slice of command strings. Existing commands for the set are deleted and the
+// new commands are inserted with positions starting at 1.
+func (r *Repository) ReplaceCommands(commandSetID int64, commands []string) error {
+	trx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer trx.Rollback()
+
+	if _, err := trx.Exec("DELETE FROM commands WHERE command_set_id = ?", commandSetID); err != nil {
+		return err
+	}
+	for i, c := range commands {
+		if _, err := trx.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", commandSetID, i+1, c); err != nil {
+			return err
+		}
+	}
+	return trx.Commit()
+}
