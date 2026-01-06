@@ -27,12 +27,12 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Add simple migrations support (`migrations.go`)
 - Acceptance: DB file created at OS path and schema validated by tests
 
-### 3) Registry (CRUD & models) (in-progress)
-- [ ] Implement `internal/registry/models.go` and `registry.go` CRUD
+### 3) Registry (CRUD & models) (completed)
+- [x] Implement `internal/registry/models.go` and `registry.go` CRUD
 - [ ] Add search/list/tagging operations
 - Acceptance: Unit tests for CRUD operations pass
 
-### 4) Execution engine (cross-platform)
+### 4) Execution engine (cross-platform) (in-progress)
 - [ ] Implement `internal/executor/executor.go` (interface)
 - [ ] Implement `executor_unix.go` and `executor_windows.go` for shell invocation
 - [ ] Implement flags: `--dry-run`, `--confirm`, `--verbose`
