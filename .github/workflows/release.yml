@@ -59,31 +59,7 @@ jobs:
             VER="v$VER"
           fi
 
-          RAW_VERSION=$(cat VERSION 2>/dev/null || echo "")
-          FILE_VERSION=""
-          if command -v jq >/dev/null 2>&1; then
-            FILE_VERSION=$(jq -r '.version // .Version // empty' VERSION 2>/dev/null || true)
-          fi
-          if [ -z "$FILE_VERSION" ]; then
-            FILE_VERSION=$(echo "$RAW_VERSION" | perl -ne "if (/(?:version)\s*[:=]\s*['\"]?(v?[0-9]+\.[0-9]+\.[0-9]+[^\s'\" ]*)/i){print \$1; exit}" | head -n1 || true)
-          fi
-          if [ -z "$FILE_VERSION" ]; then
-            FILE_VERSION=$(echo "$RAW_VERSION" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
-          fi
-
-          if [ -z "$FILE_VERSION" ]; then
-            echo "Could not extract semver from VERSION file; file content was:" >&2
-            echo "${RAW_VERSION}" >&2
-            exit 1
-          fi
-
-          N1=${VER#v}
-          N2=${FILE_VERSION#v}
-          if [ "$N1" != "$N2" ]; then
-            echo "VERSION mismatch: commit indicated $VER but VERSION file contains $FILE_VERSION" >&2
-            exit 1
-          fi
-
+          # We use the commit-detected version directly (no VERSION file required)
           echo "Found version $VER in commit message (sha $SHA)"
           echo "tag_name=$VER" >> $GITHUB_OUTPUT
           echo "release_body=$BODY" >> $GITHUB_OUTPUT
