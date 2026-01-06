@@ -128,6 +128,11 @@ jobs:
             exit 1
           fi
 
+      - name: Checkout repository (needed to create and push tag)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Create annotated git tag and push
         env:
           RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
@@ -135,6 +140,10 @@ jobs:
           TARGET_SHA: ${{ needs.detect.outputs.commit_sha }}
         run: |
           set -euo pipefail
+          if [ -z "${TAG_NAME:-}" ] || [ -z "${TARGET_SHA:-}" ]; then
+            echo "TAG_NAME or TARGET_SHA is empty; skipping tag creation to avoid errors." >&2
+            exit 0
+          fi
           git config user.email "78334105+VoxDroid@users.noreply.github.com"
           git config user.name "VoxDroid"
           git tag -a "$TAG_NAME" -m "Release $TAG_NAME" "$TARGET_SHA" || echo "Tag creation failed (maybe already exists)"
