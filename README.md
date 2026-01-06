@@ -29,3 +29,29 @@ go test ./internal/db -v
 ```
 
 See `PROJECT_OVERVIEW.md`, `docs/config.md` and `docs/database.md` for design notes and schema.
+
+Linting & formatting
+
+- Format the code with:
+
+```bash
+./scripts/fmt.sh
+```
+
+- Run linters with:
+
+```bash
+./scripts/lint.sh
+```
+
+Pre-commit hooks
+
+Install pre-commit and enable the hooks:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+This repository includes a `.pre-commit-config.yaml` that runs basic checks, `gofmt`/`goimports`, and `golangci-lint`.
+

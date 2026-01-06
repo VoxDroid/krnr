@@ -66,10 +66,10 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [ ] Add integration tests that exercise save→run→list flows
 - Acceptance: Tests run locally and pass with `go test ./...`
 
-### 10) Linting & formatting
-- [ ] Add `.golangci.yml` and configure IDE instructions
-- [ ] Enforce `gofmt`/`goimports` and `golangci-lint` checks
-- [ ] Add `scripts/lint.sh` and `fmt.sh`
+### 10) Linting & formatting (completed)
+- [x] Add `.golangci.yml` and configure IDE instructions
+- [x] Enforce `gofmt`/`goimports` and `golangci-lint` checks via pre-commit
+- [x] Add `scripts/lint.sh` and `fmt.sh`
 - Acceptance: Codebase passes linters and format checks
 
 ### 11) Pre-commit hooks & CI
