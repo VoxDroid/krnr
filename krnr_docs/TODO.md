@@ -50,9 +50,9 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [ ] Add config loading & init helper
 - Acceptance: Config directory created and respected cross-platform
 
-### 7) Importer & exporter
-- [ ] `internal/exporter/sqlite_export.go` for exporting DB or selected command_sets
-- [ ] `internal/importer/sqlite_import.go` for importing
+### 7) Importer & exporter (completed)
+- [x] `internal/exporter/sqlite_export.go` for exporting DB or selected command_sets
+- [x] `internal/importer/sqlite_import.go` for importing
 - Acceptance: Exported artifacts are portable and import restores them
 
 ### 8) Recorder, editor & utilities
