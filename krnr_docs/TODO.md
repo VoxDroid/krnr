@@ -77,10 +77,10 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Add GitHub Actions workflow for build/test/lint/cross-build
 - Acceptance: Hooks prevent bad commits; CI runs on PRs and builds artifacts
 
-### 12) Documentation
-- [ ] `docs/architecture.md` (explain components)
-- [ ] `docs/database.md` (schema & migration guide)
-- [ ] `docs/roadmap.md` (priority features)
+### 12) Documentation (completed)
+- [x] `docs/architecture.md` (explain components)
+- [x] `docs/database.md` (schema & migration guide)
+- [x] `docs/roadmap.md` (priority features)
 - Acceptance: Docs provide enough info to onboard new devs
 
 ### 13) Cross-platform build & packaging

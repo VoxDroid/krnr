@@ -28,7 +28,7 @@ go test ./...
 go test ./internal/db -v
 ```
 
-See `PROJECT_OVERVIEW.md`, `docs/config.md` and `docs/database.md` for design notes and schema.
+See `PROJECT_OVERVIEW.md`, `docs/config.md`, `docs/database.md`, `docs/architecture.md`, and `docs/roadmap.md` for design notes, architecture, and roadmap.
 
 Linting & formatting
 
