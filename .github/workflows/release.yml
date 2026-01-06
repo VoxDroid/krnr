@@ -65,7 +65,7 @@ jobs:
             FILE_VERSION=$(jq -r '.version // .Version // empty' VERSION 2>/dev/null || true)
           fi
           if [ -z "$FILE_VERSION" ]; then
-            FILE_VERSION=$(echo "$RAW_VERSION" | sed -n 's/.*version[[:space:]]*[:=][[:space:]]*["'\''']\{0,1\}\(v\?[0-9]\+\.[0-9]\+\.[0-9]\+[^"]*\)["'\''']\{0,1\}.*/\1/ip' | head -n1 || true)
+            FILE_VERSION=$(echo "$RAW_VERSION" | perl -ne "if (/(?:version)\s*[:=]\s*['\"]?(v?[0-9]+\.[0-9]+\.[0-9]+[^\s'\"]*)/i){print \\$1; exit}"
           fi
           if [ -z "$FILE_VERSION" ]; then
             FILE_VERSION=$(echo "$RAW_VERSION" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
