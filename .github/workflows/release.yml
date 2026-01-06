@@ -42,8 +42,9 @@ jobs:
             exit 0
           fi
 
-          BODY=$(echo "$match" | cut -d'::' -f1)
-          SHA=$(echo "$match" | cut -d'::' -f2)
+          # Split the match (format: <message>::<sha>) using shell parameter expansion
+          BODY="${match%%::*}"
+          SHA="${match##*::}"
           VER=$(echo "$BODY" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
 
           if [ -z "$VER" ]; then
