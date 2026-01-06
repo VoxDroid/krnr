@@ -17,7 +17,7 @@ func NewRepository(db *sql.DB) *Repository {
 
 // CreateCommandSet inserts a new command set and returns its ID.
 func (r *Repository) CreateCommandSet(name string, description *string) (int64, error) {
-	rx, err := r.db.Begin()
+	trx, err := r.db.Begin()
 	if err != nil {
 		return 0, err
 	}

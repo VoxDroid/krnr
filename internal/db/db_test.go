@@ -1,10 +1,10 @@
 package db
 
 import (
-	"database/sql"
 	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/VoxDroid/krnr/internal/config"
 )
 
 func TestInitDBCreatesFileAndSchema(t *testing.T) {
@@ -13,7 +13,7 @@ func TestInitDBCreatesFileAndSchema(t *testing.T) {
 	os.Setenv("HOME", tmp)
 	os.Setenv("USERPROFILE", tmp)
 
-	dbPath, err := DBPath()
+	dbPath, err := config.DBPath()
 	if err != nil {
 		t.Fatalf("DBPath(): %v", err)
 	}

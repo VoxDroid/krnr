@@ -2,7 +2,6 @@ package exporter
 
 import (
 	"database/sql"
-	"embed"
 	"fmt"
 	"io"
 	"os"
@@ -11,10 +10,8 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/VoxDroid/krnr/internal/config"
+	dbpkg "github.com/VoxDroid/krnr/internal/db"
 )
-
-//go:embed ../db/schema.sql
-var schemaSQL string
 
 // ExportDatabase copies the active krnr database to dstPath.
 func ExportDatabase(dstPath string) error {
@@ -75,18 +72,18 @@ func ExportCommandSet(srcDB *sql.DB, name string, dstPath string) error {
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
 		return fmt.Errorf("create dst dir: %w", err)
 	}
-	db, err := sql.Open("sqlite", dstPath)
+	dstDB, err := sql.Open("sqlite", dstPath)
 	if err != nil {
 		return fmt.Errorf("open dst db: %w", err)
 	}
-	defer db.Close()
+	defer dstDB.Close()
 
-	if _, err := db.Exec(schemaSQL); err != nil {
+	if err := dbpkg.ApplyMigrations(dstDB); err != nil {
 		return fmt.Errorf("apply schema: %w", err)
 	}
 
 	// Insert command set
-	res, err := db.Exec("INSERT INTO command_sets (name, description, created_at, last_run) VALUES (?, ?, ?, ?)", csName, description, createdAt, lastRun)
+	res, err := dstDB.Exec("INSERT INTO command_sets (name, description, created_at, last_run) VALUES (?, ?, ?, ?)", csName, description, createdAt, lastRun)
 	if err != nil {
 		return fmt.Errorf("insert command_set: %w", err)
 	}
@@ -95,7 +92,7 @@ func ExportCommandSet(srcDB *sql.DB, name string, dstPath string) error {
 		return err
 	}
 	for i, c := range cmds {
-		if _, err := db.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", newID, i+1, c); err != nil {
+		if _, err := dstDB.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", newID, i+1, c); err != nil {
 			return fmt.Errorf("insert command: %w", err)
 		}
 	}
