@@ -25,3 +25,8 @@ Thumbs.db
 
 # Go
 *.test
+
+# Python
+/pip/
+/.venv/
+__pycache__/

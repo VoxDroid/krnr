@@ -5,10 +5,13 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
 
-  - repo: https://github.com/golangci/golangci-lint
-    rev: v1.55.2
+  - repo: local
     hooks:
       - id: golangci-lint
+        name: golangci-lint (local wrapper)
+        entry: scripts/lint.sh
+        language: system
+        files: \.go$
 
   - repo: local
     hooks:
