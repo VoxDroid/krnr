@@ -13,7 +13,21 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ---
 
-## Milestones & Tasks 
+## Outstanding / To do (newest at top)
+
+- [ ] Add search/list/tagging operations to the registry (priority: medium)
+- [ ] Implement `editor.go` helper to open the user's editor for editing command sets (priority: low)
+- [ ] Implement `recorder.go` if interactive recording is desired (priority: low)
+- [ ] Add an E2E release test that runs on CI using `PERSONAL_TOKEN` (priority: high)
+- [ ] Add CI job(s) to run tests across multiple OS runners (windows/linux/macos) to catch platform-specific behaviors (priority: medium)
+- [ ] Enforce version consistency: add a check that `internal/version/version.go` matches release commit/title during the release workflow (priority: medium)
+- [ ] Add tests that cover pre-commit lint fallback behavior and Docker fallback in CI (priority: low)
+- [ ] Improve CLI UX: consider `krnr whoami` persistence or opt-in author metadata for saved command sets (priority: low)
+- [ ] Add E2E integration tests that exercise save -> run -> export -> import roundtrip (priority: medium)
+
+---
+
+## Completed / Done (older beneath)
 
 ### 1) Initialize repository & dev environment (completed)
 - [x] Create `go.mod` and minimal package layout (`cmd/`, `internal/`)
@@ -27,7 +41,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Add simple migrations support (`migrations.go`)
 - Acceptance: DB file created at OS path and schema validated by tests
 
-### 3) Registry (CRUD & models) (completed)
+### 3) Registry (CRUD & models)
 - [x] Implement `internal/registry/models.go` and `registry.go` CRUD
 - [ ] Add search/list/tagging operations
 - Acceptance: Unit tests for CRUD operations pass
@@ -38,11 +52,11 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Implement flags/options: `--dry-run`, `--confirm`, `--verbose`
 - Acceptance: Commands execute and stream stdout/stderr properly on Windows and Unix (tests or manual verification)
 
-### 5) CLI commands (Cobra) (completed)
+### 5) CLI commands (Cobra)
 - [x] `cmd/root.go` with base flags and config
 - [x] Implement `save`, `run`, `list`, `describe` commands (basic implementations)
 - [x] Implement `edit`, `delete` commands (basic implementations)
-- [ ] Implement `export`, `import` commands
+- [x] Implement `export`, `import` commands
 - Acceptance: `krnr --help` lists correct commands; each command has basic integration tests
 
 ### 6) Config & paths (completed)
@@ -58,12 +72,13 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 ### 8) Recorder, editor & utilities
 - [ ] `recorder.go` to capture interactive steps (if applicable)
 - [ ] `editor.go` helper to open user editor for editing command sets
-- [ ] `confirm.go` for yes/no confirmations
+- [x] `confirm.go` for yes/no confirmations
 - Acceptance: Editing CLI flows launch editor and persist updates
 
 ### 9) Tests (unit & integration)
-- [ ] Add unit tests for DB, registry, executor, and CLI
-- [ ] Add integration tests that exercise save→run→list flows
+- [x] Add unit tests for DB, registry, executor, and CLI
+- [x] Add integration tests that exercise save→run→list flows
+- [x] Add strict run-flag tests (`--suppress-command`, `--show-stderr`, `--dry-run`, `--verbose`, `--confirm`, `--force`)
 - Acceptance: Tests run locally and pass with `go test ./...`
 
 ### 10) Linting & formatting (completed)
@@ -108,4 +123,4 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ---
 
-_Last updated: 2026-01-06_
+_Last updated: 2026-01-07_
