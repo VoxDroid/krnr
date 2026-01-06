@@ -159,10 +159,22 @@ jobs:
           COMMITISH: ${{ needs.detect.outputs.commit_sha }}
         run: |
           set -euo pipefail
+          if [ -z "${TAG_NAME:-}" ]; then
+            echo "TAG_NAME is empty; skipping release creation." >&2
+            exit 0
+          fi
+          if [ -z "${RELEASE_TOKEN:-}" ]; then
+            echo "RELEASE_TOKEN is empty; cannot create release." >&2
+            exit 1
+          fi
           PAYLOAD=$(jq -n --arg tag "$TAG_NAME" --arg name "$TAG_NAME" --arg body "$BODY" --arg commitish "$COMMITISH" '{ tag_name: $tag, name: $name, body: $body, target_commitish: $commitish }')
           RESP=$(curl -s -X POST -H "Authorization: token ${RELEASE_TOKEN}" -H "Content-Type: application/json" -d "$PAYLOAD" "https://api.github.com/repos/${REPO}/releases")
           echo "$RESP" | jq .
           UPLOAD_URL=$(echo "$RESP" | jq -r .upload_url)
+          if [ -z "${UPLOAD_URL:-}" ] || [ "${UPLOAD_URL}" = "null" ]; then
+            echo "Failed to create release or no upload_url returned." >&2
+            exit 1
+          fi
           echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
 
       - name: Upload assets to release
