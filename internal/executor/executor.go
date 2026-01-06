@@ -15,6 +15,17 @@ type Executor struct {
 	Shell   string // optional override (e.g., "pwsh")
 }
 
+// Runner is an interface for executing commands. It allows tests to inject
+// fake implementations without running real shell commands.
+type Runner interface {
+	Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error
+}
+
+// New returns a Runner backed by the real Executor implementation.
+func New(dry, verbose bool) Runner {
+	return &Executor{DryRun: dry, Verbose: verbose}
+}
+
 // Execute runs the given command string. stdout and stderr are written to the
 // provided writers. If cwd is non-empty, the command runs in that directory.
 func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {

@@ -12,6 +12,7 @@ import (
 var saveCmd = &cobra.Command{
 	Use:   "save <name>",
 	Short: "Save a named command set",
+	Long:  "Save a named command set. Examples:\n  krnr save hello -d 'say hi' -c 'echo Hello' -c 'echo World'",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -40,7 +41,6 @@ var saveCmd = &cobra.Command{
 		return nil
 	},
 }
-
 func init() {
 	saveCmd.Flags().StringP("description", "d", "", "Description for the command set")
 	saveCmd.Flags().StringSliceP("command", "c", []string{}, "Command to add to the set (can be repeated)")

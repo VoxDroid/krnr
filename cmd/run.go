@@ -16,9 +16,14 @@ import (
 	"github.com/VoxDroid/krnr/internal/utils"
 )
 
+var execFactory = func(dry, verbose bool) executor.Runner {
+	return executor.New(dry, verbose)
+}
+
 var runCmd = &cobra.Command{
 	Use:   "run <name>",
 	Short: "Run a named command set",
+	Long:  "Run a named command set. Examples:\n  krnr run hello --confirm\n  krnr run hello --show-stderr --suppress-command",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -26,6 +31,8 @@ var runCmd = &cobra.Command{
 		confirmFlag, _ := cmd.Flags().GetBool("confirm")
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		force, _ := cmd.Flags().GetBool("force")
+		suppress, _ := cmd.Flags().GetBool("suppress-command")
+		showStderr, _ := cmd.Flags().GetBool("show-stderr")
 
 		dbConn, err := db.InitDB()
 		if err != nil {
@@ -49,7 +56,8 @@ var runCmd = &cobra.Command{
 			}
 		}
 
-		e := &executor.Executor{DryRun: dry, Verbose: verbose}
+// Create executor via factory so tests can inject a fake Runner.
+	e := execFactory(dry, verbose)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -58,8 +66,14 @@ var runCmd = &cobra.Command{
 			if err := security.CheckAllowed(c.Command); err != nil && !force {
 				return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", c.Command, err)
 			}
-			fmt.Printf("-> %s\n", c.Command)
-			if err := e.Execute(ctx, c.Command, "", os.Stdout, io.Discard); err != nil {
+			if !suppress {
+				fmt.Printf("-> %s\n", c.Command)
+			}
+			stderr := io.Discard
+			if showStderr {
+				stderr = os.Stderr
+			}
+			if err := e.Execute(ctx, c.Command, "", os.Stdout, stderr); err != nil {
 				return err
 			}
 		}
@@ -73,5 +87,7 @@ func init() {
 	runCmd.Flags().Bool("confirm", false, "Ask for confirmation before running")
 	runCmd.Flags().Bool("verbose", false, "Verbose output (prints dry-run messages)")
 	runCmd.Flags().Bool("force", false, "Override safety checks and force execution")
+	runCmd.Flags().Bool("suppress-command", false, "Suppress printing the written command before execution")
+	runCmd.Flags().Bool("show-stderr", false, "Show command stderr output instead of omitting it")
 	rootCmd.AddCommand(runCmd)
 }

@@ -12,6 +12,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List saved command sets",
+	Long:  "List saved command sets. Example:\n  krnr list",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dbConn, err := db.InitDB()
 		if err != nil {
