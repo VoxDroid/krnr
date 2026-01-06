@@ -55,7 +55,16 @@ pre-commit install
 
 This repository includes a `.pre-commit-config.yaml` that runs basic checks, `gofmt`/`goimports`, and `golangci-lint`.
 
+Linting on Windows (notes)
+
+On Windows you may encounter an error from `golangci-lint` related to incompatible export-data between Go toolchains ("could not load export data", "unsupported version"). If that happens, use the Docker fallback included in this repo:
+
+```bash
+# runs the linter inside a container (no local install required)
+docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose
+```
+
 Continuous Integration
 
-This repository includes a GitHub Actions workflow (`.github/workflows/ci.yml`) which runs on push and pull requests. It performs formatting, linting, unit tests, and produces cross-platform build artifacts for Linux, macOS, and Windows (amd64 and arm64). Artifacts are attached to the workflow run for download.
+This repository includes a GitHub Actions workflow (`.github/workflows/ci.yml`) which runs on push and pull requests. It performs formatting, linting (uses the official golangci-lint action), unit tests, and produces cross-platform build artifacts for Linux, macOS, and Windows (amd64 and arm64). Artifacts are attached to the workflow run for download.
 
