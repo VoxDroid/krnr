@@ -89,10 +89,10 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Document release process in `README.md`
 - Acceptance: Binaries built for all platforms and packaged for releases
 
-### 14) Security & safety
-- [ ] Confirm no background auto-runs; document safety defaults
-- [ ] Add checks to prevent dangerous operations by default
-- Acceptance: Security checklist reviewed and documented
+### 14) Security & safety (completed)
+- [x] Confirm no background auto-runs; document safety defaults
+- [x] Add checks to prevent dangerous operations by default
+- Acceptance: Security checklist reviewed and documented (safety check + docs added)
 
 ### 15) Final polish & release
 - [ ] Versioning, changelog, and tag (semver)

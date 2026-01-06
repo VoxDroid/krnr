@@ -13,6 +13,7 @@ import (
 	"github.com/VoxDroid/krnr/internal/executor"
 	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/utils"
+	"github.com/VoxDroid/krnr/internal/security"
 )
 
 var runCmd = &cobra.Command{
@@ -24,6 +25,7 @@ var runCmd = &cobra.Command{
 		dry, _ := cmd.Flags().GetBool("dry-run")
 		confirmFlag, _ := cmd.Flags().GetBool("confirm")
 		verbose, _ := cmd.Flags().GetBool("verbose")
+		force, _ := cmd.Flags().GetBool("force")
 
 		dbConn, err := db.InitDB()
 		if err != nil {
@@ -52,6 +54,10 @@ var runCmd = &cobra.Command{
 		defer cancel()
 
 		for _, c := range cs.Commands {
+			// Security: check if command is allowed
+			if err := security.CheckAllowed(c.Command); err != nil && !force {
+				return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", c.Command, err)
+			}
 			fmt.Printf("-> %s\n", c.Command)
 			if err := e.Execute(ctx, c.Command, "", os.Stdout, io.Discard); err != nil {
 				return err
@@ -66,5 +72,6 @@ func init() {
 	runCmd.Flags().Bool("dry-run", false, "Do not actually execute commands")
 	runCmd.Flags().Bool("confirm", false, "Ask for confirmation before running")
 	runCmd.Flags().Bool("verbose", false, "Verbose output (prints dry-run messages)")
+	runCmd.Flags().Bool("force", false, "Override safety checks and force execution")
 	rootCmd.AddCommand(runCmd)
 }
