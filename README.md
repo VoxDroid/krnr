@@ -55,3 +55,7 @@ pre-commit install
 
 This repository includes a `.pre-commit-config.yaml` that runs basic checks, `gofmt`/`goimports`, and `golangci-lint`.
 
+Continuous Integration
+
+This repository includes a GitHub Actions workflow (`.github/workflows/ci.yml`) which runs on push and pull requests. It performs formatting, linting, unit tests, and produces cross-platform build artifacts for Linux, macOS, and Windows (amd64 and arm64). Artifacts are attached to the workflow run for download.
+

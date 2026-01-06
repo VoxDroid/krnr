@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+
+      - name: Install tooling
+        run: |
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+
+      - name: Run formatter
+        run: ./scripts/fmt.sh
+
+      - name: Run linters
+        run: ./scripts/lint.sh
+
+      - name: Run tests
+        run: go test ./... -v
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, windows, darwin]
+        arch: [amd64, arm64]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Prepare build artifact path
+        run: |
+          mkdir -p dist
+          if [ "${{ matrix.os }}" = "windows" ]; then ext=".exe"; else ext=""; fi
+          echo "BINARY=dist/krnr-${{ matrix.os }}-${{ matrix.arch }}${ext}" >> $GITHUB_ENV
+
+      - name: Build
+        run: |
+          env GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-s -w" -o "$BINARY" ./...
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: krnr-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.BINARY }}

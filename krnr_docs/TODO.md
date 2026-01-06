@@ -72,10 +72,10 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Add `scripts/lint.sh` and `fmt.sh`
 - Acceptance: Codebase passes linters and format checks
 
-### 11) Pre-commit hooks & CI
-- [ ] Add `.pre-commit-config.yaml` and instructions (`pip install pre-commit`)
-- [ ] Add GitHub Actions workflow for build/test/lint/cross-build
-- Acceptance: Hooks prevent bad commits; CI green for PRs
+### 11) Pre-commit hooks & CI (completed)
+- [x] Add `.pre-commit-config.yaml` and instructions (`pip install pre-commit`)
+- [x] Add GitHub Actions workflow for build/test/lint/cross-build
+- Acceptance: Hooks prevent bad commits; CI runs on PRs and builds artifacts
 
 ### 12) Documentation
 - [ ] `docs/architecture.md` (explain components)
