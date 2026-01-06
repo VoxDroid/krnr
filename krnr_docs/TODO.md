@@ -15,19 +15,19 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ## Milestones & Tasks 
 
-### 1) Initialize repository & dev environment (in-progress)
-- [ ] Create `go.mod` and minimal package layout (`cmd/`, `internal/`)
-- [ ] Add `.gitignore`, `LICENSE`, and base `README.md`
-- [ ] Ensure Go 1.22+ development environment instructions in README
+### 1) Initialize repository & dev environment (completed)
+- [x] Create `go.mod` and minimal package layout (`cmd/`, `internal/`)
+- [x] Add `.gitignore`, `LICENSE`, and base `README.md`
+- [x] Ensure Go 1.22+ development environment instructions in README
 - Acceptance: `go build ./...` succeeds locally on Windows
 
-### 2) Database layer & migrations
-- [ ] Add `internal/db/db.go` with initialization and path discovery
-- [ ] Add `internal/db/schema.sql` with tables from `PROJECT_OVERVIEW.md`
-- [ ] Add simple migrations support (`migrations.go`)
+### 2) Database layer & migrations (completed)
+- [x] Add `internal/db/db.go` with initialization and path discovery
+- [x] Add `internal/db/schema.sql` with tables from `PROJECT_OVERVIEW.md`
+- [x] Add simple migrations support (`migrations.go`)
 - Acceptance: DB file created at OS path and schema validated by tests
 
-### 3) Registry (CRUD & models)
+### 3) Registry (CRUD & models) (in-progress)
 - [ ] Implement `internal/registry/models.go` and `registry.go` CRUD
 - [ ] Add search/list/tagging operations
 - Acceptance: Unit tests for CRUD operations pass
