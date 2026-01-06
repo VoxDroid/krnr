@@ -63,15 +63,23 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
+          # Read version from internal/version/version.go and use it as source of truth
+          FILE_VER=$(perl -ne 'if(/var\s+Version\s*=\s*"([^"]+)"/){print $1; exit}' internal/version/version.go || true)
+          if [ -z "$FILE_VER" ]; then
+            echo "Could not read version from internal/version/version.go; aborting" >&2
+            exit 1
+          fi
+          echo "Using version from version.go: $FILE_VER"
+          VERSION_NO_V="${FILE_VER#v}"
           targets=("linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64" "windows/amd64" "windows/arm64")
           for t in "${targets[@]}"; do
             os=${t%%/*}
             arch=${t##*/}
             ext=""
             if [ "$os" = "windows" ]; then ext=".exe"; fi
-            out="dist/krnr-${os}-${arch}${ext}"
+            out="dist/krnr-${VERSION_NO_V}-${os}-${arch}${ext}"
             echo "Building $out"
-            env GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -ldflags "-X github.com/VoxDroid/krnr/internal/version.Version=${{ needs.check.outputs.version }}" -o "$out" .
+            env GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -ldflags "-X github.com/VoxDroid/krnr/internal/version.Version=${VERSION_NO_V}" -o "$out" .
           done
 
       - name: Require PERSONAL_TOKEN
