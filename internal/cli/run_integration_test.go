@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/VoxDroid/krnr/internal/db"
-	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/executor"
+	"github.com/VoxDroid/krnr/internal/registry"
 )
 
 func TestRunIntegrationDryRun(t *testing.T) {

@@ -75,8 +75,13 @@ A release workflow (`.github/workflows/release.yml`) will run when you push a ta
 To create a local release build (without the workflow), run:
 
 ```bash
+# Option 1: provide version explicitly
 ./scripts/release.sh v0.1.0
+
+# Option 2: bump the root VERSION file and run the script
+# edit VERSION and then:
+./scripts/release.sh
 ```
 
-This will create archives under `dist/`.
+This will create archives under `dist/` which embed the version (from `VERSION` or the provided arg).
 

@@ -12,8 +12,8 @@ var dangerousPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\brm\s+-rf\s+/`),
 	regexp.MustCompile(`(?i)\bmkfs\b`),
 	regexp.MustCompile(`(?i)\bdd\s+if=`),
-	// fork bombs
-	regexp.MustCompile(`\b:\(\)\s*\{`),
+	// fork bombs (e.g. :(){ :|:& };:)
+	regexp.MustCompile(`:\(\)\s*\{`),
 	// package managers removing all packages
 	regexp.MustCompile(`(?i)\bapt\-get\s+remove\s+`),
 	regexp.MustCompile(`(?i)\byum\s+remove\s+`),

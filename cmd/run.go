@@ -12,8 +12,8 @@ import (
 	"github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/executor"
 	"github.com/VoxDroid/krnr/internal/registry"
-	"github.com/VoxDroid/krnr/internal/utils"
 	"github.com/VoxDroid/krnr/internal/security"
+	"github.com/VoxDroid/krnr/internal/utils"
 )
 
 var runCmd = &cobra.Command{

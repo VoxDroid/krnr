@@ -3,9 +3,9 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
-	"io/ioutil"
 
 	"github.com/spf13/cobra"
 

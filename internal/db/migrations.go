@@ -2,9 +2,9 @@ package db
 
 import (
 	"database/sql"
+	_ "embed"
 	"fmt"
 	_ "modernc.org/sqlite"
-	_ "embed"
 )
 
 //go:embed schema.sql

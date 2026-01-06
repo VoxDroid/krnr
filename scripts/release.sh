@@ -33,7 +33,8 @@ for t in "${TARGETS[@]}"; do
   OUT_PATH="$DISTDIR/${BIN_NAME}${EXT}"
 
   echo "Building $OUT_PATH"
-  env GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags "-s -w -X main.version=${VERSION}" -o "$OUT_PATH" .
+  # Embed version into binary
+  env GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags "-s -w -X github.com/VoxDroid/krnr/internal/version.Version=${VERSION}" -o "$OUT_PATH" .
 
   # Package
   if [ "$GOOS" = "windows" ]; then

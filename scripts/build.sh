@@ -7,5 +7,7 @@ set -euo pipefail
 for target in "$@"; do
   IFS='/' read -r GOOS GOARCH <<< "$target"
   echo "Building for $GOOS/$GOARCH"
-  env GOOS=$GOOS GOARCH=$GOARCH go build -o "dist/krnr-$GOOS-$GOARCH" ./...
+  # read version from VERSION file or use dev placeholder
+  VERSION=$(cat VERSION 2>/dev/null || echo "v0.0.0-dev")
+  env GOOS=$GOOS GOARCH=$GOARCH go build -ldflags "-s -w -X github.com/VoxDroid/krnr/internal/version.Version=${VERSION}" -o "dist/krnr-$GOOS-$GOARCH" .
 done

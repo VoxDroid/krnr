@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -18,23 +19,58 @@ jobs:
       - name: Make scripts executable
         run: chmod +x ./scripts/*.sh
 
+      - name: Verify VERSION matches tag
+        id: verify_version
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          STRIPPED_TAG="${TAG_NAME#v}"
+          FILE_VERSION=$(cat VERSION 2>/dev/null || echo "")
+          FILE_STRIPPED="${FILE_VERSION#v}"
+          echo "Tag: $TAG_NAME (stripped: $STRIPPED_TAG)"
+          echo "VERSION file: $FILE_VERSION (stripped: $FILE_STRIPPED)"
+          if [ "$FILE_STRIPPED" != "$STRIPPED_TAG" ]; then
+            echo "VERSION mismatch: tag $TAG_NAME vs VERSION file $FILE_VERSION"
+            exit 1
+          fi
+
       - name: Run release script
         env:
           VERSION: ${{ github.ref_name }}
         run: |
           bash ./scripts/release.sh "${{ github.ref_name }}"
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
+      - name: Create GitHub release (uses PERSONAL_TOKEN if set, else GITHUB_TOKEN)
+        id: create_release
         env:
+          RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG_NAME: ${{ github.ref_name }}
+          COMMIT_TITLE: "$(git log -1 --pretty=%s ${{ github.sha }})"
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            RELEASE_TOKEN="$GITHUB_TOKEN"
+          fi
+          echo "Using token owner to create release"
+          PAYLOAD=$(jq -n --arg tag "$TAG_NAME" --arg name "$TAG_NAME" --arg body "$COMMIT_TITLE" '{ tag_name: $tag, name: $name, body: $body }')
+          RESP=$(curl -s -X POST -H "Authorization: token $RELEASE_TOKEN" -H "Content-Type: application/json" -d "$PAYLOAD" "https://api.github.com/repos/$REPO/releases")
+          UPLOAD_URL=$(echo "$RESP" | jq -r .upload_url)
+          RELEASE_ID=$(echo "$RESP" | jq -r .id)
+          echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
+          echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
 
       - name: Upload artifacts to release
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.release.outputs.upload_url }}
-          asset_path: dist
-          asset_name: dist
-          asset_content_type: application/zip
+        env:
+          RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPLOAD_URL: ${{ steps.create_release.outputs.upload_url }}
+        run: |
+          if [ -z "$RELEASE_TOKEN" ]; then
+            RELEASE_TOKEN="$GITHUB_TOKEN"
+          fi
+          BASE_URL="${UPLOAD_URL%\{*}"
+          for f in dist/*; do
+            fname=$(basename "$f")
+            echo "Uploading $fname"
+            curl -s -X POST -H "Authorization: token $RELEASE_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$f" "$BASE_URL?name=$fname"
+          done
