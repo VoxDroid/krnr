@@ -1,0 +1,65 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"io"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/drei/krnr/internal/db"
+	"github.com/drei/krnr/internal/registry"
+	"github.com/drei/krnr/internal/executor"
+)
+
+func TestRunIntegrationDryRun(t *testing.T) {
+	// Set HOME to tempdir so DB is isolated
+	tmp := t.TempDir()
+	os.Setenv("HOME", tmp)
+	os.Setenv("USERPROFILE", tmp)
+
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer dbConn.Close()
+
+	r := registry.NewRepository(dbConn)
+	desc := "integration"
+	id, err := r.CreateCommandSet("int-set", &desc)
+	if err != nil {
+		t.Fatalf("CreateCommandSet: %v", err)
+	}
+	if _, err := r.AddCommand(id, 1, "echo one"); err != nil {
+		t.Fatalf("AddCommand: %v", err)
+	}
+	if _, err := r.AddCommand(id, 2, "echo two"); err != nil {
+		t.Fatalf("AddCommand: %v", err)
+	}
+
+	// Run with dry-run and capture output
+	var out bytes.Buffer
+	var errb bytes.Buffer
+	e := &executor.Executor{DryRun: true, Verbose: true}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cs, err := r.GetCommandSetByName("int-set")
+	if err != nil {
+		t.Fatalf("GetCommandSetByName: %v", err)
+	}
+
+	for _, c := range cs.Commands {
+		if err := e.Execute(ctx, c.Command, "", &out, &errb); err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+	}
+
+	if out.Len() == 0 {
+		t.Fatalf("expected output from dry-run, got empty")
+	}
+	if errb.Len() != 0 {
+		t.Fatalf("expected no stderr for dry-run, got: %q", errb.String())
+	}
+}
