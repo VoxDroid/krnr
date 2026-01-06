@@ -10,3 +10,6 @@ All notable changes to this project will be documented in this file.
 - Database, registry, executor, CLI commands, importer/exporter
 - CI, linting, formatting, and release automation
 - Security safety checks and docs
+
+- Tests: added strict unit tests for `run` flags (`--suppress-command`, `--show-stderr`, `--dry-run`, `--verbose`, `--confirm`, `--force`) and improved executor testability via an injectable `executor.Runner` interface.
+- CI: tests run under the `test` job on all pushes and PRs (ensures new behavior is validated in CI).
