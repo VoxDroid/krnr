@@ -33,16 +33,18 @@ jobs:
           echo "GOCACHE: $GOCACHE"
 
       - name: Cache Go modules
+        id: go-cache
         uses: actions/cache@v4
+        continue-on-error: true
         with:
           # Use setup-go populated environment variables to avoid GOPATH/GOMODCACHE mismatch
           path: |
             ${{ env.GOCACHE }}
             ${{ env.GOMODCACHE }}
-          # Include Go version in the key to avoid cross-toolchain cache corruption
-          key: ${{ runner.os }}-go-1.22-${{ hashFiles('**/go.sum') }}
+          # Include Go version and job name to avoid cross-job cache reuse
+          key: ${{ runner.os }}-go-1.22-${{ github.job }}-v2-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-1.22-
+            ${{ runner.os }}-go-1.22-${{ github.job }}-
 
       - name: Install tooling
         run: |
@@ -73,6 +75,23 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.22'
+
+      - name: Export Go cache paths to environment
+        run: |
+          echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
+          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
+
+      - name: Cache Go modules (matrix-specific)
+        id: go-cache
+        uses: actions/cache@v4
+        continue-on-error: true
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-v2-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-v2-
 
       - name: Prepare build artifact path
         run: |
