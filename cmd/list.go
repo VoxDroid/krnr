@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/drei/krnr/internal/db"
-	"github.com/drei/krnr/internal/registry"
+	"github.com/VoxDroid/krnr/internal/db"
+	"github.com/VoxDroid/krnr/internal/registry"
 )
 
 var listCmd = &cobra.Command{

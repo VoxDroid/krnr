@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drei/krnr/internal/db"
-	"github.com/drei/krnr/internal/registry"
-	"github.com/drei/krnr/internal/executor"
+	"github.com/VoxDroid/krnr/internal/db"
+	"github.com/VoxDroid/krnr/internal/registry"
+	"github.com/VoxDroid/krnr/internal/executor"
 )
 
 func TestRunIntegrationDryRun(t *testing.T) {

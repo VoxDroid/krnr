@@ -1,3 +1,3 @@
-module github.com/drei/krnr
+module github.com/VoxDroid/krnr
 
 go 1.22

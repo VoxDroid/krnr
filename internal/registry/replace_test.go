@@ -3,7 +3,7 @@ package registry
 import (
 	"testing"
 
-	"github.com/drei/krnr/internal/db"
+	"github.com/VoxDroid/krnr/internal/db"
 )
 
 func TestReplaceCommands(t *testing.T) {

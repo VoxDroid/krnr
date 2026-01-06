@@ -8,7 +8,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/drei/krnr/internal/config"
+	"github.com/VoxDroid/krnr/internal/config"
 )
 
 // InitDB ensures the data directory exists, opens the SQLite database, and

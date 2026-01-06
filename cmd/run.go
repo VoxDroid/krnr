@@ -9,10 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/drei/krnr/internal/db"
-	"github.com/drei/krnr/internal/executor"
-	"github.com/drei/krnr/internal/registry"
-	"github.com/drei/krnr/internal/utils"
+	"github.com/VoxDroid/krnr/internal/db"
+	"github.com/VoxDroid/krnr/internal/executor"
+	"github.com/VoxDroid/krnr/internal/registry"
+	"github.com/VoxDroid/krnr/internal/utils"
 )
 
 var runCmd = &cobra.Command{
