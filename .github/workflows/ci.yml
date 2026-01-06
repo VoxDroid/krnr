@@ -30,11 +30,14 @@ jobs:
           go install golang.org/x/tools/cmd/goimports@latest
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
 
+      - name: Make scripts executable
+        run: chmod +x ./scripts/*.sh
+
       - name: Run formatter
-        run: ./scripts/fmt.sh
+        run: bash ./scripts/fmt.sh
 
       - name: Run linters
-        run: ./scripts/lint.sh
+        run: bash ./scripts/lint.sh
 
       - name: Run tests
         run: go test ./... -v
@@ -61,7 +64,7 @@ jobs:
 
       - name: Build
         run: |
-          env GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-s -w" -o "$BINARY" ./...
+          env GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-s -w" -o "$BINARY" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
