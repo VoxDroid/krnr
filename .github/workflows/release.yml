@@ -1,24 +1,102 @@
-name: Release
+name: Auto Commit-Tagged Release
 
-# Ensure workflow has rights to create releases via the GITHUB_TOKEN when used
 permissions:
   contents: write
 
 on:
   push:
-    tags:
-      - 'v*'
-  release:
-    types: [created]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to release (e.g., v0.1.0)'
-        required: false
+    branches: [ main, master ]
 
 jobs:
-  package:
+  detect:
+    name: Detect version commit
     runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.detect.outputs.tag_name }}
+      release_body: ${{ steps.detect.outputs.release_body }}
+      commit_sha: ${{ steps.detect.outputs.commit_sha }}
+    steps:
+      - name: Detect version-style commit message
+        id: detect
+        run: |
+          set -euo pipefail
+          TAG=""
+          BODY=""
+          SHA=""
+
+          if [ -f "$GITHUB_EVENT_PATH" ] && command -v jq >/dev/null 2>&1; then
+            match=$(jq -r '.commits[] | select(.message|test("v?[0-9]+\\.[0-9]+\\.[0-9]+")) | (.message + "::" + .id)' "$GITHUB_EVENT_PATH" | head -n1 || true)
+          else
+            match=""
+          fi
+
+          if [ -z "$match" ]; then
+            match=$(git --no-pager log -n 20 --pretty=format:%s::%H | grep -E 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+          fi
+
+          if [ -z "$match" ]; then
+            echo "No version-style commit message found in this push. Skipping release." >&2
+            echo "tag_name=" >> $GITHUB_OUTPUT
+            echo "release_body=" >> $GITHUB_OUTPUT
+            echo "commit_sha=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          BODY=$(echo "$match" | cut -d'::' -f1)
+          SHA=$(echo "$match" | cut -d'::' -f2)
+          VER=$(echo "$BODY" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+
+          if [ -z "$VER" ]; then
+            echo "Could not parse version from commit message: $BODY" >&2
+            echo "tag_name=" >> $GITHUB_OUTPUT
+            echo "release_body=" >> $GITHUB_OUTPUT
+            echo "commit_sha=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [[ "$VER" != v* ]]; then
+            VER="v$VER"
+          fi
+
+          RAW_VERSION=$(cat VERSION 2>/dev/null || echo "")
+          FILE_VERSION=""
+          if command -v jq >/dev/null 2>&1; then
+            FILE_VERSION=$(jq -r '.version // .Version // empty' VERSION 2>/dev/null || true)
+          fi
+          if [ -z "$FILE_VERSION" ]; then
+            FILE_VERSION=$(echo "$RAW_VERSION" | sed -n 's/.*version[[:space:]]*[:=][[:space:]]*["'\''']\{0,1\}\(v\?[0-9]\+\.[0-9]\+\.[0-9]\+[^"]*\)["'\''']\{0,1\}.*/\1/ip' | head -n1 || true)
+          fi
+          if [ -z "$FILE_VERSION" ]; then
+            FILE_VERSION=$(echo "$RAW_VERSION" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
+          fi
+
+          if [ -z "$FILE_VERSION" ]; then
+            echo "Could not extract semver from VERSION file; file content was:" >&2
+            echo "${RAW_VERSION}" >&2
+            exit 1
+          fi
+
+          N1=${VER#v}
+          N2=${FILE_VERSION#v}
+          if [ "$N1" != "$N2" ]; then
+            echo "VERSION mismatch: commit indicated $VER but VERSION file contains $FILE_VERSION" >&2
+            exit 1
+          fi
+
+          echo "Found version $VER in commit message (sha $SHA)"
+          echo "tag_name=$VER" >> $GITHUB_OUTPUT
+          echo "release_body=$BODY" >> $GITHUB_OUTPUT
+          echo "commit_sha=$SHA" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build binaries
+    needs: detect
+    if: needs.detect.outputs.tag_name != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,127 +107,90 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Make scripts executable
-        run: chmod +x ./scripts/*.sh
+      - name: Prepare dist dir
+        run: mkdir -p dist
 
-      - name: Verify VERSION matches tag (or detect version commit)
-        id: verify_version
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
         run: |
           set -euo pipefail
+          ext=""
+          if [ "${{ matrix.os }}" = "windows" ]; then ext=".exe"; fi
+          out="dist/krnr-${{ matrix.os }}-${{ matrix.arch }}${ext}"
+          echo "Building $out"
+          go build -ldflags "-X github.com/VoxDroid/krnr/internal/version.Version=${{ needs.detect.outputs.tag_name }}" -o "$out" .
 
-          # 1) Resolve TAG_NAME depending on event
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TAG_NAME="${{ github.event.release.tag_name }}"
-          elif [ -n "${{ github.event.inputs.tag || '' }}" ]; then
-            TAG_NAME="${{ github.event.inputs.tag }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            TAG_NAME=""
-            echo "Scanning commits for version tag pattern..."
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: krnr-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/krnr-${{ matrix.os }}-${{ matrix.arch }}*
 
-            # Prefer using the event payload (no external network required)
-            if [ -f "$GITHUB_EVENT_PATH" ] && command -v jq >/dev/null 2>&1; then
-              TAG_NAME=$(jq -r '.commits[]?.message' "$GITHUB_EVENT_PATH" 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
-            fi
-
-            # Fallback: search last 10 commit messages from git
-            if [ -z "$TAG_NAME" ]; then
-              TAG_NAME=$(git --no-pager log -n 10 --pretty=format:%s | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || true)
-            fi
-
-            if [ -z "$TAG_NAME" ]; then
-              echo "No version-style commit message found in this push. Skipping release." >&2
-              # export empty tag_name so downstream steps can check
-              echo "tag_name=" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-
-            # ensure it starts with v
-            if [[ "$TAG_NAME" != v* ]]; then
-              TAG_NAME="v$TAG_NAME"
-            fi
-          else
-            TAG_NAME="${{ github.ref_name }}"
-          fi
-
-          STRIPPED_TAG="${TAG_NAME#v}"
-
-          # Read raw VERSION content (for comparison)
-          RAW_VERSION=$(cat VERSION 2>/dev/null || echo "")
-          echo "Raw VERSION file content:" >&2
-          echo "${RAW_VERSION}" >&2
-
-          # Try to extract a semver from common formats (JSON/TOML/YAML/plain)
-          FILE_VERSION=""
-          if command -v jq >/dev/null 2>&1; then
-            FILE_VERSION=$(jq -r '.version // .Version // empty' VERSION 2>/dev/null || true)
-          fi
-          if [ -z "$FILE_VERSION" ]; then
-            FILE_VERSION=$(echo "$RAW_VERSION" | sed -n 's/.*version[[:space:]]*[:=][[:space:]]*["'\''']\{0,1\}\(v\?[0-9]\+\.[0-9]\+\.[0-9]\+[^"]*\)["'\''']\{0,1\}.*/\1/ip' | head -n1 || true)
-          fi
-          if [ -z "$FILE_VERSION" ]; then
-            FILE_VERSION=$(echo "$RAW_VERSION" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+([\-\+\.0-9A-Za-z_]*)' | head -n1 || true)
-          fi
-
-          if [ -z "$FILE_VERSION" ]; then
-            echo "Could not extract semver from VERSION file; file content was:" >&2
-            echo "${RAW_VERSION}" >&2
-            exit 1
-          fi
-
-          FILE_STRIPPED="${FILE_VERSION#v}"
-          echo "Detected tag: $TAG_NAME (stripped: $STRIPPED_TAG)"
-          echo "VERSION file: $FILE_VERSION (stripped: $FILE_STRIPPED)"
-
-          if [ "$FILE_STRIPPED" != "$STRIPPED_TAG" ]; then
-            echo "VERSION mismatch: tag $TAG_NAME vs VERSION file $FILE_VERSION"
-            exit 1
-          fi
-
-          # Export tag for later steps
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Run release script
-        if: ${{ steps.verify_version.outputs.tag_name != '' }}
-        env:
-          VERSION: ${{ steps.verify_version.outputs.tag_name }}
+  release:
+    name: Create release and upload artifacts
+    needs: build
+    if: needs.detect.outputs.tag_name != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install jq (for JSON handling)
         run: |
-          bash ./scripts/release.sh "${{ steps.verify_version.outputs.tag_name }}"
+          sudo apt-get update -y && sudo apt-get install -y jq
 
-      - name: Create GitHub release (uses PERSONAL_TOKEN if set, else GITHUB_TOKEN)
-        if: ${{ steps.verify_version.outputs.tag_name != '' }}
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Require PERSONAL_TOKEN
+        run: |
+          if [ -z "${{ secrets.PERSONAL_TOKEN }}" ]; then
+            echo "PERSONAL_TOKEN secret is required to create a release under your account. Add it to repository secrets and re-run." >&2
+            exit 1
+          fi
+
+      - name: Create annotated git tag and push
+        env:
+          RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          TAG_NAME: ${{ needs.detect.outputs.tag_name }}
+          TARGET_SHA: ${{ needs.detect.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          git config user.email "78334105+VoxDroid@users.noreply.github.com"
+          git config user.name "VoxDroid"
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME" "$TARGET_SHA" || echo "Tag creation failed (maybe already exists)"
+          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${{ github.repository }}.git" "refs/tags/$TAG_NAME" || echo "Tag push failed (maybe already exists)"
+
+      - name: Create GitHub release
         id: create_release
         env:
           RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          TAG_NAME: ${{ steps.verify_version.outputs.tag_name }}
-          COMMIT_TITLE: "$(git log -1 --pretty=%s ${{ github.sha }})"
-          COMMITISH: ${{ github.sha }}
+          TAG_NAME: ${{ needs.detect.outputs.tag_name }}
+          BODY: ${{ needs.detect.outputs.release_body }}
+          COMMITISH: ${{ needs.detect.outputs.commit_sha }}
         run: |
-          if [ -z "$RELEASE_TOKEN" ]; then
-            RELEASE_TOKEN="$GITHUB_TOKEN"
-          fi
-          echo "Using token owner to create release"
-          PAYLOAD=$(jq -n --arg tag "$TAG_NAME" --arg name "$TAG_NAME" --arg body "$COMMIT_TITLE" --arg commitish "$COMMITISH" '{ tag_name: $tag, name: $name, body: $body, target_commitish: $commitish }')
-          RESP=$(curl -s -X POST -H "Authorization: token $RELEASE_TOKEN" -H "Content-Type: application/json" -d "$PAYLOAD" "https://api.github.com/repos/$REPO/releases")
+          set -euo pipefail
+          PAYLOAD=$(jq -n --arg tag "$TAG_NAME" --arg name "$TAG_NAME" --arg body "$BODY" --arg commitish "$COMMITISH" '{ tag_name: $tag, name: $name, body: $body, target_commitish: $commitish }')
+          RESP=$(curl -s -X POST -H "Authorization: token ${RELEASE_TOKEN}" -H "Content-Type: application/json" -d "$PAYLOAD" "https://api.github.com/repos/${REPO}/releases")
+          echo "$RESP" | jq .
           UPLOAD_URL=$(echo "$RESP" | jq -r .upload_url)
-          RELEASE_ID=$(echo "$RESP" | jq -r .id)
           echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
-          echo "release_id=$RELEASE_ID" >> $GITHUB_OUTPUT
 
-      - name: Upload artifacts to release
-        if: ${{ steps.verify_version.outputs.tag_name != '' }}
+      - name: Upload assets to release
         env:
           RELEASE_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPLOAD_URL: ${{ steps.create_release.outputs.upload_url }}
         run: |
-          if [ -z "$RELEASE_TOKEN" ]; then
-            RELEASE_TOKEN="$GITHUB_TOKEN"
-          fi
+          set -euo pipefail
           BASE_URL="${UPLOAD_URL%\{*}"
           for f in dist/*; do
-            fname=$(basename "$f")
-            echo "Uploading $fname"
-            curl -s -X POST -H "Authorization: token $RELEASE_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @"$f" "$BASE_URL?name=$fname"
+            foo="$f"
+            if [ -f "$foo" ]; then
+              fname=$(basename "$foo")
+              echo "Uploading $fname"
+              curl -s -X POST -H "Authorization: token ${RELEASE_TOKEN}" -H "Content-Type: application/octet-stream" --data-binary @"$foo" "${BASE_URL}?name=$fname"
+            fi
           done
