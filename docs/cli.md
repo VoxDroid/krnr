@@ -40,6 +40,11 @@ Interactive edit details:
 - Blank lines and lines beginning with `#` are ignored when saving (use `#` for comments).
 - The `EDITOR` environment variable is respected; if unset, a sensible platform default is used (`notepad` on Windows, `vi` on Unix).
 
+## record
+
+`krnr record <name> [-d "description"]`
+
+Record commands from standard input into a new command set. After running the command, type commands one per line and finish with EOF (Ctrl-D on Unix, Ctrl-Z on Windows). Blank lines and lines beginning with `#` are ignored. The recorded commands will be saved as a new command set named `<name>`.
 ## delete
 
 `krnr delete <name> [--confirm]`

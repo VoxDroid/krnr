@@ -20,6 +20,7 @@ krnr (Kernel Runner) is designed as a small, modular Go application with clear s
 
 - Utilities (`internal/utils`)
   - Editor opener (`OpenEditor`) that respects `$EDITOR` and provides sensible fallbacks. The editor helper is testable by setting `EDITOR` to a script during tests.
+  - Recorder (`internal/recorder`) — small helper to record commands from stdin and save them into the registry. Useful for interactive capture of multi-line workflows.
   - Confirmation helper for interactive flows.
 
 - Importer & Exporter (`internal/importer`, `internal/exporter`)
