@@ -31,13 +31,3 @@ jobs:
           name: e2e-release-dist
           path: dist/**
 
-      - name: Optionally publish draft release using PERSONAL_TOKEN
-        if: env.PERSONAL_TOKEN != ''
-        run: |
-          echo "PERSONAL_TOKEN detected — creating draft release (attach dist files)"
-          sudo snap install gh --classic || true
-          echo "(logging in with token)"
-          echo "$PERSONAL_TOKEN" | gh auth login --with-token
-          gh release create v0.0.0-e2e --draft --title "E2E test release" --notes "E2E release test run by CI" dist/* || true
-        env:
-          PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
