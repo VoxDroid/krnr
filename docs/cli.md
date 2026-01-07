@@ -32,7 +32,13 @@ prompt interactively before running.
 
 `krnr edit <name> [-c "cmd" ...]`
 
-Edit a command set. Use `-c` multiple times to replace commands non-interactively; if no `-c` is provided the user's editor (from `$EDITOR`) will be opened to edit the command list.
+Edit a command set. Use `-c` multiple times to replace commands non-interactively; if no `-c` is provided the user's editor (from `$EDITOR`) will be opened to edit the command list interactively.
+
+Interactive edit details:
+
+- The editor will be pre-populated with the command set, one command per line.
+- Blank lines and lines beginning with `#` are ignored when saving (use `#` for comments).
+- The `EDITOR` environment variable is respected; if unset, a sensible platform default is used (`notepad` on Windows, `vi` on Unix).
 
 ## delete
 

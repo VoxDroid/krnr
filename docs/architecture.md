@@ -19,7 +19,7 @@ krnr (Kernel Runner) is designed as a small, modular Go application with clear s
   - Streams stdout/stderr through caller-provided writers so the CLI can forward or capture output.
 
 - Utilities (`internal/utils`)
-  - Editor opener (`OpenEditor`) that respects `$EDITOR` and provides sensible fallbacks.
+  - Editor opener (`OpenEditor`) that respects `$EDITOR` and provides sensible fallbacks. The editor helper is testable by setting `EDITOR` to a script during tests.
   - Confirmation helper for interactive flows.
 
 - Importer & Exporter (`internal/importer`, `internal/exporter`)

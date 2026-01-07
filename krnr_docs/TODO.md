@@ -16,7 +16,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 ## Outstanding / To do (newest at top)
 
 - [x] Add search/list/tagging operations to the registry (priority: medium) — implemented in `internal/registry` with tests and docs.
-- [ ] Implement `editor.go` helper to open the user's editor for editing command sets (priority: low)
+- [x] Implement `editor.go` helper to open the user's editor for editing command sets (priority: low) — added unit/integration tests and docs.
 - [ ] Implement `recorder.go` if interactive recording is desired (priority: low)
 - [ ] Add an E2E release test that runs on CI using `PERSONAL_TOKEN` (priority: high)
 - [ ] Add CI job(s) to run tests across multiple OS runners (windows/linux/macos) to catch platform-specific behaviors (priority: medium)
