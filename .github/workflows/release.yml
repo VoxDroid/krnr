@@ -44,6 +44,25 @@ jobs:
             echo "commit_sha=" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Verify version consistency
+        if: ${{ steps.decide.outputs.publish == 'true' }}
+        id: verify_version
+        run: |
+          # read version from internal/version/version.go
+          FILE_VER=$(perl -ne 'if(/var\s+Version\s*=\s*"([^"]+)"/){print $1; exit}' internal/version/version.go || true)
+          if [ -z "$FILE_VER" ]; then
+            echo "Could not read version from internal/version/version.go; aborting" >&2
+            exit 1
+          fi
+          # normalize expected version from commit message
+          EXP_VER="${{ steps.decide.outputs.version }}"
+          if [[ $EXP_VER != v* ]]; then EXP_VER="v$EXP_VER"; fi
+          if [[ "$FILE_VER" != "$EXP_VER" ]]; then
+            echo "Version mismatch: commit message version is $EXP_VER but internal/version/version.go contains $FILE_VER" >&2
+            exit 1
+          fi
+          echo "Version consistency check passed: $FILE_VER"
+
   build-and-publish:
     name: Build and publish
     needs: check

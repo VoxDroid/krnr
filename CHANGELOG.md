@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
   - The workflow uploads `dist/` as a workflow artifact for inspection by maintainers.
 
 - CI: add a `test-matrix` job to run `go test ./...` on Ubuntu, macOS, and Windows runners to catch platform-specific failures and improve coverage.
+
+- Release workflow: enforce version consistency by verifying that the version found in the release commit message matches `internal/version/version.go`; the workflow will fail if they do not match.
 ## v0.1.0 - 2026-01-06
 
 - Initial release: core features (save, run, list, describe, edit, delete), database, registry, executor, CLI, importer/exporter, CI, linting, release automation, and security checks.
