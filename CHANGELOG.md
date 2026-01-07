@@ -16,9 +16,10 @@ All notable changes to this project will be documented in this file.
 
 - Add E2E release test and CI workflow:
   - Add `internal/release/release_test.go` which runs `scripts/release.sh` in a sandbox and verifies artifacts and checksums are created.
-  - Add `.github/workflows/e2e-release.yml` (manual `workflow_dispatch`) to run the E2E build and optionally publish a draft GitHub Release when `PERSONAL_TOKEN` secret is provided.
+  - Add `.github/workflows/e2e-release.yml` (manual `workflow_dispatch`) to run the E2E build.
   - The workflow uploads `dist/` as a workflow artifact for inspection by maintainers.
 
+- CI: add a `test-matrix` job to run `go test ./...` on Ubuntu, macOS, and Windows runners to catch platform-specific failures and improve coverage.
 ## v0.1.0 - 2026-01-06
 
 - Initial release: core features (save, run, list, describe, edit, delete), database, registry, executor, CLI, importer/exporter, CI, linting, release automation, and security checks.

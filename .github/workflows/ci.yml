@@ -70,6 +70,57 @@ jobs:
       - name: Run tests
         run: go test ./... -v
 
+  # Run tests across multiple operating systems to catch platform-specific issues
+  test-matrix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Export Go cache paths to environment
+        run: |
+          echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
+          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
+
+      - name: Cache Go build cache (matrix-specific)
+        id: go-cache
+        uses: actions/cache@v4
+        continue-on-error: true
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-1.22-${{ matrix.os }}-gocache-v3-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-1.22-${{ matrix.os }}-gocache-v3-
+
+      - name: Populate Go module cache
+        run: |
+          echo "Running 'go mod download' to populate module cache in a fresh runner"
+          go mod download
+
+      - name: Make scripts executable (unix only)
+        if: matrix.os != 'windows-latest'
+        run: chmod +x ./scripts/*.sh
+
+      - name: Run formatter (unix only)
+        if: matrix.os != 'windows-latest'
+        run: bash ./scripts/fmt.sh
+
+      - name: Run linters (unix only; Docker fallback inside script)
+        if: matrix.os != 'windows-latest'
+        run: bash ./scripts/lint.sh
+
+      - name: Run tests
+        run: go test ./... -v
+
   build:
     runs-on: ubuntu-latest
     strategy:
