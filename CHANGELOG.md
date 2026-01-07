@@ -14,6 +14,11 @@ All notable changes to this project will be documented in this file.
   - Add `krnr record <name>` CLI command to record commands from stdin and persist them as a named command set.
   - Add unit test for `RecordCommands` and integration test for `krnr record`.
 
+- Add E2E release test and CI workflow:
+  - Add `internal/release/release_test.go` which runs `scripts/release.sh` in a sandbox and verifies artifacts and checksums are created.
+  - Add `.github/workflows/e2e-release.yml` (manual `workflow_dispatch`) to run the E2E build and optionally publish a draft GitHub Release when `PERSONAL_TOKEN` secret is provided.
+  - The workflow uploads `dist/` as a workflow artifact for inspection by maintainers.
+
 ## v0.1.0 - 2026-01-06
 
 - Initial release: core features (save, run, list, describe, edit, delete), database, registry, executor, CLI, importer/exporter, CI, linting, release automation, and security checks.

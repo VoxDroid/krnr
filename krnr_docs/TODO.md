@@ -18,7 +18,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Add search/list/tagging operations to the registry (priority: medium) — implemented in `internal/registry` with tests and docs.
 - [x] Implement `editor.go` helper to open the user's editor for editing command sets (priority: low) — added unit/integration tests and docs.
 - [x] Implement `recorder.go` if interactive recording is desired (priority: low) — implemented `internal/recorder`, added `krnr record` CLI, tests and docs.
-- [ ] Add an E2E release test that runs on CI using `PERSONAL_TOKEN` (priority: high)
+- [x] Add an E2E release test that runs on CI using `PERSONAL_TOKEN` (priority: high) — added `internal/release/release_test.go` and `.github/workflows/e2e-release.yml` (manual dispatch).
 - [ ] Add CI job(s) to run tests across multiple OS runners (windows/linux/macos) to catch platform-specific behaviors (priority: medium)
 - [ ] Enforce version consistency: add a check that `internal/version/version.go` matches release commit/title during the release workflow (priority: medium)
 - [ ] Add tests that cover pre-commit lint fallback behavior and Docker fallback in CI (priority: low)

@@ -1,0 +1,43 @@
+name: E2E Release Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e-release:
+    runs-on: ubuntu-latest
+    env:
+      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Run unit tests
+        run: go test ./... -v
+
+      - name: Run release script (E2E build)
+        run: |
+          bash ./scripts/release.sh v0.0.0-e2e linux/amd64 windows/amd64
+
+      - name: Upload artifacts as workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-release-dist
+          path: dist/**
+
+      - name: Optionally publish draft release using PERSONAL_TOKEN
+        if: env.PERSONAL_TOKEN != ''
+        run: |
+          echo "PERSONAL_TOKEN detected — creating draft release (attach dist files)"
+          sudo snap install gh --classic || true
+          echo "(logging in with token)"
+          echo "$PERSONAL_TOKEN" | gh auth login --with-token
+          gh release create v0.0.0-e2e --draft --title "E2E test release" --notes "E2E release test run by CI" dist/* || true
+        env:
+          PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
