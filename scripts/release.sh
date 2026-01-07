@@ -48,9 +48,21 @@ for t in "${TARGETS[@]}"; do
   fi
 done
 
-# Generate checksums
+# Generate checksums (include only existing archives)
 pushd "$DISTDIR" > /dev/null
-shasum -a 256 *.{tar.gz,zip} > "krnr-${VERSION}-SHA256SUMS"
+# collect existing artifacts (works correctly when one of the globs is missing)
+files=( *.tar.gz *.zip )
+existing=()
+for f in "${files[@]}"; do
+  if [ -e "$f" ]; then
+    existing+=("$f")
+  fi
+done
+if [ ${#existing[@]} -eq 0 ]; then
+  echo "No release artifacts to checksum"
+else
+  shasum -a 256 "${existing[@]}" > "krnr-${VERSION}-SHA256SUMS"
+fi
 popd > /dev/null
 
 echo "Release artifacts generated in $DISTDIR"
