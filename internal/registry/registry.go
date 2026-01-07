@@ -69,8 +69,13 @@ func (r *Repository) GetCommandSetByName(name string) (*CommandSet, error) {
 		}
 		cs.Commands = append(cs.Commands, c)
 	}
+
+	if err := r.attachTags(&cs); err != nil {
+		return nil, err
+	}
+
 	return &cs, nil
-}
+} 
 
 // ListCommandSets returns all command sets (without their commands).
 func (r *Repository) ListCommandSets() ([]CommandSet, error) {
@@ -86,10 +91,13 @@ func (r *Repository) ListCommandSets() ([]CommandSet, error) {
 		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.CreatedAt, &cs.LastRun); err != nil {
 			return nil, err
 		}
+		if err := r.attachTags(&cs); err != nil {
+			return nil, err
+		}
 		out = append(out, cs)
 	}
 	return out, nil
-}
+} 
 
 // DeleteCommandSet removes a command set and its commands by name.
 func (r *Repository) DeleteCommandSet(name string) error {
@@ -136,4 +144,136 @@ func (r *Repository) ReplaceCommands(commandSetID int64, commands []string) erro
 		}
 	}
 	return trx.Commit()
+}
+
+// attachTags loads tags for a command set into the provided CommandSet.
+func (r *Repository) attachTags(cs *CommandSet) error {
+	rows, err := r.db.Query("SELECT t.name FROM tags t JOIN command_set_tags cst ON t.id = cst.tag_id WHERE cst.command_set_id = ?", cs.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return err
+		}
+		cs.Tags = append(cs.Tags, name)
+	}
+	return nil
+}
+
+// AddTagToCommandSet adds a tag (creating it if necessary) and associates it with the command set.
+func (r *Repository) AddTagToCommandSet(commandSetID int64, tag string) error {
+	trx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer trx.Rollback()
+
+	// ensure tag exists
+	if _, err := trx.Exec("INSERT OR IGNORE INTO tags (name) VALUES (?)", tag); err != nil {
+		return err
+	}
+	var tagID int64
+	row := trx.QueryRow("SELECT id FROM tags WHERE name = ?", tag)
+	if err := row.Scan(&tagID); err != nil {
+		return err
+	}
+	// associate
+	if _, err := trx.Exec("INSERT OR IGNORE INTO command_set_tags (command_set_id, tag_id) VALUES (?, ?)", commandSetID, tagID); err != nil {
+		return err
+	}
+	return trx.Commit()
+}
+
+// RemoveTagFromCommandSet removes an association between a tag and a command set.
+func (r *Repository) RemoveTagFromCommandSet(commandSetID int64, tag string) error {
+	// find tag id
+	row := r.db.QueryRow("SELECT id FROM tags WHERE name = ?", tag)
+	var tagID int64
+	if err := row.Scan(&tagID); err != nil {
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		return err
+	}
+	if _, err := r.db.Exec("DELETE FROM command_set_tags WHERE command_set_id = ? AND tag_id = ?", commandSetID, tagID); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ListTagsForCommandSet returns all tag names associated with a command set.
+func (r *Repository) ListTagsForCommandSet(commandSetID int64) ([]string, error) {
+	rows, err := r.db.Query("SELECT t.name FROM tags t JOIN command_set_tags cst ON t.id = cst.tag_id WHERE cst.command_set_id = ?", commandSetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		out = append(out, name)
+	}
+	return out, nil
+}
+
+// ListCommandSetsByTag returns all command sets that have the given tag.
+func (r *Repository) ListCommandSetsByTag(tag string) ([]CommandSet, error) {
+	rows, err := r.db.Query(`
+		SELECT cs.id, cs.name, cs.description, cs.created_at, cs.last_run
+		FROM command_sets cs
+		JOIN command_set_tags cst ON cs.id = cst.command_set_id
+		JOIN tags t ON t.id = cst.tag_id
+		WHERE t.name = ?
+		ORDER BY cs.created_at DESC
+	`, tag)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CommandSet
+	for rows.Next() {
+		var cs CommandSet
+		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.CreatedAt, &cs.LastRun); err != nil {
+			return nil, err
+		}
+		if err := r.attachTags(&cs); err != nil {
+			return nil, err
+		}
+		out = append(out, cs)
+	}
+	return out, nil
+}
+
+// SearchCommandSets searches command sets by name, description, or contained commands.
+func (r *Repository) SearchCommandSets(query string) ([]CommandSet, error) {
+	pattern := "%" + query + "%"
+	rows, err := r.db.Query(`
+		SELECT DISTINCT cs.id, cs.name, cs.description, cs.created_at, cs.last_run
+		FROM command_sets cs
+		LEFT JOIN commands c ON c.command_set_id = cs.id
+		WHERE cs.name LIKE ? OR cs.description LIKE ? OR c.command LIKE ?
+		ORDER BY cs.created_at DESC
+	`, pattern, pattern, pattern)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CommandSet
+	for rows.Next() {
+		var cs CommandSet
+		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.CreatedAt, &cs.LastRun); err != nil {
+			return nil, err
+		}
+		if err := r.attachTags(&cs); err != nil {
+			return nil, err
+		}
+		out = append(out, cs)
+	}
+	return out, nil
 }

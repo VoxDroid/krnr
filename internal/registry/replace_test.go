@@ -14,6 +14,8 @@ func TestReplaceCommands(t *testing.T) {
 	defer dbConn.Close()
 
 	r := NewRepository(dbConn)
+	// ensure a clean state if a previous run left artifacts
+	_ = r.DeleteCommandSet("rep-set")
 	desc := "replace"
 	id, err := r.CreateCommandSet("rep-set", &desc)
 	if err != nil {
