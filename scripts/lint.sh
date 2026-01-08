@@ -45,9 +45,21 @@ fi
 
 if [ "$NEEDS_DOCKER" = true ]; then
   if command -v docker >/dev/null 2>&1; then
-    echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2)..."
+    # Determine required Go toolchain from go.mod if present (e.g., 'go 1.24')
+    GO_TOOLCHAIN=""
+    if [ -f go.mod ]; then
+      GO_TOOLCHAIN=$(awk '/^go [0-9]+\./{print $2; exit}' go.mod || true)
+    fi
+    if [ -n "$GO_TOOLCHAIN" ]; then
+      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2) with Go toolchain $GO_TOOLCHAIN..."
+      GOTOOLCHAIN_ARG=( -e "GOTOOLCHAIN=$GO_TOOLCHAIN" )
+    else
+      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2)..."
+      GOTOOLCHAIN_ARG=()
+    fi
+
     set +e
-    docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose
+    docker run --rm "${GOTOOLCHAIN_ARG[@]}" -v "$(pwd)":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose
     DOCK_RC=$?
     set -e
     if [ $DOCK_RC -eq 0 ]; then
