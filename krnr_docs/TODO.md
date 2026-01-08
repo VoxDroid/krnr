@@ -15,16 +15,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ## Outstanding / To do (newest at top)
 
-- [x] Add search/list/tagging operations to the registry (priority: medium) — implemented in `internal/registry` with tests and docs.
-- [x] Implement `editor.go` helper to open the user's editor for editing command sets (priority: low) — added unit/integration tests and docs.
-- [x] Implement `recorder.go` if interactive recording is desired (priority: low) — implemented `internal/recorder`, added `krnr record` CLI, tests and docs.
-- [x] Add an E2E release test that runs on CI using `PERSONAL_TOKEN` (priority: high) — added `internal/release/release_test.go` and `.github/workflows/e2e-release.yml` (manual dispatch).
-- [x] Add CI job(s) to run tests across multiple OS runners (windows/linux/macos) to catch platform-specific behaviors (priority: medium) — added `test-matrix` job to `.github/workflows/ci.yml`.
-- [x] Enforce version consistency: add a check that `internal/version/version.go` matches release commit/title during the release workflow (priority: medium) — added verification step in `.github/workflows/release.yml`.
-- [x] Add tests that cover pre-commit lint fallback behavior and Docker fallback in CI (priority: low) — added tests under `internal/ci` and `docs/ci.md`.
-- [x] Improve CLI UX: add `krnr whoami` persistence and opt-in author metadata for saved command sets (priority: low) — added `whoami` commands, `internal/user` persistence, `--author`/`--author-email` flags, DB migration, tests, and docs.
-- [x] Add `--shell` flag to `krnr run` to allow selecting the shell (e.g., `pwsh`, `cmd`, `bash`) and add tests/docs (priority: medium) — implemented in `cmd/run.go`, tests, and `docs/cli.md`
-- [ ] Add E2E integration tests that exercise save -> run -> export -> import roundtrip (priority: medium)
+- No high-priority outstanding tasks remain; the recent backlog items have been implemented and moved to the Completed section below. If you'd like, we can create new subtasks (examples: release packaging artifacts into `dist/`, publish installers, or add more E2E scenarios).
 
 ---
 
@@ -44,13 +35,15 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ### 3) Registry (CRUD & models)
 - [x] Implement `internal/registry/models.go` and `registry.go` CRUD
-- [ ] Add search/list/tagging operations
-- Acceptance: Unit tests for CRUD operations pass
+- [x] Add search/list/tagging operations — implemented in `internal/registry` with `List`/`Search` helpers, tag attach/detach, and unit tests.
+- Acceptance: Unit tests for CRUD and search/tagging operations pass
 
 ### 4) Execution engine (cross-platform) (completed)
 - [x] Implement `internal/executor/executor.go` (implementation)
 - [x] Implement `executor_unix.go` and `executor_windows.go` for shell invocation
 - [x] Implement flags/options: `--dry-run`, `--confirm`, `--verbose`
+- [x] Add `--shell` override and OS-aware `shellInvocation` mapping (support `pwsh`, `powershell`, `cmd`, `bash`) — implemented in `cmd/run.go` and `internal/executor` with tests and docs.
+- [x] Normalize Windows shell output (`unescapeWriter`) to remove backslash-escaped quotes — implemented and tested.
 - Acceptance: Commands execute and stream stdout/stderr properly on Windows and Unix (tests or manual verification)
 
 ### 5) CLI commands (Cobra)
@@ -58,6 +51,8 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Implement `save`, `run`, `list`, `describe` commands (basic implementations)
 - [x] Implement `edit`, `delete` commands (basic implementations)
 - [x] Implement `export`, `import` commands
+- [x] Add `krnr record` command to capture commands from stdin (recorder)
+- [x] Add `whoami` command group (set/show/clear) and `--author`/`--author-email` flags on `save` to persist author metadata
 - Acceptance: `krnr --help` lists correct commands; each command has basic integration tests
 
 ### 6) Config & paths (completed)
@@ -71,15 +66,17 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - Acceptance: Exported artifacts are portable and import restores them
 
 ### 8) Recorder, editor & utilities
-- [ ] `recorder.go` to capture interactive steps (if applicable)
-- [ ] `editor.go` helper to open user editor for editing command sets
+- [x] `recorder.go` to capture interactive steps — implemented `internal/recorder`, added `krnr record` CLI, and tests.
+- [x] `editor.go` helper to open user editor for editing command sets — implemented editor helper and added integration tests that exercise interactive edits.
 - [x] `confirm.go` for yes/no confirmations
-- Acceptance: Editing CLI flows launch editor and persist updates
+- Acceptance: Editing and recording CLI flows launch editor/recording and persist updates
 
 ### 9) Tests (unit & integration)
 - [x] Add unit tests for DB, registry, executor, and CLI
 - [x] Add integration tests that exercise save→run→list flows
 - [x] Add strict run-flag tests (`--suppress-command`, `--show-stderr`, `--dry-run`, `--verbose`, `--confirm`, `--force`)
+- [x] Add E2E roundtrip integration test (save → run → export → import) — `cmd/save_run_export_import_test.go` verifies full-cycle portability
+- [x] Add `cmd/save_run_export_import_test.go` and update docs to reflect E2E coverage
 - Acceptance: Tests run locally and pass with `go test ./...`
 
 ### 10) Linting & formatting (completed)
@@ -90,13 +87,17 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ### 11) Pre-commit hooks & CI (completed)
 - [x] Add `.pre-commit-config.yaml` and instructions (`pip install pre-commit`)
-- [x] Add GitHub Actions workflow for build/test/lint/cross-build
+- [x] Add GitHub Actions workflow for build/test/lint/cross-build (test-matrix on Ubuntu/macOS/Windows)
+- [x] Add resilient `scripts/lint.sh` and tests that cover missing local linter and Docker fallback; fixed test path resolution so CI invokes the script reliably
+- [x] Add E2E release test/workflow (manual dispatch) and enforce release version consistency in release workflow
 - Acceptance: Hooks prevent bad commits; CI runs on PRs and builds artifacts
 
 ### 12) Documentation (completed)
 - [x] `docs/architecture.md` (explain components)
 - [x] `docs/database.md` (schema & migration guide)
 - [x] `docs/roadmap.md` (priority features)
+- [x] Update `docs/cli.md` with `--shell` usage and examples
+- [x] Update `docs/ci.md` with lint fallback behavior and test notes
 - Acceptance: Docs provide enough info to onboard new devs
 
 ### 13) Cross-platform build & packaging (completed)
@@ -124,4 +125,4 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ---
 
-_Last updated: 2026-01-07_
+_Last updated: 2026-01-08 (features enumerated)_

@@ -9,12 +9,34 @@ import (
 	"testing"
 )
 
+// helper to find the repo-root-local scripts/lint.sh path
+func findLintScript(t *testing.T) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	for {
+		candidate := filepath.Join(cwd, "scripts", "lint.sh")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		parent := filepath.Dir(cwd)
+		if parent == cwd {
+			break
+		}
+		cwd = parent
+	}
+	t.Fatalf("scripts/lint.sh not found in repository tree")
+	return ""
+}
+
 // helper to run the lint script with a modified PATH and return output and exit error
 func runLintWithPath(t *testing.T, path string) (string, error) {
 	if runtime.GOOS == "windows" {
 		t.Skip("script tests skipped on Windows")
 	}
-	cmd := exec.Command("bash", "./scripts/lint.sh")
+	script := findLintScript(t)
+	cmd := exec.Command("bash", script)
 	cmd.Env = append(os.Environ(), "PATH="+path)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
