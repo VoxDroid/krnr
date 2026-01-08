@@ -56,8 +56,8 @@ var runCmd = &cobra.Command{
 			}
 		}
 
-// Create executor via factory so tests can inject a fake Runner.
-	e := execFactory(dry, verbose)
+		// Create executor via factory so tests can inject a fake Runner.
+		e := execFactory(dry, verbose)
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 

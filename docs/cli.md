@@ -4,9 +4,24 @@ This document describes the top-level CLI commands and usage.
 
 ## save
 
-`krnr save <name> -c "echo hello" -c "echo world" -d "description"`
+`krnr save <name> -c "echo hello" -c "echo world" -d "description" --author "Name" --author-email "a@example.com"`
 
 Saves a named command set with provided commands (use `-c` multiple times).
+
+Author metadata:
+
+- `--author` (`-a`) sets the author name for the saved command set and overrides any stored identity.
+- `--author-email` (`-e`) optionally sets the author email.
+- If `--author` is not provided, `krnr save` will use the stored `whoami` identity if present.
+
+## whoami
+
+`krnr whoami set --name "Your Name" [--email "you@example.com"]` — store a default author identity for future `save` operations.
+
+`krnr whoami show` — display the stored identity.
+
+`krnr whoami clear` — remove the stored identity.
+
 
 ## list
 

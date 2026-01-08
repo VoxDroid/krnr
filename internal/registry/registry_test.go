@@ -18,7 +18,7 @@ func TestRepository_CRUD(t *testing.T) {
 
 	// Create a command set
 	desc := "demo"
-	id, err := r.CreateCommandSet("demo-set", &desc)
+	id, err := r.CreateCommandSet("demo-set", &desc, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestRepository_TagsAndSearch(t *testing.T) {
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")
 	d1 := "alpha description"
-	id1, err := r.CreateCommandSet("alpha", &d1)
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet alpha: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestRepository_TagsAndSearch(t *testing.T) {
 	}
 
 	d2 := "beta demo"
-	id2, err := r.CreateCommandSet("beta", &d2)
+	id2, err := r.CreateCommandSet("beta", &d2, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet beta: %v", err)
 	}

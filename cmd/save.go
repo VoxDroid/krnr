@@ -7,6 +7,7 @@ import (
 
 	"github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/registry"
+	"github.com/VoxDroid/krnr/internal/user"
 )
 
 var saveCmd = &cobra.Command{
@@ -26,7 +27,28 @@ var saveCmd = &cobra.Command{
 		defer dbConn.Close()
 
 		r := registry.NewRepository(dbConn)
-		id, err := r.CreateCommandSet(name, &desc)
+		// determine author (flag overrides stored whoami)
+		authorFlag, _ := cmd.Flags().GetString("author")
+		authorEmailFlag, _ := cmd.Flags().GetString("author-email")
+		var authorNamePtr *string
+		var authorEmailPtr *string
+		if authorFlag != "" {
+			authorNamePtr = &authorFlag
+			if authorEmailFlag != "" {
+				authorEmailPtr = &authorEmailFlag
+			}
+		} else {
+			if p, ok, _ := user.GetProfile(); ok {
+				if p.Name != "" {
+					authorNamePtr = &p.Name
+				}
+				if p.Email != "" {
+					authorEmailPtr = &p.Email
+				}
+			}
+		}
+
+		id, err := r.CreateCommandSet(name, &desc, authorNamePtr, authorEmailPtr)
 		if err != nil {
 			return err
 		}
@@ -41,8 +63,11 @@ var saveCmd = &cobra.Command{
 		return nil
 	},
 }
+
 func init() {
 	saveCmd.Flags().StringP("description", "d", "", "Description for the command set")
 	saveCmd.Flags().StringSliceP("command", "c", []string{}, "Command to add to the set (can be repeated)")
+	saveCmd.Flags().StringP("author", "a", "", "Author name for this command set (overrides stored whoami)")
+	saveCmd.Flags().StringP("author-email", "e", "", "Author email for this command set (optional)")
 	rootCmd.AddCommand(saveCmd)
 }

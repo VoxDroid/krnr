@@ -5,10 +5,10 @@ The registry package (`internal/registry`) provides CRUD operations for `Command
 Key functions:
 
 - `NewRepository(db *sql.DB) *Repository` — construct a repository.
-- `(*Repository) CreateCommandSet(name string, description *string) (int64, error)` — create a new named workflow.
+- `(*Repository) CreateCommandSet(name string, description *string, authorName *string, authorEmail *string) (int64, error)` — create a new named workflow; author metadata is optional.
 - `(*Repository) AddCommand(commandSetID int64, position int, cmd string) (int64, error)` — add a command to a set.
-- `(*Repository) GetCommandSetByName(name string) (*CommandSet, error)` — fetch set and its ordered commands (includes `Tags`).
-- `(*Repository) ListCommandSets() ([]CommandSet, error)` — list sets (without commands; includes `Tags`).
+- `(*Repository) GetCommandSetByName(name string) (*CommandSet, error)` — fetch set and its ordered commands (includes `AuthorName`, `AuthorEmail`, and `Tags`).
+- `(*Repository) ListCommandSets() ([]CommandSet, error)` — list sets (without commands; includes author metadata and `Tags`).
 - `(*Repository) DeleteCommandSet(name string) error` — delete a set and its commands.
 - `(*Repository) AddTagToCommandSet(commandSetID int64, tag string) error` — add a tag to a set (creates tag if needed).
 - `(*Repository) RemoveTagFromCommandSet(commandSetID int64, tag string) error` — remove a tag from a set.

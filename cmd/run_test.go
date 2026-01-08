@@ -16,7 +16,7 @@ import (
 
 // fakeRunner implements the executor.Runner interface for tests.
 type fakeRunner struct {
-	lastCmd     string
+	lastCmd      string
 	stderrWriter io.Writer
 }
 
@@ -75,14 +75,14 @@ func captureOutput(f func()) (string, string) {
 func TestRunSuppressAndStderrFlags(t *testing.T) {
 	setupTempDB(t)
 
-dbConn, err := db.InitDB()
+	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
 	defer dbConn.Close()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("hello", nil)
+	id, err := r.CreateCommandSet("hello", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestRunDryRunAndVerbose(t *testing.T) {
 	defer dbConn.Close()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("dry", nil)
+	id, err := r.CreateCommandSet("dry", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 	defer dbConn.Close()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("confirm", nil)
+	id, err := r.CreateCommandSet("confirm", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestRunForceBehavior(t *testing.T) {
 	defer dbConn.Close()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("unsafe", nil)
+	id, err := r.CreateCommandSet("unsafe", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

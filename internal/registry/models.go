@@ -7,6 +7,8 @@ type CommandSet struct {
 	ID          int64
 	Name        string
 	Description sql.NullString
+	AuthorName  sql.NullString
+	AuthorEmail sql.NullString
 	CreatedAt   string
 	LastRun     sql.NullString
 	Commands    []Command

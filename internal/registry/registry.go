@@ -16,14 +16,14 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 // CreateCommandSet inserts a new command set and returns its ID.
-func (r *Repository) CreateCommandSet(name string, description *string) (int64, error) {
+func (r *Repository) CreateCommandSet(name string, description *string, authorName *string, authorEmail *string) (int64, error) {
 	trx, err := r.db.Begin()
 	if err != nil {
 		return 0, err
 	}
 	defer trx.Rollback()
 
-	res, err := trx.Exec("INSERT INTO command_sets (name, description, created_at) VALUES (?, ?, datetime('now'))", name, description)
+	res, err := trx.Exec("INSERT INTO command_sets (name, description, author_name, author_email, created_at) VALUES (?, ?, ?, ?, datetime('now'))", name, description, authorName, authorEmail)
 	if err != nil {
 		return 0, fmt.Errorf("insert command_set: %w", err)
 	}
@@ -48,9 +48,9 @@ func (r *Repository) AddCommand(commandSetID int64, position int, cmd string) (i
 
 // GetCommandSetByName retrieves a command set and its commands by name.
 func (r *Repository) GetCommandSetByName(name string) (*CommandSet, error) {
-	row := r.db.QueryRow("SELECT id, name, description, created_at, last_run FROM command_sets WHERE name = ?", name)
+	row := r.db.QueryRow("SELECT id, name, description, author_name, author_email, created_at, last_run FROM command_sets WHERE name = ?", name)
 	var cs CommandSet
-	if err := row.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.CreatedAt, &cs.LastRun); err != nil {
+	if err := row.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.AuthorName, &cs.AuthorEmail, &cs.CreatedAt, &cs.LastRun); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -75,11 +75,11 @@ func (r *Repository) GetCommandSetByName(name string) (*CommandSet, error) {
 	}
 
 	return &cs, nil
-} 
+}
 
 // ListCommandSets returns all command sets (without their commands).
 func (r *Repository) ListCommandSets() ([]CommandSet, error) {
-	rows, err := r.db.Query("SELECT id, name, description, created_at, last_run FROM command_sets ORDER BY created_at DESC")
+	rows, err := r.db.Query("SELECT id, name, description, author_name, author_email, created_at, last_run FROM command_sets ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (r *Repository) ListCommandSets() ([]CommandSet, error) {
 	var out []CommandSet
 	for rows.Next() {
 		var cs CommandSet
-		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.CreatedAt, &cs.LastRun); err != nil {
+		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.AuthorName, &cs.AuthorEmail, &cs.CreatedAt, &cs.LastRun); err != nil {
 			return nil, err
 		}
 		if err := r.attachTags(&cs); err != nil {
@@ -97,7 +97,7 @@ func (r *Repository) ListCommandSets() ([]CommandSet, error) {
 		out = append(out, cs)
 	}
 	return out, nil
-} 
+}
 
 // DeleteCommandSet removes a command set and its commands by name.
 func (r *Repository) DeleteCommandSet(name string) error {
@@ -225,7 +225,7 @@ func (r *Repository) ListTagsForCommandSet(commandSetID int64) ([]string, error)
 // ListCommandSetsByTag returns all command sets that have the given tag.
 func (r *Repository) ListCommandSetsByTag(tag string) ([]CommandSet, error) {
 	rows, err := r.db.Query(`
-		SELECT cs.id, cs.name, cs.description, cs.created_at, cs.last_run
+		SELECT cs.id, cs.name, cs.description, cs.author_name, cs.author_email, cs.created_at, cs.last_run
 		FROM command_sets cs
 		JOIN command_set_tags cst ON cs.id = cst.command_set_id
 		JOIN tags t ON t.id = cst.tag_id
@@ -239,7 +239,7 @@ func (r *Repository) ListCommandSetsByTag(tag string) ([]CommandSet, error) {
 	var out []CommandSet
 	for rows.Next() {
 		var cs CommandSet
-		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.CreatedAt, &cs.LastRun); err != nil {
+		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.AuthorName, &cs.AuthorEmail, &cs.CreatedAt, &cs.LastRun); err != nil {
 			return nil, err
 		}
 		if err := r.attachTags(&cs); err != nil {
@@ -254,7 +254,7 @@ func (r *Repository) ListCommandSetsByTag(tag string) ([]CommandSet, error) {
 func (r *Repository) SearchCommandSets(query string) ([]CommandSet, error) {
 	pattern := "%" + query + "%"
 	rows, err := r.db.Query(`
-		SELECT DISTINCT cs.id, cs.name, cs.description, cs.created_at, cs.last_run
+		SELECT DISTINCT cs.id, cs.name, cs.description, cs.author_name, cs.author_email, cs.created_at, cs.last_run
 		FROM command_sets cs
 		LEFT JOIN commands c ON c.command_set_id = cs.id
 		WHERE cs.name LIKE ? OR cs.description LIKE ? OR c.command LIKE ?
@@ -267,7 +267,7 @@ func (r *Repository) SearchCommandSets(query string) ([]CommandSet, error) {
 	var out []CommandSet
 	for rows.Next() {
 		var cs CommandSet
-		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.CreatedAt, &cs.LastRun); err != nil {
+		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.AuthorName, &cs.AuthorEmail, &cs.CreatedAt, &cs.LastRun); err != nil {
 			return nil, err
 		}
 		if err := r.attachTags(&cs); err != nil {
