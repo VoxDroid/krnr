@@ -88,8 +88,32 @@ Interactive edit details:
 `krnr record <name> [-d "description"]`
 
 Record commands from standard input into a new command set. After running the command, type commands one per line and finish with EOF (Ctrl-D on Unix, Ctrl-Z on Windows). Blank lines and lines beginning with `#` are ignored. The recorded commands will be saved as a new command set named `<name>`.
+
 ## delete
 
 `krnr delete <name> [--confirm]`
 
 Delete a command set; use `--confirm` to prompt interactively before deleting.
+
+## install
+
+`krnr install [--user|--system] [--path <dir>] [--from <file>] [--add-to-path] [--yes] [--dry-run]`
+
+Install the `krnr` binary. By default this performs a per-user install (creates `~/krnr/bin` or `%USERPROFILE%\krnr\bin` on Windows). Use `--system` to install to a system-wide directory (requires elevation). `--path` overrides the target installation directory; `--from` points to a binary to install (defaults to the running executable).
+
+- `--add-to-path` will persistently add the installation directory to PATH (on Windows this will modify the User or Machine PATH depending on `--system`).
+- `--dry-run` shows planned actions without changing persistent state; `--yes` accepts prompts non-interactively.
+- On Windows, persistent PATH writes use PowerShell `-EncodedCommand` (UTF-16LE base64) to avoid quoting problems; `krnr` runs a post-write normalization fixer that corrects doubled backslashes.
+- Tests/CI: set `KRNR_TEST_NO_SETX=1` to avoid persisting PATH changes during tests.
+
+## uninstall
+
+`krnr uninstall [--path <dir>] [--yes] [--dry-run] [--verbose]`
+
+Uninstall the previously installed `krnr` (reads metadata to determine what to remove and how to restore PATH). `--dry-run` shows planned actions; `--verbose` prints diagnostic information including before/after PATH values when available. When a full PATH restore is performed the same safe encoded-PowerShell approach is used and the post-write normalization fixer runs; any fixer message will be included in the uninstall actions to make fixes visible.
+
+## status
+
+`krnr status`
+
+Reports whether `krnr` is installed for the current user and system, and whether the user installation directory is present on the process PATH. Useful for debugging and CI checks.

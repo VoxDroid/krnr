@@ -23,19 +23,27 @@ It focuses on a pragmatic, low-risk first implementation (per-user installer CLI
 ## Design decisions
 - Default behavior is **per-user** install.
   - Target dirs:
-    - Linux/macOS: `$HOME/.local/bin` (or `$HOME/bin` on macOS if `~/.local/bin` not preferred)
+    - Linux/macOS: `$HOME/krnr/bin` (per-application directory under the user's home)
+    - Windows: `%USERPROFILE%\krnr\bin` (created if needed)
     - macOS can also use `~/Applications` for packaged .app, but initial scope is CLI binary placement.
-    - Windows: `%USERPROFILE%\bin` (created if needed) or user's AppData bin dir.
 - PATH handling:
   - Detect whether target dir is already on `PATH` in current shell environment.
   - If not on PATH, show the exact shell rc modification lines and prompt the user to accept; only append to shell rc if user confirms (support `--yes` to skip prompt).
-  - For Windows, use `setx` for persistent user PATH updates; warn about requiring re-login to apply.
+  - On Windows we use PowerShell to persistently set the User PATH by default; `--system` will attempt to set the Machine (system) PATH and **requires elevation**. PowerShell writes use `-EncodedCommand` (UTF-16LE base64) to avoid quoting/escaping issues when setting PATH persistently.
+  - The installer records the previous PATH value and will attempt to restore it at uninstall. After any persistent PATH write (both install and uninstall) `krnr` runs a post-write normalization fixer that collapses doubled backslashes and ensures PATH entries remain well-formed — this resolves a class of PATH corruption issues on Windows. Tests and CI use a `KRNR_TEST_NO_SETX` test mode to avoid modifying real environments; set this env var in CI or local tests to prevent persistent PATH changes.
+
+### Uninstall behavior
+
+- `krnr uninstall` reads the recorded install metadata (`~/.krnr/install_metadata.json`) and attempts to undo changes (remove installed binary, restore PATH to recorded previous value when present, or remove the installed directory from PATH otherwise).
+- When restoring a recorded full PATH value `krnr` uses the same safe, encoded PowerShell approach and runs the normalization fixer afterwards; if the fixer makes changes its message is included in the uninstall actions so users can see the diagnostics.
+- `krnr uninstall` supports `--dry-run` (show planned actions), `--yes` (skip interactive confirmation), and `--verbose` (show before/after PATH details when available). If the binary is in use and cannot be removed, the uninstall will instruct you to run the downloaded `krnr` binary (for example from Downloads) and re-run `krnr uninstall` so the installed executable is not locked by a running process.
 - Permissions:
   - `--system` attempts system install paths (`/usr/local/bin`, `C:\Program Files\krnr`) and will require elevation. If not elevated, print guidance and exit with a helpful message.
 - Safety & rollback:
   - Before modifying any file (shell rc or system PATH), create backups (e.g., `~/.bashrc.krnr.bak.<timestamp>`).
-  - Record an install metadata file in the data dir (e.g., `~/.krnr/install.json`) that lists changes for uninstall.
-  - `krnr uninstall` uses the metadata file to undo changes and restore backups where possible.
+  - Record an install metadata file in the data dir (e.g., `~/.krnr/install_metadata.json`) that lists changes for uninstall.
+  - `krnr uninstall` uses the metadata file to undo changes and restore backups and previous PATH values where possible; it also attempts to remove the install directory if it becomes empty.
+  - **Important:** if uninstall fails with "access denied" because the installed binary is in use, run the downloaded `krnr` binary (for example, the copy in your Downloads folder) and run `krnr uninstall` from there so the installed program is not locked by the running process. For system installs you may need to run the downloaded binary elevated (Run as Administrator).
 - Binary source:
   - Installer can operate on the current running executable (via `os.Executable()`), or accept a path to a built artifact (`--from <file>`). This supports both dev builds and release artifacts.
 - Safety checks:
@@ -44,13 +52,13 @@ It focuses on a pragmatic, low-risk first implementation (per-user installer CLI
 
 ## CLI proposal
 - `krnr install [--user|--system] [--path <dir>] [--from <file>] [--yes] [--dry-run]`
-  - `--user` default installs to user-local bin.
+  - `--user` default installs to user-local bin (default: `~/krnr/bin` or `%USERPROFILE%\krnr\bin`).
   - `--system` install to OS system location (requires elevation).
   - `--path` explicitly set target dir.
   - `--from` path to a binary to install; default is current executable.
   - `--yes` non-interactive accept (dangerous; requires caution in docs).
   - `--dry-run` show exact actions without performing them.
-- `krnr uninstall [--path <dir>] [--yes]` — undo last install performed by the installer.
+- `krnr uninstall [--path <dir>] [--yes] [--dry-run]` — undo last install performed by the installer; `--dry-run` shows planned actions (recommended before running).
 - `krnr install --check` — diagnostics: show installability (path permissions, PATH presence).
 
 ## Tests

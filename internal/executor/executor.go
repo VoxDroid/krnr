@@ -19,12 +19,13 @@ type Executor struct {
 // unescapeWriter wraps an io.Writer and normalizes output produced by some
 // shells on Windows which can emit backslash-escaped quotes like \"HELLO\".
 // It will:
-//  - unescape `\"` -> `"`
-//  - if the entire line is wrapped in quotes ("..."), strip the outer quotes
-//    so `"HELLO"\n` becomes `HELLO\n` for a cleaner UX.
+//   - unescape `\"` -> `"`
+//   - if the entire line is wrapped in quotes ("..."), strip the outer quotes
+//     so `"HELLO"\n` becomes `HELLO\n` for a cleaner UX.
+//
 // This is conservative and applies only to simple cases where the whole output
 // line is a quoted string.
-type unescapeWriter struct{
+type unescapeWriter struct {
 	w io.Writer
 }
 
@@ -39,7 +40,7 @@ func (u *unescapeWriter) Write(p []byte) (int, error) {
 	trimmed := strings.TrimRight(s, "\r\n")
 	// If the whole trimmed line is wrapped in quotes, strip them
 	if len(trimmed) >= 2 && strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"") {
-		body := trimmed[1:len(trimmed)-1]
+		body := trimmed[1 : len(trimmed)-1]
 		// re-append the original newline suffix
 		suffix := s[len(trimmed):]
 		s = body + suffix

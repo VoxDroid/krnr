@@ -28,6 +28,23 @@ All notable changes to this project will be documented in this file.
 - CLI UX: add `whoami` persistent identity (set/show/clear) and opt-in author metadata for saves (`--author`, `--author-email`). The registry stores `author_name`/`author_email` on command sets and the DB migration ensures columns are added on upgrade.
 
 - Add `--shell` flag to `krnr run` to allow explicitly selecting the shell (e.g., `pwsh`, `powershell`, `cmd`, `bash`) so platform-specific commands (PowerShell cmdlets) can be executed as intended. Behavior is OS-aware: unspecified shell uses sensible defaults (`cmd` on Windows, `bash` on Unix-like systems); `--shell powershell` prefers the Windows `powershell` executable when available and falls back to `pwsh` if present. Added unit and CLI tests and updated `docs/cli.md` to document usage and examples (see `cmd/run.go` and `internal/executor/shellInvocation`).
+
+## Installer & Windows PATH fixes
+
+- Add `krnr install` and `krnr uninstall` commands:
+  - `krnr install` supports `--user` (default), `--system` (requires elevation), `--path`, `--from`, `--yes`, and `--dry-run`.
+  - `krnr uninstall` reads recorded install metadata and attempts to restore previous PATH values; supports `--dry-run`, `--yes`, and `--verbose` (prints before/after PATH diagnostics).
+  - `krnr install --dry-run` and `krnr uninstall --dry-run` show planned actions without performing them.
+
+- Windows PATH handling hardened:
+  - Use PowerShell `-EncodedCommand` (UTF-16LE base64) to avoid quoting/escaping issues when writing PATH.
+  - Both install and uninstall run a post-write normalization fixer that collapses doubled backslashes and corrects PATH corruption (resolves an observed issue where uninstall left doubled backslashes). The fixer runs after install, after a full restore, and after removing individual entries.
+  - Tests and CI use `KRNR_TEST_NO_SETX=1` to avoid persisting PATH changes in test environments.
+
+- Add `krnr status` command that detects user/system installs and whether the user path is on PATH (useful for CI and diagnostics).
+
+- Added `PlanUninstall()` and CLI `--dry-run` behavior so users can preview uninstall actions safely before performing them.
+
 ## v0.1.0 - 2026-01-06
 
 - Initial release: core features (save, run, list, describe, edit, delete), database, registry, executor, CLI, importer/exporter, CI, linting, release automation, and security checks.

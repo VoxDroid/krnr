@@ -40,21 +40,21 @@ func TestRunOutputsUnescaped(t *testing.T) {
 		}
 	})
 
-// Normalize escaped quotes (observed on some Windows runtimes) and CRLF.
-    normalized := strings.ReplaceAll(out, "\\\"", "\"")
-    normalized = strings.ReplaceAll(normalized, "\r\n", "\n")
+	// Normalize escaped quotes (observed on some Windows runtimes) and CRLF.
+	normalized := strings.ReplaceAll(out, "\\\"", "\"")
+	normalized = strings.ReplaceAll(normalized, "\r\n", "\n")
 
-    // Ensure outputs contain the expected words
-    if !strings.Contains(normalized, "HELLO") {
-        t.Fatalf("expected HELLO in output, got: %q", normalized)
-    }
-    if !strings.Contains(normalized, "HOW ARE YOU") {
-        t.Fatalf("expected HOW ARE YOU in output, got: %q", normalized)
-    }
+	// Ensure outputs contain the expected words
+	if !strings.Contains(normalized, "HELLO") {
+		t.Fatalf("expected HELLO in output, got: %q", normalized)
+	}
+	if !strings.Contains(normalized, "HOW ARE YOU") {
+		t.Fatalf("expected HOW ARE YOU in output, got: %q", normalized)
+	}
 
-    // Ensure escaped quotes are removed by normalization
-    if strings.Contains(normalized, "\\\"") {
-        t.Fatalf("unexpected escaped quotes remaining in normalized output: %q", normalized)
+	// Ensure escaped quotes are removed by normalization
+	if strings.Contains(normalized, "\\\"") {
+		t.Fatalf("unexpected escaped quotes remaining in normalized output: %q", normalized)
 	}
 
 	// cleanup

@@ -3,10 +3,10 @@ package executor
 import (
 	"bytes"
 	"context"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
-	"runtime"
 )
 
 func TestExecuteEcho(t *testing.T) {
