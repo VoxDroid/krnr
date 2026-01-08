@@ -25,8 +25,15 @@ fi
 
 # If local linter is missing or failed with export-data error, try Docker fallback
 NEEDS_DOCKER=false
+contains_export_error() {
+  case "$1" in
+    *"unsupported version"*|*"could not load export data"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 if [ $RC -ne 0 ]; then
-  if echo "$OUT" | grep -q "unsupported version" || echo "$OUT" | grep -q "could not load export data" || [ "$LOCAL_INSTALLED" = false ]; then
+  if contains_export_error "$OUT" || [ "$LOCAL_INSTALLED" = false ]; then
     NEEDS_DOCKER=true
   fi
 fi
@@ -51,7 +58,7 @@ if [ "$NEEDS_DOCKER" = true ]; then
 fi
 
 # If we reach here, the local linter failed and Docker fallback wasn't possible or failed
-if echo "$OUT" | grep -q "unsupported version" || echo "$OUT" | grep -q "could not load export data"; then
+if contains_export_error "$OUT"; then
   echo "\ngolangci-lint encountered an export-data incompatible error. This usually means the linter binary was built with a different Go toolchain version than the one used to build the project. Try one of the following fixes:" 
   echo "  - Ensure the linter is installed with the same Go version (e.g., 'go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2' using your 'go' executable)."
   echo "  - Use the Docker fallback: 'docker run --rm -v \"$(pwd)\":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose'"
