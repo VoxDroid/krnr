@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"runtime"
 )
 
 func TestExecuteEcho(t *testing.T) {
@@ -61,5 +62,41 @@ func TestUnescapeWriter(t *testing.T) {
 	// Expect outer quotes to be stripped: HELLO\n
 	if buf.String() != "HELLO\n" {
 		t.Fatalf("expected HELLO\n, got: %q", buf.String())
+	}
+}
+
+func TestShellInvocationOverride(t *testing.T) {
+	// pwsh should use -Command
+	shell, args := shellInvocation("echo hi", "pwsh")
+	if shell != "pwsh" {
+		t.Fatalf("expected pwsh shell, got: %s", shell)
+	}
+	if len(args) < 1 || args[0] != "-Command" {
+		t.Fatalf("expected -Command arg for pwsh, got: %v", args)
+	}
+
+	// generic overrides (bash) should use -c
+	shell, args = shellInvocation("echo hi", "bash")
+	if shell != "bash" {
+		t.Fatalf("expected bash shell, got: %s", shell)
+	}
+	if len(args) < 1 || args[0] != "-c" {
+		t.Fatalf("expected -c arg for bash, got: %v", args)
+	}
+}
+
+func TestShellInvocationPowershellMapping(t *testing.T) {
+	// 'powershell' should map to the appropriate executable depending on OS.
+	shell, _ := shellInvocation("echo hi", "powershell")
+	if runtime.GOOS == "windows" {
+		// On Windows we expect either 'powershell' or a full path containing 'powershell'
+		if !strings.Contains(strings.ToLower(shell), "powershell") {
+			t.Fatalf("expected powershell on Windows, got: %q", shell)
+		}
+	} else {
+		// Non-Windows prefer 'pwsh'
+		if !strings.Contains(strings.ToLower(shell), "pwsh") {
+			t.Fatalf("expected pwsh on non-Windows, got: %q", shell)
+		}
 	}
 }

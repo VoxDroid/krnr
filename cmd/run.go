@@ -58,6 +58,11 @@ var runCmd = &cobra.Command{
 
 		// Create executor via factory so tests can inject a fake Runner.
 		e := execFactory(dry, verbose)
+		// Allow user to override the shell used to execute commands (e.g., pwsh, bash, cmd)
+		shellFlag, _ := cmd.Flags().GetString("shell")
+		if ex, ok := e.(*executor.Executor); ok {
+			ex.Shell = shellFlag
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -89,5 +94,6 @@ func init() {
 	runCmd.Flags().Bool("force", false, "Override safety checks and force execution")
 	runCmd.Flags().Bool("suppress-command", false, "Suppress printing the written command before execution")
 	runCmd.Flags().Bool("show-stderr", false, "Show command stderr output instead of omitting it")
+	runCmd.Flags().String("shell", "", "Override shell to execute commands (e.g., pwsh, bash, cmd)")
 	rootCmd.AddCommand(runCmd)
 }

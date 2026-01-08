@@ -96,12 +96,31 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 // Optional `override` lets callers request alternate shell (e.g., pwsh).
 func shellInvocation(command string, overrideShell string) (string, []string) {
 	if overrideShell != "" {
-		// If caller requests `pwsh`, use PowerShell CLI variant; otherwise pass through
-		if overrideShell == "pwsh" || overrideShell == "powershell" {
+		// Handle PowerShell variants explicitly so users can request the
+		// Windows-provided `powershell` (legacy Windows PowerShell) or the
+		// cross-platform `pwsh` (PowerShell Core).
+		switch overrideShell {
+		case "pwsh":
 			return "pwsh", []string{"-Command", command}
+		case "powershell":
+			// On Windows prefer the OS-provided 'powershell' if present, else
+			// fall back to 'pwsh' if available. On non-Windows prefer 'pwsh'.
+			if runtime.GOOS == "windows" {
+				if p, err := exec.LookPath("powershell"); err == nil {
+					return p, []string{"-Command", command}
+				}
+				if p, err := exec.LookPath("pwsh"); err == nil {
+					return p, []string{"-Command", command}
+				}
+				// Fallback to the executable name; exec will surface a useful error
+				return "powershell", []string{"-Command", command}
+			}
+			// Non-windows: prefer pwsh
+			return "pwsh", []string{"-Command", command}
+		default:
+			// generic: use override as the shell command and -c to pass command
+			return overrideShell, []string{"-c", command}
 		}
-		// generic: use override as the shell command and -c to pass command
-		return overrideShell, []string{"-c", command}
 	}
 
 	if runtime.GOOS == "windows" {

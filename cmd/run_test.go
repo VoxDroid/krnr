@@ -312,3 +312,49 @@ func TestRunForceBehavior(t *testing.T) {
 		t.Fatalf("expected fake runner to be invoked with unsafe command, got: %q", fake.lastCmd)
 	}
 }
+
+func TestRunShellFlagWiresExecutor(t *testing.T) {
+	setupTempDB(t)
+
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer dbConn.Close()
+
+	r := registry.NewRepository(dbConn)
+	id, err := r.CreateCommandSet("shell-test", nil, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet: %v", err)
+	}
+	if _, err := r.AddCommand(id, 1, "echo shell"); err != nil {
+		t.Fatalf("AddCommand: %v", err)
+	}
+
+	origFactory := execFactory
+	defer func() { execFactory = origFactory }()
+
+	var captured *executor.Executor
+	execFactory = func(dry, verbose bool) executor.Runner {
+		e := &executor.Executor{DryRun: dry, Verbose: verbose}
+		captured = e
+		return e
+	}
+
+	// Ensure flags do not carry over
+	runCmd.Flags().Set("dry-run", "false")
+	// Run with shell override and dry-run to avoid side effects
+	captureOutput(func() {
+		rootCmd.SetArgs([]string{"run", "shell-test", "--shell", "pwsh", "--dry-run"})
+		if err := rootCmd.Execute(); err != nil {
+			t.Fatalf("run command failed: %v", err)
+		}
+	})
+
+	if captured == nil {
+		t.Fatalf("expected executor to be captured")
+	}
+	if captured.Shell != "pwsh" {
+		t.Fatalf("expected shell to be pwsh, got: %q", captured.Shell)
+	}
+}

@@ -27,7 +27,7 @@ All notable changes to this project will be documented in this file.
 
 - CLI UX: add `whoami` persistent identity (set/show/clear) and opt-in author metadata for saves (`--author`, `--author-email`). The registry stores `author_name`/`author_email` on command sets and the DB migration ensures columns are added on upgrade.
 
-- Planned: Add `--shell` flag to `krnr run` to allow explicitly selecting the shell (e.g., `pwsh`, `cmd`, `bash`) so platform-specific commands (PowerShell cmdlets) can be executed as intended; will add tests and docs.
+- Add `--shell` flag to `krnr run` to allow explicitly selecting the shell (e.g., `pwsh`, `powershell`, `cmd`, `bash`) so platform-specific commands (PowerShell cmdlets) can be executed as intended. Behavior is OS-aware: unspecified shell uses sensible defaults (`cmd` on Windows, `bash` on Unix-like systems); `--shell powershell` prefers the Windows `powershell` executable when available and falls back to `pwsh` if present. Added unit and CLI tests and updated `docs/cli.md` to document usage and examples (see `cmd/run.go` and `internal/executor/shellInvocation`).
 ## v0.1.0 - 2026-01-06
 
 - Initial release: core features (save, run, list, describe, edit, delete), database, registry, executor, CLI, importer/exporter, CI, linting, release automation, and security checks.

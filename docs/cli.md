@@ -37,11 +37,36 @@ Shows details of a command set and its commands.
 
 ## run
 
-`krnr run <name> [--dry-run] [--confirm] [--verbose]`
+`krnr run <name> [--dry-run] [--confirm] [--verbose] [--shell <shell>]`
 
 Runs the commands in order. Defaults to stopping on the first failing command.
 Use `--dry-run` to preview commands without running them. `--confirm` will
 prompt interactively before running.
+
+Use `--shell` to select the shell used to execute commands (for example
+`pwsh`, `powershell`, `bash`, or `cmd`). If omitted, platform defaults are used
+(`cmd` on Windows, `bash` on Unix-like systems).
+
+Behavior and notes:
+
+- `--shell pwsh` runs PowerShell Core with `pwsh -Command <cmd>` (requires
+  `pwsh` to be installed and on PATH).
+- `--shell powershell` on **Windows** will prefer the legacy Windows
+  PowerShell executable (`powershell`) if found; otherwise it falls back to
+  `pwsh` if available. On non-Windows systems `powershell` will choose
+  `pwsh` (the cross-platform implementation).
+- Other values are passed through as the executable name and invoked with
+  `-c` (e.g., `--shell bash` → `bash -c "..."`).
+- If the requested shell executable is not present on `PATH`, execution will
+  fail with an "executable file not found" error from the OS. Use
+  `where pwsh` (or `Get-Command pwsh`) to check availability on Windows.
+
+Examples:
+
+- `krnr run hello --shell pwsh` — run with PowerShell Core
+- `krnr run hello --shell powershell` — prefer Windows PowerShell on Windows
+- `krnr run hello --shell cmd` — force Windows `cmd.exe`
+- Omit `--shell` to use sensible platform defaults.
 
 ## edit
 
