@@ -15,7 +15,14 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ## Outstanding / To do (newest at top)
 
-- No high-priority outstanding tasks remain; the recent backlog items have been implemented and moved to the Completed section below. If you'd like, we can create new subtasks (examples: release packaging artifacts into `dist/`, publish installers, or add more E2E scenarios).
+- [ ] Design installer strategy (priority: high) — decide scope (per-user `krnr install` CLI vs platform packages), security model, and test plan. (in-progress)
+- [ ] Implement `krnr install` (priority: high) — add cross-platform per-user installer (dry-run, --user, --system, --path, --yes, --uninstall) with unit and integration tests.
+- [ ] Create platform packages (priority: medium) — add GoReleaser configuration & manifests to produce Windows MSI/Winget, macOS Homebrew/cask or pkg, and Linux `.deb`/`.rpm` packages/archives.
+- [ ] Add CI build/release jobs for installers (priority: medium) — build artifacts for each platform and upload to `dist/` during release workflows.
+- [ ] Add install tests (priority: medium) — unit tests for install logic and a CI E2E job that runs `install --dry-run` and an install->run smoke test.
+- [ ] Add uninstall/rollback and safety checks (priority: medium) — ensure changes are reversible and prompt before editing PATH or shell rc files.
+- [ ] Update docs and CHANGELOG (priority: low) — add `docs/install.md`, update `docs/cli.md` examples, and add a `CHANGELOG` entry when released.
+- [ ] Perform release packaging & publish manifests (priority: low) — create official Homebrew/Scoop/Winget manifests and publish in release workflow.
 
 ---
 
