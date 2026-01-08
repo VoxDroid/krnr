@@ -49,6 +49,9 @@ prompt interactively before running.
 
 Edit a command set. Use `-c` multiple times to replace commands non-interactively; if no `-c` is provided the user's editor (from `$EDITOR`) will be opened to edit the command list interactively.
 
+Developer note — Clean rebuild
+
+- If you make code changes and want to ensure a fresh binary is used when testing CLI behavior, perform a clean rebuild (see `README.md` Clean rebuild (dev) section). On Windows, explicitly build to `krnr.exe` and run `.\krnr.exe run <name>` to verify runtime fixes (for example, output normalization on Windows).
 Interactive edit details:
 
 - The editor will be pre-populated with the command set, one command per line.

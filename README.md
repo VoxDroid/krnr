@@ -8,6 +8,27 @@ Quick start (dev):
 2. Run `go build ./...`
 3. Run `./krnr` (or `krnr.exe` on Windows)
 
+Clean rebuild (dev):
+
+- If you see behavior that looks out of date (for example, after fixing runtime output), perform a clean rebuild to ensure you're running the latest code you have checked out:
+
+```bash
+# Unix / macOS
+go clean -cache -testcache
+go build -v -o krnr .
+./krnr run <name>
+
+# Windows (PowerShell)
+go clean -cache -testcache
+go build -v -o krnr.exe .
+.\krnr.exe run <name>
+```
+
+- For release packaging and cross-compiles use the provided scripts:
+  - `./scripts/build.sh` — cross-compile binaries for supported platforms
+  - `./scripts/release.sh <version>` — create release archives (tar/zip) locally
+
+- If you built from a previously released artifact (`dist/krnr-...`), replace it with the freshly-built binary to pick up fixes.
 Database:
 
 - The database file is created under your home directory in `.krnr/krnr.db` by default.

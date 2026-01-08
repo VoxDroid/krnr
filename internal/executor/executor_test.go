@@ -48,3 +48,18 @@ func TestDryRun(t *testing.T) {
 		t.Fatalf("expected dry-run message, got: %q", out.String())
 	}
 }
+
+func TestUnescapeWriter(t *testing.T) {
+	var buf bytes.Buffer
+	uw := &unescapeWriter{w: &buf}
+	in := []byte("\\\"HELLO\\\"\n")
+	if n, err := uw.Write(in); err != nil {
+		t.Fatalf("write failed: %v", err)
+	} else if n != len(in) {
+		t.Fatalf("expected write len %d, got %d", len(in), n)
+	}
+	// Expect outer quotes to be stripped: HELLO\n
+	if buf.String() != "HELLO\n" {
+		t.Fatalf("expected HELLO\n, got: %q", buf.String())
+	}
+}

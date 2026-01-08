@@ -23,6 +23,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Enforce version consistency: add a check that `internal/version/version.go` matches release commit/title during the release workflow (priority: medium) — added verification step in `.github/workflows/release.yml`.
 - [x] Add tests that cover pre-commit lint fallback behavior and Docker fallback in CI (priority: low) — added tests under `internal/ci` and `docs/ci.md`.
 - [x] Improve CLI UX: add `krnr whoami` persistence and opt-in author metadata for saved command sets (priority: low) — added `whoami` commands, `internal/user` persistence, `--author`/`--author-email` flags, DB migration, tests, and docs.
+- [ ] Add `--shell` flag to `krnr run` to allow selecting the shell (e.g., `pwsh`, `cmd`, `bash`) and add tests/docs (priority: medium)
 - [ ] Add E2E integration tests that exercise save -> run -> export -> import roundtrip (priority: medium)
 
 ---

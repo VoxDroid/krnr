@@ -26,6 +26,8 @@ All notable changes to this project will be documented in this file.
 - Tests: add unit/integration tests for the `scripts/lint.sh` fallback behavior (local missing, export-data error, and Docker fallback).
 
 - CLI UX: add `whoami` persistent identity (set/show/clear) and opt-in author metadata for saves (`--author`, `--author-email`). The registry stores `author_name`/`author_email` on command sets and the DB migration ensures columns are added on upgrade.
+
+- Planned: Add `--shell` flag to `krnr run` to allow explicitly selecting the shell (e.g., `pwsh`, `cmd`, `bash`) so platform-specific commands (PowerShell cmdlets) can be executed as intended; will add tests and docs.
 ## v0.1.0 - 2026-01-06
 
 - Initial release: core features (save, run, list, describe, edit, delete), database, registry, executor, CLI, importer/exporter, CI, linting, release automation, and security checks.
