@@ -11,6 +11,9 @@ fi
 # Run local linter if present
 OUT=""
 RC=0
+# Diagnostic placeholders for Docker runs, initialized to avoid unbound variable errors
+DOCKER_OUT=""
+RETRY_OUT=""
 if [ "$LOCAL_INSTALLED" = true ]; then
   set +e
   OUT=$(golangci-lint run ./... 2>&1)
