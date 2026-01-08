@@ -1,3 +1,4 @@
+// Package db provides database utilities.
 package db
 
 import (
@@ -6,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	// _ import for sqlite driver registration
 	_ "modernc.org/sqlite"
 
 	"github.com/VoxDroid/krnr/internal/config"
@@ -27,7 +29,7 @@ func InitDB() (*sql.DB, error) {
 	}
 
 	if err := ApplyMigrations(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return db, nil

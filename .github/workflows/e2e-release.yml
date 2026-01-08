@@ -30,4 +30,3 @@ jobs:
         with:
           name: e2e-release-dist
           path: dist/**
-

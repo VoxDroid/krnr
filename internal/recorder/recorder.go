@@ -1,3 +1,4 @@
+// Package recorder provides command recording functionality.
 package recorder
 
 import (

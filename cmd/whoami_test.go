@@ -20,8 +20,8 @@ func TestWhoamiSetShowClear(t *testing.T) {
 	out.Reset()
 
 	whoamiSetCmd.SetOut(&out)
-	whoamiSetCmd.Flags().Set("name", "Bob")
-	whoamiSetCmd.Flags().Set("email", "bob@example.com")
+	_ = whoamiSetCmd.Flags().Set("name", "Bob")
+	_ = whoamiSetCmd.Flags().Set("email", "bob@example.com")
 	if err := whoamiSetCmd.RunE(whoamiSetCmd, []string{}); err != nil {
 		t.Fatalf("whoami set failed: %v", err)
 	}

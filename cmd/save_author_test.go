@@ -20,7 +20,7 @@ func TestSaveUsesStoredWhoami(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("whoami-save")
@@ -29,7 +29,7 @@ func TestSaveUsesStoredWhoami(t *testing.T) {
 	buf := bytes.Buffer{}
 	saveCmd.SetOut(&buf)
 	// set command flag and execute save
-	saveCmd.Flags().Set("command", "echo ok")
+	_ = saveCmd.Flags().Set("command", "echo ok")
 	if err := saveCmd.RunE(saveCmd, []string{"whoami-save"}); err != nil {
 		t.Fatalf("saveCmd failed: %v", err)
 	}

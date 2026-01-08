@@ -1,3 +1,4 @@
+// Package executor provides command execution functionality.
 package executor
 
 import (
@@ -67,7 +68,7 @@ func New(dry, verbose bool) Runner {
 func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
 	if e.DryRun {
 		if e.Verbose {
-			fmt.Fprintf(stdout, "dry-run: %s\n", command)
+			_, _ = fmt.Fprintf(stdout, "dry-run: %s\n", command)
 		}
 		return nil
 	}

@@ -18,7 +18,7 @@ func TestRunOutputsUnescaped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("yeet-output")

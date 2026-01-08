@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	// _ import for sqlite driver registration
 	_ "modernc.org/sqlite"
 
 	"github.com/VoxDroid/krnr/internal/config"
@@ -27,7 +28,7 @@ func ImportDatabase(srcPath string, overwrite bool) error {
 	if err != nil {
 		return fmt.Errorf("open source: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("create dst dir: %w", err)
 	}
@@ -35,7 +36,7 @@ func ImportDatabase(srcPath string, overwrite bool) error {
 	if err != nil {
 		return fmt.Errorf("create dst: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	if _, err := io.Copy(out, in); err != nil {
 		return fmt.Errorf("copy db: %w", err)
 	}
@@ -49,7 +50,7 @@ func ImportCommandSet(srcPath string) error {
 	if err != nil {
 		return fmt.Errorf("open src: %w", err)
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	dstPath, err := config.DBPath()
 	if err != nil {
@@ -59,13 +60,13 @@ func ImportCommandSet(srcPath string) error {
 	if err != nil {
 		return fmt.Errorf("open dst: %w", err)
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	rows, err := src.Query("SELECT id, name, description, created_at, last_run FROM command_sets")
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var id int64
 		var name string
@@ -107,15 +108,15 @@ func ImportCommandSet(srcPath string) error {
 			var pos int
 			var cmd string
 			if err := crows.Scan(&pos, &cmd); err != nil {
-				crows.Close()
+				_ = crows.Close()
 				return err
 			}
 			if _, err := dst.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", newID, pos, cmd); err != nil {
-				crows.Close()
+				_ = crows.Close()
 				return err
 			}
 		}
-		crows.Close()
+		_ = crows.Close()
 	}
 	return nil
 }

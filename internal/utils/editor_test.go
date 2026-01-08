@@ -19,8 +19,8 @@ func TestOpenEditor_Success(t *testing.T) {
 		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 			t.Fatalf("write script: %v", err)
 		}
-		os.Setenv("EDITOR", scriptPath)
-		defer os.Unsetenv("EDITOR")
+		_ = os.Setenv("EDITOR", scriptPath)
+		defer func() { _ = os.Unsetenv("EDITOR") }()
 	} else {
 		script = "#!/bin/sh\nprintf 'ok' > \"" + marker + "\"\nexit 0\n"
 		scriptPath := filepath.Join(d, "fake-editor.sh")
@@ -30,8 +30,8 @@ func TestOpenEditor_Success(t *testing.T) {
 		if err := os.Chmod(scriptPath, 0o755); err != nil {
 			t.Fatalf("chmod script: %v", err)
 		}
-		os.Setenv("EDITOR", scriptPath)
-		defer os.Unsetenv("EDITOR")
+		_ = os.Setenv("EDITOR", scriptPath)
+		defer func() { _ = os.Unsetenv("EDITOR") }()
 	}
 
 	// call OpenEditor with a dummy file path
@@ -58,8 +58,8 @@ func TestOpenEditor_Failure(t *testing.T) {
 		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
 			t.Fatalf("write script: %v", err)
 		}
-		os.Setenv("EDITOR", scriptPath)
-		defer os.Unsetenv("EDITOR")
+		_ = os.Setenv("EDITOR", scriptPath)
+		defer func() { _ = os.Unsetenv("EDITOR") }()
 	} else {
 		script = "#!/bin/sh\nexit 1\n"
 		scriptPath := filepath.Join(d, "fail-editor.sh")
@@ -69,8 +69,8 @@ func TestOpenEditor_Failure(t *testing.T) {
 		if err := os.Chmod(scriptPath, 0o755); err != nil {
 			t.Fatalf("chmod script: %v", err)
 		}
-		os.Setenv("EDITOR", scriptPath)
-		defer os.Unsetenv("EDITOR")
+		_ = os.Setenv("EDITOR", scriptPath)
+		defer func() { _ = os.Unsetenv("EDITOR") }()
 	}
 
 	if err := OpenEditor(filepath.Join(d, "dummy.txt")); err == nil {

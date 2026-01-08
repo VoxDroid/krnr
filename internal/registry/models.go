@@ -1,3 +1,4 @@
+// Package registry provides command registry functionality.
 package registry
 
 import "database/sql"

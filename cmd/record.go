@@ -40,7 +40,7 @@ var recordCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		r := registry.NewRepository(dbConn)
 		if _, err := recorder.SaveRecorded(r, name, desc, cmds); err != nil {

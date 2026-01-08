@@ -10,14 +10,14 @@ import (
 
 func TestExportDatabase(t *testing.T) {
 	tmp := t.TempDir()
-	os.Setenv("HOME", tmp)
-	os.Setenv("USERPROFILE", tmp)
+	_ = os.Setenv("HOME", tmp)
+	_ = os.Setenv("USERPROFILE", tmp)
 
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	dbConn.Close()
+	_ = dbConn.Close()
 
 	dst := filepath.Join(tmp, "exported.db")
 	if err := ExportDatabase(dst); err != nil {

@@ -24,7 +24,7 @@ var saveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		r := registry.NewRepository(dbConn)
 		// determine author (flag overrides stored whoami)

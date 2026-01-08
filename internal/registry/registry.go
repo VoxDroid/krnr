@@ -21,7 +21,7 @@ func (r *Repository) CreateCommandSet(name string, description *string, authorNa
 	if err != nil {
 		return 0, err
 	}
-	defer trx.Rollback()
+	defer func() { _ = trx.Rollback() }()
 
 	res, err := trx.Exec("INSERT INTO command_sets (name, description, author_name, author_email, created_at) VALUES (?, ?, ?, ?, datetime('now'))", name, description, authorName, authorEmail)
 	if err != nil {
@@ -61,7 +61,7 @@ func (r *Repository) GetCommandSetByName(name string) (*CommandSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var c Command
 		if err := rows.Scan(&c.ID, &c.CommandSetID, &c.Position, &c.Command); err != nil {
@@ -83,7 +83,7 @@ func (r *Repository) ListCommandSets() ([]CommandSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []CommandSet
 	for rows.Next() {
@@ -105,7 +105,7 @@ func (r *Repository) DeleteCommandSet(name string) error {
 	if err != nil {
 		return err
 	}
-	defer trx.Rollback()
+	defer func() { _ = trx.Rollback() }()
 
 	var id int64
 	row := trx.QueryRow("SELECT id FROM command_sets WHERE name = ?", name)
@@ -133,7 +133,7 @@ func (r *Repository) ReplaceCommands(commandSetID int64, commands []string) erro
 	if err != nil {
 		return err
 	}
-	defer trx.Rollback()
+	defer func() { _ = trx.Rollback() }()
 
 	if _, err := trx.Exec("DELETE FROM commands WHERE command_set_id = ?", commandSetID); err != nil {
 		return err
@@ -152,7 +152,7 @@ func (r *Repository) attachTags(cs *CommandSet) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
@@ -169,7 +169,7 @@ func (r *Repository) AddTagToCommandSet(commandSetID int64, tag string) error {
 	if err != nil {
 		return err
 	}
-	defer trx.Rollback()
+	defer func() { _ = trx.Rollback() }()
 
 	// ensure tag exists
 	if _, err := trx.Exec("INSERT OR IGNORE INTO tags (name) VALUES (?)", tag); err != nil {
@@ -210,7 +210,7 @@ func (r *Repository) ListTagsForCommandSet(commandSetID int64) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []string
 	for rows.Next() {
 		var name string
@@ -235,7 +235,7 @@ func (r *Repository) ListCommandSetsByTag(tag string) ([]CommandSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []CommandSet
 	for rows.Next() {
 		var cs CommandSet
@@ -250,7 +250,7 @@ func (r *Repository) ListCommandSetsByTag(tag string) ([]CommandSet, error) {
 	return out, nil
 }
 
-// SearchCommandSets searches command sets by name, description, or contained commands.
+// SearchCommandSets searches for command sets by name, description, or command content.
 func (r *Repository) SearchCommandSets(query string) ([]CommandSet, error) {
 	pattern := "%" + query + "%"
 	rows, err := r.db.Query(`
@@ -263,7 +263,7 @@ func (r *Repository) SearchCommandSets(query string) ([]CommandSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []CommandSet
 	for rows.Next() {
 		var cs CommandSet

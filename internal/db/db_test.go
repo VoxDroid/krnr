@@ -10,8 +10,8 @@ import (
 func TestInitDBCreatesFileAndSchema(t *testing.T) {
 	tmp := t.TempDir()
 	// Ensure user home resolves to tmp for DBPath
-	os.Setenv("HOME", tmp)
-	os.Setenv("USERPROFILE", tmp)
+	_ = os.Setenv("HOME", tmp)
+	_ = os.Setenv("USERPROFILE", tmp)
 
 	dbPath, err := config.DBPath()
 	if err != nil {
@@ -19,13 +19,13 @@ func TestInitDBCreatesFileAndSchema(t *testing.T) {
 	}
 
 	// remove any existing file
-	os.Remove(dbPath)
+	_ = os.Remove(dbPath)
 
 	db, err := InitDB()
 	if err != nil {
 		t.Fatalf("InitDB() error: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if _, err := os.Stat(dbPath); err != nil {
 		t.Fatalf("db file not created: %v", err)

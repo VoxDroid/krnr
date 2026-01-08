@@ -15,14 +15,14 @@ import (
 func TestRunIntegrationDryRun(t *testing.T) {
 	// Set HOME to tempdir so DB is isolated
 	tmp := t.TempDir()
-	os.Setenv("HOME", tmp)
-	os.Setenv("USERPROFILE", tmp)
+	_ = os.Setenv("HOME", tmp)
+	_ = os.Setenv("USERPROFILE", tmp)
 
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	desc := "integration"

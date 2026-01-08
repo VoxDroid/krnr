@@ -14,10 +14,44 @@ RC=0
 # Diagnostic placeholders for Docker runs, initialized to avoid unbound variable errors
 DOCKER_OUT=""
 RETRY_OUT=""
+# Helper to detect toolchain-related docker errors even if docker path isn't taken
+contains_toolchain_error() {
+  case "$1" in
+    *"invalid GOTOOLCHAIN"*|*"failed to run 'go env'"*|*"requires go"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Detect the intermittent 'parallel golangci-lint is running' condition and retry
+contains_parallel_error() {
+  case "$1" in
+    *"parallel golangci-lint is running"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 if [ "$LOCAL_INSTALLED" = true ]; then
   set +e
   OUT=$(golangci-lint run ./... 2>&1)
   RC=$?
+  # If we hit the 'parallel golangci-lint is running' transient error, retry a
+  # couple times with a short backoff. This prevents pre-commit from failing
+  # when concurrent golangci-lint runs overlap on CI or local dev machines.
+  if [ $RC -ne 0 ] && contains_parallel_error "$OUT"; then
+    tries=0
+    until [ $tries -ge 3 ]; do
+      tries=$((tries+1))
+      echo "golangci-lint appears busy; retrying (attempt $tries/3)..."
+      sleep $tries
+      OUT=$(golangci-lint run ./... 2>&1)
+      RC=$?
+      if [ $RC -eq 0 ]; then
+        break
+      fi
+      if ! contains_parallel_error "$OUT"; then
+        break
+      fi
+    done
+  fi
   set -e
   if [ $RC -eq 0 ]; then
     echo "No linter issues found (local)."
@@ -100,7 +134,7 @@ if [ "$NEEDS_DOCKER" = true ]; then
         echo "Docker-based golangci-lint passed on retry without GOTOOLCHAIN."
         exit 0
       else
-        echo "Retry without GOTOOLCHAIN failed (exit $RETRY_RC). Treating this as a non-fatal export-data incompatibility for CI; please follow guidance below to resolve locally." 
+        echo "Retry without GOTOOLCHAIN failed (exit $RETRY_RC). Treating this as a non-fatal export-data incompatibility for CI; please follow guidance below to resolve locally."
         # Print guidance below by letting the script continue to the guidance section and exit 0 afterwards.
       fi
     else
@@ -114,7 +148,7 @@ fi
 
 # If we reach here, the local linter failed and Docker fallback wasn't possible or failed
     if contains_export_error "$OUT" || contains_toolchain_error "$DOCKER_OUT"; then
-      echo "\ngolangci-lint encountered an export-data incompatible error or Docker/toolchain mismatch. This usually means the linter binary was built with a different Go toolchain version than the one used to build the project. Try one of the following fixes:" 
+      echo "\ngolangci-lint encountered an export-data incompatible error or Docker/toolchain mismatch. This usually means the linter binary was built with a different Go toolchain version than the one used to build the project. Try one of the following fixes:"
   echo "  - Use the Docker fallback: 'docker run --rm -v \"$(pwd)\":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose'"
   echo "  - Use the GitHub Action 'golangci/golangci-lint-action' in CI (this repo already does)."
   echo "  - Upgrade/downgrade your local Go toolchain to match the project's required Go version."

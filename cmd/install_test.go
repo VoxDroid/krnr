@@ -17,8 +17,8 @@ func TestInstallDryRunCLI(t *testing.T) {
 	_ = os.WriteFile(src, []byte("exe"), 0o644)
 
 	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmp)
-	defer os.Setenv("HOME", oldHome)
+	_ = os.Setenv("HOME", tmp)
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 
 	oldArgs := rootCmd.Args
 	_ = oldArgs
@@ -33,9 +33,9 @@ func TestInstallDryRunCLI(t *testing.T) {
 		t.Fatalf("install command failed: %v", err)
 	}
 
-	wOut.Close()
+	_ = wOut.Close()
 	var buf bytes.Buffer
-	io.Copy(&buf, rOut)
+	_, _ = io.Copy(&buf, rOut)
 	os.Stdout = oldOut
 
 	out := buf.String()

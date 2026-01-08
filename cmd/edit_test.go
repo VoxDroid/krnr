@@ -15,7 +15,7 @@ func TestEditCommand_Interactive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("edit-test")
@@ -48,8 +48,8 @@ func TestEditCommand_Interactive(t *testing.T) {
 			t.Fatalf("chmod script: %v", err)
 		}
 	}
-	os.Setenv("EDITOR", scriptPath)
-	defer os.Unsetenv("EDITOR")
+	_ = os.Setenv("EDITOR", scriptPath)
+	defer func() { _ = os.Unsetenv("EDITOR") }()
 
 	// Run the edit command which should invoke the script, then read the temp file
 	if err := editCmd.RunE(editCmd, []string{"edit-test"}); err != nil {

@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+
+	// _ import for sqlite driver registration
 	_ "modernc.org/sqlite"
 )
 
@@ -30,7 +32,7 @@ func ensureCommandSetColumns(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	cols := map[string]bool{}
 	for rows.Next() {
 		var cid int

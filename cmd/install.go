@@ -14,7 +14,7 @@ var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install the krnr binary to your system or user path",
 	Long:  "Install the current krnr binary to a per-user or system path. Use --dry-run to preview actions.",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		user, _ := cmd.Flags().GetBool("user")
 		system, _ := cmd.Flags().GetBool("system")
 		path, _ := cmd.Flags().GetString("path")
@@ -44,7 +44,7 @@ var installCmd = &cobra.Command{
 			if !addFlag && !opts.Yes {
 				fmt.Print("Target dir is not on PATH. Add it to PATH now? [y/N]: ")
 				var resp string
-				fmt.Scanln(&resp)
+				_, _ = fmt.Scanln(&resp)
 				if resp == "y" || resp == "Y" {
 					opts.AddToPath = true
 				}
@@ -55,7 +55,7 @@ var installCmd = &cobra.Command{
 		if !opts.Yes {
 			fmt.Print("Proceed? [y/N]: ")
 			var resp string
-			fmt.Scanln(&resp)
+			_, _ = fmt.Scanln(&resp)
 			if resp != "y" && resp != "Y" {
 				fmt.Println("aborted")
 				return nil

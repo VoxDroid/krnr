@@ -70,5 +70,5 @@ func TestReleaseScript(t *testing.T) {
 	}
 
 	// cleanup artifacts to keep workspace clean
-	os.RemoveAll(dist)
+	_ = os.RemoveAll(dist)
 }

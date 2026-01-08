@@ -11,8 +11,8 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show krnr installation status (user and system)",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		st, err := install.Status()
+	RunE: func(_ *cobra.Command, _ []string) error {
+		st, err := install.GetStatus()
 		if err != nil {
 			return err
 		}

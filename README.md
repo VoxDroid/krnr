@@ -105,4 +105,3 @@ To create a local release build (without the workflow), run:
 ```
 
 This will create archives under `dist/` which embed the version (from `VERSION` or the provided arg).
-

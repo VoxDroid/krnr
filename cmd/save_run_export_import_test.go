@@ -48,13 +48,13 @@ func TestSaveRunExportImportRoundtrip(t *testing.T) {
 
 	// Create a fresh environment and ensure DB is empty
 	other := t.TempDir()
-	os.Setenv("KRNR_HOME", other)
+	_ = os.Setenv("KRNR_HOME", other)
 	// initialize an empty DB at the new location
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB for fresh env: %v", err)
 	}
-	dbConn.Close()
+	_ = dbConn.Close()
 
 	// Import the exported command set into the fresh DB
 	if err := importer.ImportCommandSet(dst); err != nil {
@@ -66,7 +66,7 @@ func TestSaveRunExportImportRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB after import: %v", err)
 	}
-	defer dbConn2.Close()
+	defer func() { _ = dbConn2.Close() }()
 
 	r := registry.NewRepository(dbConn2)
 	cs, err := r.GetCommandSetByName("e2e-roundtrip")

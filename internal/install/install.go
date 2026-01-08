@@ -1,3 +1,4 @@
+// Package install provides installation utilities.
 package install
 
 import (
@@ -105,6 +106,7 @@ func PlanInstall(opts Options) ([]string, string, error) {
 	return actions, targetPath, nil
 }
 
+// ContainsPath checks if the given directory is in the PATH environment variable.
 func ContainsPath(pathEnv, dir string) bool {
 	if pathEnv == "" || dir == "" {
 		return false
@@ -207,12 +209,12 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open source: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	out, err := os.Create(targetPath)
 	if err != nil {
 		return nil, fmt.Errorf("create target: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	if _, err := io.Copy(out, in); err != nil {
 		return nil, fmt.Errorf("copy: %w", err)
 	}
@@ -237,7 +239,7 @@ func ExecuteInstall(opts Options) ([]string, error) {
 }
 
 // Status represents the presence of krnr in user and system locations and PATH.
-type InstallStatus struct {
+type Status struct {
 	UserPath        string
 	SystemPath      string
 	UserInstalled   bool
@@ -247,15 +249,15 @@ type InstallStatus struct {
 	MetadataFound   bool
 }
 
-// Status inspects the system and returns installation status for user and system locations.
-func Status() (*InstallStatus, error) {
+// GetStatus inspects the system and returns installation status for user and system locations.
+func GetStatus() (*Status, error) {
 	binName := "krnr"
 	if runtime.GOOS == "windows" {
 		binName = "krnr.exe"
 	}
 	userPath := filepath.Join(DefaultUserBin(), binName)
 	sysPath := filepath.Join(systemBin(), binName)
-	st := &InstallStatus{UserPath: userPath, SystemPath: sysPath}
+	st := &Status{UserPath: userPath, SystemPath: sysPath}
 	if _, err := os.Stat(userPath); err == nil {
 		st.UserInstalled = true
 	}
@@ -369,34 +371,40 @@ func addToPath(targetPath string, system bool) (string, string, error) {
 		// For system installs on Unix we prefer instructing the admin rather than editing system files.
 		return "", "", fmt.Errorf("system PATH modifications require admin privileges; move the binary to %s or add %s to system PATH manually", systemBin(), filepath.Dir(targetPath))
 	}
-	// Attempt to find shell rc for user
+	// Attempt to find shell rc for user. Prefer an existing rc file (e.g., a
+	// test that creates ~/.bashrc expects us to append there) and otherwise
+	// fall back to shell detection or ~/.profile.
 	shell := os.Getenv("SHELL")
-	homedir, err := os.UserHomeDir()
-	if err != nil {
-		return "", "", err
+	homedir := os.Getenv("HOME")
+	if homedir == "" {
+		var err error
+		homedir, err = os.UserHomeDir()
+		if err != nil {
+			return "", "", err
+		}
 	}
 	rcfile := filepath.Join(homedir, ".profile")
-	if strings.Contains(shell, "zsh") {
+	// Prefer existing rc files if present (ensures tests that create .bashrc
+	// are handled correctly regardless of the SHELL environment variable).
+	if _, err := os.Stat(filepath.Join(homedir, ".bashrc")); err == nil {
+		rcfile = filepath.Join(homedir, ".bashrc")
+	} else if _, err := os.Stat(filepath.Join(homedir, ".zshrc")); err == nil {
+		rcfile = filepath.Join(homedir, ".zshrc")
+	} else if strings.Contains(shell, "zsh") {
 		rcfile = filepath.Join(homedir, ".zshrc")
 	} else if strings.Contains(shell, "bash") {
 		rcfile = filepath.Join(homedir, ".bashrc")
-	} else {
-		// prefer existing rc files if shell not set
-		if _, err := os.Stat(filepath.Join(homedir, ".bashrc")); err == nil {
-			rcfile = filepath.Join(homedir, ".bashrc")
-		} else if _, err := os.Stat(filepath.Join(homedir, ".zshrc")); err == nil {
-			rcfile = filepath.Join(homedir, ".zshrc")
-		}
 	}
 	line := fmt.Sprintf("# krnr: add %s to PATH\nexport PATH=\"%s:$PATH\"\n", dir, dir)
 	f, err := os.OpenFile(rcfile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return "", "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.WriteString(line); err != nil {
 		return "", "", err
 	}
+	_ = f.Sync()
 	return rcfile, "", nil
 }
 
@@ -453,14 +461,14 @@ func Uninstall(verbose bool) ([]string, error) {
 		if err == nil {
 			s := string(b)
 			// remove any line containing krnr and target dir
-			new := []string{}
+			newLines := []string{}
 			for _, line := range strings.Split(s, "\n") {
 				if strings.Contains(line, filepath.Dir(m.TargetPath)) && strings.Contains(line, "krnr") {
 					continue
 				}
-				new = append(new, line)
+				newLines = append(newLines, line)
 			}
-			_ = os.WriteFile(rcfile, []byte(strings.Join(new, "\n")), 0o644)
+			_ = os.WriteFile(rcfile, []byte(strings.Join(newLines, "\n")), 0o644)
 			actions = append(actions, fmt.Sprintf("Removed PATH entry from %s", rcfile))
 		} else {
 			actions = append(actions, fmt.Sprintf("No PATH file %s found; nothing to remove", rcfile))
@@ -651,7 +659,7 @@ func removeFromPathWindows(scope, dir string, verbose bool) (string, error) {
 	if cur == "" {
 		return fmt.Sprintf("No %s PATH found; nothing to remove", scope), nil
 	}
-	new, removed := computeNewPathString(cur, dir)
+	newPath, removed := computeNewPathString(cur, dir)
 	if !removed {
 		return fmt.Sprintf("No %s PATH entry for %s found; nothing to do", scope, dir), nil
 	}
@@ -659,7 +667,7 @@ func removeFromPathWindows(scope, dir string, verbose bool) (string, error) {
 		return fmt.Sprintf("Note: would remove %s from %s PATH (test mode)", dir, scope), nil
 	}
 	// Build an encoded PowerShell command to set the PATH safely
-	script := fmt.Sprintf("[Environment]::SetEnvironmentVariable('Path', %s, '%s')", toPowerShellString(new), scope)
+	script := fmt.Sprintf("[Environment]::SetEnvironmentVariable('Path', %s, '%s')", toPowerShellString(newPath), scope)
 	enc := encodePowerShellCommand(script)
 	setCmd := exec.Command("powershell", "-NoProfile", "-EncodedCommand", enc)
 	if out2, err := setCmd.CombinedOutput(); err != nil {

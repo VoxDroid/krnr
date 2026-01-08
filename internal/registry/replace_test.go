@@ -11,7 +11,7 @@ func TestReplaceCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := NewRepository(dbConn)
 	// ensure a clean state if a previous run left artifacts

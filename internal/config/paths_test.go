@@ -8,8 +8,8 @@ import (
 
 func TestDataDirEnvOverride(t *testing.T) {
 	tmp := t.TempDir()
-	os.Setenv(EnvKRNRHome, tmp)
-	defer os.Unsetenv(EnvKRNRHome)
+	_ = os.Setenv(EnvKRNRHome, tmp)
+	defer func() { _ = os.Unsetenv(EnvKRNRHome) }()
 
 	d, err := DataDir()
 	if err != nil {
@@ -22,8 +22,8 @@ func TestDataDirEnvOverride(t *testing.T) {
 
 func TestDBPathEnvOverride(t *testing.T) {
 	tmp := filepath.Join(t.TempDir(), "custom.db")
-	os.Setenv(EnvKRNRDB, tmp)
-	defer os.Unsetenv(EnvKRNRDB)
+	_ = os.Setenv(EnvKRNRDB, tmp)
+	defer func() { _ = os.Unsetenv(EnvKRNRDB) }()
 
 	p, err := DBPath()
 	if err != nil {
@@ -35,11 +35,11 @@ func TestDBPathEnvOverride(t *testing.T) {
 }
 
 func TestEnsureDataDirCreatesDir(t *testing.T) {
-	os.Unsetenv(EnvKRNRHome)
+	_ = os.Unsetenv(EnvKRNRHome)
 	tmp := t.TempDir()
 	// fake home by setting HOME/USERPROFILE
-	os.Setenv("HOME", tmp)
-	os.Setenv("USERPROFILE", tmp)
+	_ = os.Setenv("HOME", tmp)
+	_ = os.Setenv("USERPROFILE", tmp)
 
 	d, err := EnsureDataDir()
 	if err != nil {

@@ -18,7 +18,7 @@ var whoamiSetCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Set stored author identity",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		name, _ := cmd.Flags().GetString("name")
 		email, _ := cmd.Flags().GetString("email")
 		if name == "" {
@@ -28,7 +28,7 @@ var whoamiSetCmd = &cobra.Command{
 			return err
 		}
 		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "stored author as: %s <%s>\n", name, email)
+		_, _ = fmt.Fprintf(out, "stored author as: %s <%s>\n", name, email)
 		return nil
 	},
 }
@@ -37,12 +37,12 @@ var whoamiClearCmd = &cobra.Command{
 	Use:   "clear",
 	Short: "Clear stored author identity",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		if err := user.ClearProfile(); err != nil {
 			return err
 		}
 		out := cmd.OutOrStdout()
-		fmt.Fprintln(out, "cleared stored author identity")
+		_, _ = fmt.Fprintln(out, "cleared stored author identity")
 		return nil
 	},
 }
@@ -51,17 +51,17 @@ var whoamiShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show stored author identity",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		p, ok, err := user.GetProfile()
 		if err != nil {
 			return err
 		}
 		out := cmd.OutOrStdout()
 		if !ok {
-			fmt.Fprintln(out, "no stored author identity")
+			_, _ = fmt.Fprintln(out, "no stored author identity")
 			return nil
 		}
-		fmt.Fprintf(out, "%s <%s>\n", p.Name, p.Email)
+		_, _ = fmt.Fprintf(out, "%s <%s>\n", p.Name, p.Email)
 		return nil
 	},
 }

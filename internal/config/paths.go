@@ -1,3 +1,4 @@
+// Package config provides configuration utilities.
 package config
 
 import (

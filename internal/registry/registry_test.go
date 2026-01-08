@@ -12,7 +12,7 @@ func TestRepository_CRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := NewRepository(dbConn)
 
@@ -75,7 +75,7 @@ func TestRepository_TagsAndSearch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := NewRepository(dbConn)
 

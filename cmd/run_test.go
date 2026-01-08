@@ -20,14 +20,14 @@ type fakeRunner struct {
 	stderrWriter io.Writer
 }
 
-func (f *fakeRunner) Execute(ctx context.Context, command, cwd string, stdout io.Writer, stderr io.Writer) error {
+func (f *fakeRunner) Execute(_ context.Context, command, _ string, stdout io.Writer, stderr io.Writer) error {
 	f.lastCmd = command
 	f.stderrWriter = stderr
 	if stdout != nil {
-		fmt.Fprintln(stdout, "cmd output")
+		_, _ = fmt.Fprintln(stdout, "cmd output")
 	}
 	if stderr != nil {
-		fmt.Fprintln(stderr, "cmd error")
+		_, _ = fmt.Fprintln(stderr, "cmd error")
 	}
 	return nil
 }
@@ -35,7 +35,7 @@ func (f *fakeRunner) Execute(ctx context.Context, command, cwd string, stdout io
 func setupTempDB(t *testing.T) string {
 	t.Helper()
 	d := t.TempDir()
-	os.Setenv("KRNR_HOME", d)
+	_ = os.Setenv("KRNR_HOME", d)
 	return d
 }
 
@@ -51,19 +51,19 @@ func captureOutput(f func()) (string, string) {
 	errC := make(chan string)
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, rOut)
+		_, _ = io.Copy(&buf, rOut)
 		outC <- buf.String()
 	}()
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, rErr)
+		_, _ = io.Copy(&buf, rErr)
 		errC <- buf.String()
 	}()
 
 	f()
 
-	wOut.Close()
-	wErr.Close()
+	_ = wOut.Close()
+	_ = wErr.Close()
 	os.Stdout = oldOut
 	os.Stderr = oldErr
 
@@ -79,7 +79,7 @@ func TestRunSuppressAndStderrFlags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	id, err := r.CreateCommandSet("hello", nil, nil, nil)
@@ -94,7 +94,7 @@ func TestRunSuppressAndStderrFlags(t *testing.T) {
 	defer func() { execFactory = origFactory }()
 
 	fake := &fakeRunner{}
-	execFactory = func(dry, verbose bool) executor.Runner {
+	execFactory = func(_, _ bool) executor.Runner {
 		return fake
 	}
 
@@ -137,9 +137,9 @@ func TestRunSuppressAndStderrFlags(t *testing.T) {
 
 	// Case 3: show stderr
 	// Ensure flag state is clean
-	runCmd.Flags().Set("suppress-command", "false")
-	runCmd.Flags().Set("show-stderr", "true")
-	out, errOut = captureOutput(func() {
+	_ = runCmd.Flags().Set("suppress-command", "false")
+	_ = runCmd.Flags().Set("show-stderr", "true")
+	_, errOut = captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "hello", "--show-stderr"})
 		if err := rootCmd.Execute(); err != nil {
 			t.Fatalf("run command failed: %v", err)
@@ -161,7 +161,7 @@ func TestRunDryRunAndVerbose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	id, err := r.CreateCommandSet("dry", nil, nil, nil)
@@ -176,13 +176,13 @@ func TestRunDryRunAndVerbose(t *testing.T) {
 	defer func() { execFactory = origFactory }()
 
 	// Use real executor for dry-run behavior (it will print dry-run messages)
-	execFactory = func(dry, verbose bool) executor.Runner {
-		return executor.New(dry, verbose)
+	execFactory = func(_, verbose bool) executor.Runner {
+		return executor.New(true, verbose) // dry is always true here
 	}
 
 	// Ensure flags do not carry over from other tests
-	runCmd.Flags().Set("dry-run", "false")
-	runCmd.Flags().Set("verbose", "false")
+	_ = runCmd.Flags().Set("dry-run", "false")
+	_ = runCmd.Flags().Set("verbose", "false")
 	out, errOut := captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "dry", "--dry-run", "--verbose"})
 		if err := rootCmd.Execute(); err != nil {
@@ -209,7 +209,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	id, err := r.CreateCommandSet("confirm", nil, nil, nil)
@@ -224,7 +224,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 	defer func() { execFactory = origFactory }()
 
 	fake := &fakeRunner{}
-	execFactory = func(dry, verbose bool) executor.Runner {
+	execFactory = func(_, _ bool) executor.Runner {
 		return fake
 	}
 
@@ -232,7 +232,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 	oldStdin := os.Stdin
 	rR, rW, _ := os.Pipe()
 	_, _ = rW.Write([]byte("n\n"))
-	rW.Close()
+	_ = rW.Close()
 	os.Stdin = rR
 	out, _ := captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "confirm", "--confirm"})
@@ -240,7 +240,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 			t.Fatalf("run command failed: %v", err)
 		}
 	})
-	rR.Close()
+	_ = rR.Close()
 	os.Stdin = oldStdin
 	if !strings.Contains(out, "aborted") {
 		t.Fatalf("expected 'aborted' when user replies n, got: %q", out)
@@ -252,7 +252,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 	// Case: user accepts
 	rR, rW, _ = os.Pipe()
 	_, _ = rW.Write([]byte("y\n"))
-	rW.Close()
+	_ = rW.Close()
 	os.Stdin = rR
 	_, _ = captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "confirm", "--confirm"})
@@ -260,7 +260,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 			t.Fatalf("run command failed: %v", err)
 		}
 	})
-	rR.Close()
+	_ = rR.Close()
 	os.Stdin = oldStdin
 	if fake.lastCmd != "echo confirm" {
 		t.Fatalf("expected fake runner to be invoked with command, got: %q", fake.lastCmd)
@@ -274,7 +274,7 @@ func TestRunForceBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	id, err := r.CreateCommandSet("unsafe", nil, nil, nil)
@@ -289,12 +289,12 @@ func TestRunForceBehavior(t *testing.T) {
 	defer func() { execFactory = origFactory }()
 
 	fake := &fakeRunner{}
-	execFactory = func(dry, verbose bool) executor.Runner {
+	execFactory = func(_, _ bool) executor.Runner {
 		return fake
 	}
 
 	// Without --force we expect an error
-	runCmd.Flags().Set("confirm", "false")
+	_ = runCmd.Flags().Set("confirm", "false")
 	rootCmd.SetArgs([]string{"run", "unsafe"})
 	if err := rootCmd.Execute(); err == nil {
 		t.Fatalf("expected error when running unsafe command without --force")
@@ -303,7 +303,7 @@ func TestRunForceBehavior(t *testing.T) {
 	}
 
 	// With --force it should run
-	runCmd.Flags().Set("confirm", "false")
+	_ = runCmd.Flags().Set("confirm", "false")
 	rootCmd.SetArgs([]string{"run", "unsafe", "--force"})
 	if err := rootCmd.Execute(); err != nil {
 		t.Fatalf("expected run to succeed with --force, got: %v", err)
@@ -320,7 +320,7 @@ func TestRunShellFlagWiresExecutor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	id, err := r.CreateCommandSet("shell-test", nil, nil, nil)
@@ -342,7 +342,7 @@ func TestRunShellFlagWiresExecutor(t *testing.T) {
 	}
 
 	// Ensure flags do not carry over
-	runCmd.Flags().Set("dry-run", "false")
+	_ = runCmd.Flags().Set("dry-run", "false")
 	// Run with shell override and dry-run to avoid side effects
 	captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "shell-test", "--shell", "pwsh", "--dry-run"})

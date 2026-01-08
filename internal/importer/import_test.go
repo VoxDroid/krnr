@@ -1,3 +1,4 @@
+// Package importer provides tests for importing functionality.
 package importer
 
 import (
@@ -12,15 +13,15 @@ import (
 
 func TestImportCommandSet(t *testing.T) {
 	tmp := t.TempDir()
-	os.Setenv("HOME", tmp)
-	os.Setenv("USERPROFILE", tmp)
+	_ = os.Setenv("HOME", tmp)
+	_ = os.Setenv("USERPROFILE", tmp)
 
 	// create source db and command set
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
 	desc := "imp"
@@ -40,14 +41,14 @@ func TestImportCommandSet(t *testing.T) {
 
 	// Prepare a fresh destination environment (new DB path)
 	otherTmp := t.TempDir()
-	os.Setenv("HOME", otherTmp)
-	os.Setenv("USERPROFILE", otherTmp)
+	_ = os.Setenv("HOME", otherTmp)
+	_ = os.Setenv("USERPROFILE", otherTmp)
 	// initialize empty DB
 	dbConn2, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB() 2: %v", err)
 	}
-	dbConn2.Close()
+	_ = dbConn2.Close()
 
 	// import command sets from exported file
 	if err := ImportCommandSet(dst); err != nil {
@@ -59,7 +60,7 @@ func TestImportCommandSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB() 3: %v", err)
 	}
-	defer dbConn3.Close()
+	defer func() { _ = dbConn3.Close() }()
 
 	r2 := registry.NewRepository(dbConn3)
 	cs, err := r2.GetCommandSetByName("imp-set")

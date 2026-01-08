@@ -38,7 +38,7 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		r := registry.NewRepository(dbConn)
 		cs, err := r.GetCommandSetByName(name)

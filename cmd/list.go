@@ -13,12 +13,12 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List saved command sets",
 	Long:  "List saved command sets. Example:\n  krnr list",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		dbConn, err := db.InitDB()
 		if err != nil {
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		r := registry.NewRepository(dbConn)
 		sets, err := r.ListCommandSets()

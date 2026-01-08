@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -26,7 +25,7 @@ var editCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		r := registry.NewRepository(dbConn)
 		cs, err := r.GetCommandSetByName(name)
@@ -47,25 +46,25 @@ var editCmd = &cobra.Command{
 		}
 
 		// Interactive: write commands to temp file and open editor
-		tmpf, err := ioutil.TempFile("", "krnr-edit-*.txt")
+		tmpf, err := os.CreateTemp("", "krnr-edit-*.txt")
 		if err != nil {
 			return err
 		}
-		defer os.Remove(tmpf.Name())
+		defer func() { _ = os.Remove(tmpf.Name()) }()
 
 		w := bufio.NewWriter(tmpf)
 		for _, c := range cs.Commands {
-			w.WriteString(c.Command + "\n")
+			_, _ = w.WriteString(c.Command + "\n")
 		}
-		w.Flush()
-		tmpf.Close()
+		_ = w.Flush()
+		_ = tmpf.Close()
 
 		if err := utils.OpenEditor(tmpf.Name()); err != nil {
 			return err
 		}
 
 		// Read back file and parse non-empty lines
-		b, err := ioutil.ReadFile(tmpf.Name())
+		b, err := os.ReadFile(tmpf.Name())
 		if err != nil {
 			return err
 		}

@@ -13,7 +13,7 @@ func TestRecordCommand_SavesCommandsFromStdin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	// prepare stdin with two commands and an empty line + comment
 	input := "echo record1\n# comment\necho record2\n"

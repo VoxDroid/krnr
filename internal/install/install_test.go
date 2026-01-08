@@ -62,9 +62,7 @@ func TestExecuteInstallCopiesFile(t *testing.T) {
 func TestInstallAddToPathAndUninstall(t *testing.T) {
 	// Simulate a shell rc in a temporary HOME
 	tmp := t.TempDir()
-	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmp)
-	defer os.Setenv("HOME", oldHome)
+	t.Setenv("HOME", tmp)
 	// Make a .bashrc
 	rc := filepath.Join(tmp, ".bashrc")
 	_ = os.WriteFile(rc, []byte("# existing\n"), 0o644)
@@ -74,8 +72,8 @@ func TestInstallAddToPathAndUninstall(t *testing.T) {
 	opts := Options{User: true, Path: tmp, From: src, DryRun: false, AddToPath: true}
 	// On Windows, enable test-mode BEFORE calling ExecuteInstall so we don't invoke PowerShell
 	if runtime.GOOS == "windows" {
-		os.Setenv("KRNR_TEST_NO_SETX", "1")
-		defer os.Unsetenv("KRNR_TEST_NO_SETX")
+		_ = os.Setenv("KRNR_TEST_NO_SETX", "1")
+		defer func() { _ = os.Unsetenv("KRNR_TEST_NO_SETX") }()
 	}
 	_, err := ExecuteInstall(opts)
 	if err != nil {
@@ -134,8 +132,8 @@ func TestSystemInstallAddToPathAndUninstall_WindowsOnly(t *testing.T) {
 		t.Skip("Windows-only system PATH test")
 	}
 	// Use KRNR_TEST_NO_SETX to avoid changing the real machine PATH
-	os.Setenv("KRNR_TEST_NO_SETX", "1")
-	defer os.Unsetenv("KRNR_TEST_NO_SETX")
+	_ = os.Setenv("KRNR_TEST_NO_SETX", "1")
+	defer func() { _ = os.Unsetenv("KRNR_TEST_NO_SETX") }()
 
 	tmp := t.TempDir()
 	installDir := filepath.Join(tmp, "krnr")
@@ -187,23 +185,23 @@ func TestDetectAndUninstallBothScopes(t *testing.T) {
 	_ = os.WriteFile(sysBin, []byte("s"), 0o644)
 	// Set overrides so DefaultUserBin and systemBin point to these test dirs
 	oldHome := os.Getenv("HOME")
-	os.Setenv("HOME", filepath.Join(tmp))
-	defer os.Setenv("HOME", oldHome)
+	_ = os.Setenv("HOME", filepath.Join(tmp))
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
 	if runtime.GOOS == "windows" {
 		oldUser := os.Getenv("USERPROFILE")
-		os.Setenv("USERPROFILE", filepath.Join(tmp))
-		defer os.Setenv("USERPROFILE", oldUser)
+		_ = os.Setenv("USERPROFILE", filepath.Join(tmp))
+		defer func() { _ = os.Setenv("USERPROFILE", oldUser) }()
 	}
 	// override system bin via env var
 	oldSys := os.Getenv("KRNR_TEST_SYSTEM_BIN")
-	os.Setenv("KRNR_TEST_SYSTEM_BIN", sysDir)
-	defer os.Setenv("KRNR_TEST_SYSTEM_BIN", oldSys)
+	_ = os.Setenv("KRNR_TEST_SYSTEM_BIN", sysDir)
+	defer func() { _ = os.Setenv("KRNR_TEST_SYSTEM_BIN", oldSys) }()
 	// Ensure user bin is on PATH for process-level detection
 	oldPath := os.Getenv("PATH")
-	defer os.Setenv("PATH", oldPath)
-	os.Setenv("PATH", oldPath+string(os.PathListSeparator)+filepath.Dir(userBin))
+	defer func() { _ = os.Setenv("PATH", oldPath) }()
+	_ = os.Setenv("PATH", oldPath+string(os.PathListSeparator)+filepath.Dir(userBin))
 	// Now check Status
-	st, err := Status()
+	st, err := GetStatus()
 	if err != nil {
 		t.Fatalf("Status failed: %v", err)
 	}
@@ -234,18 +232,18 @@ func TestDetectAndUninstallBothScopes(t *testing.T) {
 func TestComputeNewPathString_RemovesOnlyTargetAndKeepsOthers(t *testing.T) {
 	// simulate a PATH where one entry has doubled backslashes (corruption) and another is target
 	cur := `C:\\Users\\Vox\\AppData\\Local\\Microsoft\\WindowsApps;C:\Temp`
-	new, removed := computeNewPathString(cur, `C:\Temp`)
+	newPath, removed := computeNewPathString(cur, `C:\Temp`)
 	if !removed {
 		t.Fatalf("expected removal")
 	}
 	// ensure no doubled backslashes remain
-	if strings.Contains(new, `\\\\`) {
-		t.Fatalf("expected no doubled backslashes in resulting PATH, got: %s", new)
+	if strings.Contains(newPath, `\\\\`) {
+		t.Fatalf("expected no doubled backslashes in resulting PATH, got: %s", newPath)
 	}
-	if strings.Contains(new, `C:\\Temp`) {
-		t.Fatalf("expected C:\\Temp removed, got: %s", new)
+	if strings.Contains(newPath, `C:\\Temp`) {
+		t.Fatalf("expected C:\\Temp removed, got: %s", newPath)
 	}
-	if !strings.Contains(new, "WindowsApps") {
-		t.Fatalf("expected WindowsApps to remain, got: %s", new)
+	if !strings.Contains(newPath, "WindowsApps") {
+		t.Fatalf("expected WindowsApps to remain, got: %s", newPath)
 	}
 }

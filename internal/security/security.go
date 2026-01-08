@@ -1,3 +1,4 @@
+// Package security provides security-related utilities.
 package security
 
 import (

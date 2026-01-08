@@ -13,13 +13,13 @@ var describeCmd = &cobra.Command{
 	Use:   "describe <name>",
 	Short: "Show details for a command set",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		name := args[0]
 		dbConn, err := db.InitDB()
 		if err != nil {
 			return err
 		}
-		defer dbConn.Close()
+		defer func() { _ = dbConn.Close() }()
 
 		r := registry.NewRepository(dbConn)
 		cs, err := r.GetCommandSetByName(name)

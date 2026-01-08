@@ -1,3 +1,4 @@
+// Package exporter provides functionality to export command sets from the database.
 package exporter
 
 import (
@@ -7,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	// _ import for sqlite driver registration
 	_ "modernc.org/sqlite"
 
 	"github.com/VoxDroid/krnr/internal/config"
@@ -23,7 +25,7 @@ func ExportDatabase(dstPath string) error {
 	if err != nil {
 		return fmt.Errorf("open source db: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
 		return fmt.Errorf("create dst dir: %w", err)
 	}
@@ -31,7 +33,7 @@ func ExportDatabase(dstPath string) error {
 	if err != nil {
 		return fmt.Errorf("create dst db: %w", err)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	if _, err := io.Copy(out, in); err != nil {
 		return fmt.Errorf("copy db: %w", err)
 	}
@@ -56,7 +58,7 @@ func ExportCommandSet(srcDB *sql.DB, name string, dstPath string) error {
 	if err != nil {
 		return fmt.Errorf("select commands: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	cmds := []string{}
 	for rows.Next() {
@@ -76,7 +78,7 @@ func ExportCommandSet(srcDB *sql.DB, name string, dstPath string) error {
 	if err != nil {
 		return fmt.Errorf("open dst db: %w", err)
 	}
-	defer dstDB.Close()
+	defer func() { _ = dstDB.Close() }()
 
 	if err := dbpkg.ApplyMigrations(dstDB); err != nil {
 		return fmt.Errorf("apply schema: %w", err)

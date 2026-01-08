@@ -1,3 +1,4 @@
+// Package cmd provides the CLI commands for krnr.
 package cmd
 
 import (
@@ -11,7 +12,7 @@ var rootCmd = &cobra.Command{
 	Use:   "krnr",
 	Short: "krnr is a global, SQLite-backed command runner",
 	Long:  "krnr provides a global registry of named terminal workflows",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		// Easter egg flag: --whoami
 		who, _ := cmd.Flags().GetBool("whoami")
 		if who {
@@ -20,7 +21,7 @@ var rootCmd = &cobra.Command{
 			os.Exit(0)
 		}
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Println("krnr: run 'krnr --help' to see available commands")
 	},
 }
@@ -28,7 +29,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	// hidden easter-egg flag
 	rootCmd.PersistentFlags().Bool("whoami", false, "Easter egg: show author handle")
-	rootCmd.PersistentFlags().MarkHidden("whoami")
+	_ = rootCmd.PersistentFlags().MarkHidden("whoami")
 }
 
 // Execute executes the root command

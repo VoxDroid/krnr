@@ -1,3 +1,4 @@
+// Package user provides user-related utilities.
 package user
 
 import (
@@ -32,7 +33,7 @@ func SetProfile(p Profile) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
 	return enc.Encode(p)
