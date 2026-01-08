@@ -45,14 +45,17 @@ fi
 
 if [ "$NEEDS_DOCKER" = true ]; then
   if command -v docker >/dev/null 2>&1; then
-    # Determine required Go toolchain from go.mod if present (e.g., 'go 1.24')
+    # Determine required Go toolchain from go.mod if present (e.g., 'go 1.24' or 'go 1.24.0')
     GO_TOOLCHAIN=""
     if [ -f go.mod ]; then
       GO_TOOLCHAIN=$(awk '/^go [0-9]+\./{print $2; exit}' go.mod || true)
     fi
+    # Normalize to major.minor (strip any patch, e.g., 1.24.0 -> 1.24) because GOTOOLCHAIN
+    # expects a 'major.minor' value.
     if [ -n "$GO_TOOLCHAIN" ]; then
-      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2) with Go toolchain $GO_TOOLCHAIN..."
-      GOTOOLCHAIN_ARG=( -e "GOTOOLCHAIN=$GO_TOOLCHAIN" )
+      GO_TOOLCHAIN_SHORT=$(echo "$GO_TOOLCHAIN" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
+      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2) with Go toolchain $GO_TOOLCHAIN_SHORT..."
+      GOTOOLCHAIN_ARG=( -e "GOTOOLCHAIN=$GO_TOOLCHAIN_SHORT" )
     else
       echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2)..."
       GOTOOLCHAIN_ARG=()
