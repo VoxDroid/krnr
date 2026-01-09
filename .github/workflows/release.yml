@@ -126,13 +126,38 @@ jobs:
             exit 1
           fi
 
-      - name: Create GitHub Release and upload artifacts
-        uses: ncipollo/release-action@v1
-        with:
-          token: ${{ secrets.PERSONAL_TOKEN }}
-          tag: ${{ needs.check.outputs.version }}
-          name: ${{ needs.check.outputs.version }}
-          body: ${{ needs.check.outputs.release_body }}
-          artifacts: "dist/*"
-          draft: false
-          prerelease: false
+      - name: Create annotated tag for release
+        if: ${{ needs.check.outputs.publish == 'true' }}
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.check.outputs.version }}"
+          echo "Creating and pushing tag $VERSION"
+          git config user.name "VoxDroid"
+          git config user.email "izeno.contact@gmail.com"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push "https://x-access-token:${PERSONAL_TOKEN}@github.com/${GITHUB_REPO}" "$VERSION"
+
+      - name: Install GoReleaser
+        if: ${{ needs.check.outputs.publish == 'true' }}
+        run: |
+          curl -sSfL https://github.com/goreleaser/goreleaser/releases/latest/download/goreleaser_Linux_x86_64.tar.gz | tar xz -C /tmp
+          sudo mv /tmp/goreleaser /usr/local/bin/
+
+      - name: Run GoReleaser (publish)
+        if: ${{ needs.check.outputs.publish == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Running GoReleaser to build and publish artifacts (GitHub Release + package registries as configured)"
+          goreleaser release --rm-dist --release-notes "${{ needs.check.outputs.release_body }}" --snapshot=false
+
+      - name: Confirm published artifacts
+        if: ${{ needs.check.outputs.publish == 'true' }}
+        run: |
+          echo "Listing generated artifacts in dist/"
+          ls -la dist || true
+          echo "GoReleaser should have published these to the GitHub Release and registries configured in .goreleaser.yml"

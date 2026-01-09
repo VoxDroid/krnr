@@ -108,6 +108,14 @@ Follow these steps to install and verify `krnr` on your machine. These steps ass
 - Verify checksums and signatures (if configured) and confirm package contents and installation paths prior to publishing.
 - After a real release, update Homebrew formula SHA and Scoop/Winget URLs/SHA to point to the released assets.
 
+### Publishing notes
+- The integrated `release.yml` runs GoReleaser to **publish artifacts automatically** when a version commit (e.g., `v1.2.3`) is detected.
+- Required secrets:
+  - `PERSONAL_TOKEN` (recommended) — a GitHub Personal Access Token with `repo`, `releases`, and `packages` write permissions. This token is used by GoReleaser to create the GitHub Release and to push to other repositories (e.g., Homebrew taps or Scoop buckets) if those targets are configured.
+  - `GITHUB_TOKEN` (auto-provided) is also available but may be limited for cross-repo operations; use `PERSONAL_TOKEN` if you need to push to other repos.
+- If you want automatic publishing to Homebrew, Scoop, or Winget, ensure the token has write access to those target repos (or provide separate tokens via secrets).
+- We recommend running `release-validate.yml` first to inspect generated artifacts before creating an actual release.
+
 ## Acceptance criteria
 - `krnr install --dry-run` shows changes without modifying user files.
 - `krnr install --user` places executable in the per-user directory and prints exact PATH change instructions (makes the change only if user consents or `--yes` provided).

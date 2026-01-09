@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.1 - 2026-01-10
+
+- Packaging & release automation improvements:
+  - Integrate GoReleaser into the release workflow to produce installer artifacts (Deb/RPM via `nfpm`, Homebrew formula, Scoop/Winget manifests, and Windows archives).
+  - Add initial `.goreleaser.yml` and sample packaging manifests under `packaging/` (Homebrew, Scoop, Winget) and `packaging/nfpm/` (deb/rpm).
+  - Add `release-validate.yml` workflow to run GoReleaser in snapshot mode and upload generated `dist/` artifacts for inspection before publishing.
+  - Extend `release.yml` to create portable archives and run GoReleaser to publish artifacts when a version commit is detected.
+  - Document publishing notes and required token scopes in `docs/install.md` (use `PERSONAL_TOKEN` for cross-repo pushes and package registry publishing).
+
+- Documentation & CI polish:
+  - Add validation steps and documentation for packaging and publishing in `docs/install.md`.
+  - Add TODO and docs entries to track packaging progress and manifest publishing.
+
+
 ## v0.2.0 - 2026-01-09
 
 - Implement editor helper tests and interactive edit behavior:

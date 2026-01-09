@@ -18,7 +18,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - [x] Design installer strategy (priority: high) — decide scope (per-user `krnr install` CLI vs platform packages), security model, and test plan. (completed)
 - [x] Implement `krnr install` (priority: high) — add cross-platform per-user installer (dry-run, --user, --system, --path, --yes, --uninstall) with unit and integration tests. (completed)
 - [ ] Create platform packages (priority: medium) — add GoReleaser configuration & manifests to produce Windows MSI/Winget, macOS Homebrew/cask or pkg, and Linux `.deb`/`.rpm` packages/archives. (in progress: VoxDroid)
-- [x] Add CI build/release jobs for installers (priority: medium) — build artifacts for each platform and upload to `dist/` during release workflows. (goreleaser: release-goreleaser.yml added)
+- [x] Add CI build/release jobs for installers (priority: medium) — build artifacts for each platform and upload to `dist/` during release workflows. (goreleaser integrated into `release.yml`)
 - [x] Test release & validate artifacts (release-validate.yml added; artifacts uploaded for inspection)
 - [x] Add install tests (priority: medium) — unit tests for install logic and a CI E2E job that runs `install --dry-run` and an install->run smoke test. (completed)
 - [x] Add uninstall/rollback and safety checks (priority: medium) — ensure changes are reversible and prompt before editing PATH or shell rc files. (completed)
