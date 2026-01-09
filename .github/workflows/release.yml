@@ -154,7 +154,8 @@ jobs:
           set -euo pipefail
           echo "Removing old dist/ and running GoReleaser to build and publish artifacts"
           rm -rf dist || true
-          goreleaser release --release-notes "${{ needs.check.outputs.release_body }}" --snapshot=false
+          # Pass explicit release notes text (avoid a bare tag like "v0.2.1" being interpreted as a file name)
+          goreleaser release --release-notes "Release ${{ needs.check.outputs.version }}: ${{ needs.check.outputs.release_body }}" --snapshot=false
 
       - name: Confirm published artifacts
         if: ${{ needs.check.outputs.publish == 'true' }}
