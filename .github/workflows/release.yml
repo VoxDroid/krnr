@@ -152,8 +152,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
           set -euo pipefail
-          echo "Running GoReleaser to build and publish artifacts (GitHub Release + package registries as configured)"
-          goreleaser release --rm-dist --release-notes "${{ needs.check.outputs.release_body }}" --snapshot=false
+          echo "Removing old dist/ and running GoReleaser to build and publish artifacts"
+          rm -rf dist || true
+          goreleaser release --release-notes "${{ needs.check.outputs.release_body }}" --snapshot=false
 
       - name: Confirm published artifacts
         if: ${{ needs.check.outputs.publish == 'true' }}

@@ -33,8 +33,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          echo "Running goreleaser in snapshot mode to validate artifacts"
-          goreleaser release --snapshot --rm-dist --skip-publish
+          echo "Removing old dist/ and running goreleaser in snapshot mode to validate artifacts"
+          rm -rf dist || true
+          goreleaser release --snapshot --skip-publish
 
       - name: Upload generated artifacts for inspection
         uses: actions/upload-artifact@v4

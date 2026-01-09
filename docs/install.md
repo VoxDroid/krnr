@@ -106,6 +106,7 @@ Follow these steps to install and verify `krnr` on your machine. These steps ass
 - Use the `release-validate.yml` workflow (manual `workflow_dispatch` or push a `v*` tag) to produce artifacts in CI and upload them as workflow artifacts for inspection.
 - Inspect generated artifacts (`dist/`) for expected package types: `*-portable.*`, Debian `.deb`, RPM `.rpm`, Homebrew artifacts, and Windows installers (ZIP/MSI as produced).
 - Verify checksums and signatures (if configured) and confirm package contents and installation paths prior to publishing.
+- Note: workflows explicitly remove any existing `dist/` directory before invoking GoReleaser to avoid compatibility issues with older GoReleaser versions that don't support the `--rm-dist` flag.
 - After a real release, update Homebrew formula SHA and Scoop/Winget URLs/SHA to point to the released assets.
 
 ### Publishing notes
