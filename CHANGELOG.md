@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased - 2026-01-08
+## v0.2.0 - 2026-01-09
 
 - Implement editor helper tests and interactive edit behavior:
   - Add `OpenEditor` unit tests that run a scripted editor via `$EDITOR` (cross-platform).

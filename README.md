@@ -1,5 +1,7 @@
 # krnr — Kernel Runner
 
+[![CI](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml) [![Downloads](https://img.shields.io/github/downloads/VoxDroid/krnr/total?label=downloads&color=blue)](https://github.com/VoxDroid/krnr/releases)
+
 krnr is a cross-platform CLI tool that provides a global, persistent command registry backed by SQLite.
 
 Quick start (dev):
