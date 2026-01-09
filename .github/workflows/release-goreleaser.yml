@@ -1,0 +1,48 @@
+name: Release (GoReleaser)
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Install GoReleaser
+        run: |
+          curl -sSfL https://github.com/goreleaser/goreleaser/releases/latest/download/goreleaser_Linux_x86_64.tar.gz | tar xz -C /tmp
+          sudo mv /tmp/goreleaser /usr/local/bin/
+
+      - name: Build installer artifacts (nfpm, homebrew, scoop, winget)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Ensure goreleaser uses the release tag from the GitHub release event
+          TAG=${{ github.event.release.tag_name }}
+          echo "Using tag: $TAG"
+          goreleaser release --rm-dist --skip-publish --rm-dist --release-notes "${{ github.event.release.body }}" --snapshot=false --rm-dist
+
+      - name: Upload artifacts to the GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          tag: ${{ github.event.release.tag_name }}
+          name: ${{ github.event.release.tag_name }}
+          body: ${{ github.event.release.body }}
+          artifacts: "dist/*"
+          draft: false
+          prerelease: false

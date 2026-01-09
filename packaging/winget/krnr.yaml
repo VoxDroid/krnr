@@ -1,0 +1,10 @@
+Id: VoxDroid.krnr
+Name: krnr
+Publisher: VoxDroid
+Version: 0.0.0
+License: MIT
+InstallerType: zip
+Installers:
+  - Architecture: x64
+    Url: https://github.com/VoxDroid/krnr/releases/download/v0.0.0/krnr-windows-amd64.zip
+    Sha256: PLACEHOLDER_SHA256

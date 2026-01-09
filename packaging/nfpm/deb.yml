@@ -1,0 +1,20 @@
+name: krnr
+arch: amd64
+platform: linux
+version: "{{ .Version }}"
+maintainer: "VoxDroid <izeno.contact@gmail.com>"
+section: utils
+priority: optional
+description: "krnr — Kernel Runner (CLI)"
+homepage: "https://github.com/VoxDroid/krnr"
+license: MIT
+
+files:
+  krnr: /usr/bin/krnr
+
+scripts:
+  post-install: |
+    set -e
+    if [ ! -f /usr/bin/krnr ]; then
+      echo "Warning: /usr/bin/krnr not found after install"
+    fi

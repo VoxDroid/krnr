@@ -78,7 +78,7 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Build distributions
+      - name: Build distributions (portable)
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -90,6 +90,7 @@ jobs:
           fi
           echo "Using version from version.go: $FILE_VER"
           VERSION_NO_V="${FILE_VER#v}"
+
           targets=("linux/amd64" "linux/arm64" "darwin/amd64" "darwin/arm64" "windows/amd64" "windows/arm64")
           for t in "${targets[@]}"; do
             os=${t%%/*}
@@ -100,6 +101,23 @@ jobs:
             echo "Building $out"
             env GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -ldflags "-X github.com/VoxDroid/krnr/internal/version.Version=${VERSION_NO_V}" -o "$out" .
           done
+
+          # Create portable archives (named with '-portable') next to the binaries
+          mkdir -p dist/portable
+          for f in dist/krnr-${VERSION_NO_V}-*; do
+            base=$(basename "$f")
+            if [[ "$base" == *.exe ]]; then
+              echo "Creating ZIP portable for $base"
+              zip -j "dist/${base%.*}-portable.zip" "dist/$base" LICENSE README.md || true
+            else
+              echo "Creating tar.gz portable for $base"
+              tar -C dist -czf "dist/${base}-portable.tar.gz" "$base" LICENSE README.md || true
+            fi
+          done
+
+          # Move raw binaries into an artifacts subdir for cleanliness
+          mkdir -p dist/portable/binaries
+          mv dist/krnr-${VERSION_NO_V}-* dist/portable/binaries/ || true
 
       - name: Require PERSONAL_TOKEN
         run: |

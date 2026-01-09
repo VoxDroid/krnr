@@ -1,0 +1,13 @@
+{
+  "version": "0.0.0",
+  "homepage": "https://github.com/VoxDroid/krnr",
+  "license": "MIT",
+  "url": "https://github.com/VoxDroid/krnr/releases/download/v0.0.0/krnr-windows-amd64.zip",
+  "bin": "krnr.exe",
+  "checkver": {
+    "github": "VoxDroid/krnr"
+  },
+  "autoupdate": {
+    "github": "VoxDroid/krnr"
+  }
+}

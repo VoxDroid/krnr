@@ -1,0 +1,47 @@
+name: Validate Release Artifacts (GoReleaser snapshot)
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Install GoReleaser
+        run: |
+          curl -sSfL https://github.com/goreleaser/goreleaser/releases/latest/download/goreleaser_Linux_x86_64.tar.gz | tar xz -C /tmp
+          sudo mv /tmp/goreleaser /usr/local/bin/
+
+      - name: Run GoReleaser (snapshot)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Running goreleaser in snapshot mode to validate artifacts"
+          goreleaser release --snapshot --rm-dist --skip-publish
+
+      - name: Upload generated artifacts for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: goreleaser-artifacts
+          path: dist/
+
+      - name: List generated files
+        run: |
+          echo "Generated artifacts:" && ls -la dist || true

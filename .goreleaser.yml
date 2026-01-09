@@ -1,0 +1,47 @@
+project_name: krnr
+
+builds:
+  - binary: krnr
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+  - format: zip
+    os: [windows]
+    files:
+      - LICENSE
+      - README.md
+
+nfpm:
+  packages:
+    - file: packaging/nfpm/deb.yml
+    - file: packaging/nfpm/rpm.yml
+
+brews:
+  - name: krnr
+    folder: packaging/homebrew
+
+snapshot:
+  name_template: 'krnr-{{ .Version }}'
+
+release:
+  github:
+    owner: VoxDroid
+    name: krnr
+
+changelog:
+  use: git

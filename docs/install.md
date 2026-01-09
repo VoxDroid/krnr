@@ -8,7 +8,7 @@ It focuses on a pragmatic, low-risk first implementation (per-user installer CLI
 - Avoid requiring admin privileges by default; provide an explicit `--system` mode that requires elevation.
 - Be transparent and reversible: provide `--dry-run`, `--uninstall`, and a rollback mechanism.
 - Make the implementation testable and CI-friendly.
-- Later produce official packages (Homebrew/Scoop/Winget/MSI/.deb/.rpm) using GoReleaser.
+- Later produce official packages (Homebrew/Scoop/Winget/MSI/.deb/.rpm) using GoReleaser. (in progress: VoxDroid)
 
 ## Non-goals (initial)
 - Not attempting to replace platform package managers in the first iteration.
@@ -99,7 +99,14 @@ Follow these steps to install and verify `krnr` on your machine. These steps ass
 3. Implement file operations (copy, set executable, create backups, metadata file). Add uninstall. (1-2 days)
 4. Add integration tests & CI job that runs dry-run tests on all OS runners. (1 day)
 5. Add `--system` with conditional elevation guidance and tests. (1 day)
-6. Create GoReleaser config for packaging and add release CI. (2-3 days)
+6. Create GoReleaser config for packaging and add release CI. (2-3 days) (initial config and release-goreleaser.yml added)
+
+### Packaging validation
+- Run `goreleaser` locally in snapshot mode to verify build and packaging output without publishing: `goreleaser release --snapshot --rm-dist`.
+- Use the `release-validate.yml` workflow (manual `workflow_dispatch` or push a `v*` tag) to produce artifacts in CI and upload them as workflow artifacts for inspection.
+- Inspect generated artifacts (`dist/`) for expected package types: `*-portable.*`, Debian `.deb`, RPM `.rpm`, Homebrew artifacts, and Windows installers (ZIP/MSI as produced).
+- Verify checksums and signatures (if configured) and confirm package contents and installation paths prior to publishing.
+- After a real release, update Homebrew formula SHA and Scoop/Winget URLs/SHA to point to the released assets.
 
 ## Acceptance criteria
 - `krnr install --dry-run` shows changes without modifying user files.
