@@ -43,16 +43,16 @@ nfpms:
       - rpm
     bindir: /usr/bin
 
-brews:
-  - name: krnr
-    repository:
-      owner: VoxDroid
-      name: homebrew
-    homepage: https://github.com/VoxDroid/krnr
-    description: Kernel-related CLI utility
-    commit_author:
-      name: VoxDroid
-      email: izeno.contact@gmail.com
+# brews:
+#   - name: krnr
+#     repository:
+#       owner: VoxDroid
+#       name: homebrew
+#     homepage: https://github.com/VoxDroid/krnr
+#     description: Kernel-related CLI utility
+#     commit_author:
+#       name: VoxDroid
+#       email: izeno.contact@gmail.com
 
 snapshot:
   name_template: "krnr-{{ .Version }}"
