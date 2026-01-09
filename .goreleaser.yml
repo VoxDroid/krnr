@@ -24,18 +24,21 @@ archives:
       - LICENSE
       - README.md
   - format: zip
-    os: [windows]
+    goos: [windows]
     files:
       - LICENSE
       - README.md
 
 nfpms:
-  - file: packaging/nfpm/deb.yml
-  - file: packaging/nfpm/rpm.yml
+  - path: packaging/nfpm/deb.yml
+  - path: packaging/nfpm/rpm.yml
 
 brews:
   - name: krnr
-    folder: packaging/homebrew
+    repo: VoxDroid/homebrew
+    commit_author:
+      name: "VoxDroid"
+      email: "izeno.contact@gmail.com"
 
 snapshot:
   name_template: 'krnr-{{ .Version }}'
