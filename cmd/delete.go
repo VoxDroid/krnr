@@ -26,8 +26,8 @@ var deleteCmd = &cobra.Command{
 
 		r := registry.NewRepository(dbConn)
 		if !yesFlag {
-			// prompt interactively; use utils.Confirm which reads from stdin
-			if !utils.Confirm(fmt.Sprintf("Delete '%s' permanently?", name)) {
+			// prompt interactively; read from the command's input so tests can script it
+			if !utils.ConfirmReader(fmt.Sprintf("Delete '%s' permanently?", name), cmd.InOrStdin()) {
 				fmt.Println("aborted")
 				return nil
 			}

@@ -8,6 +8,15 @@ Quick start (dev):
 2. Run `go build ./...`
 3. Run `./krnr` (or `krnr.exe` on Windows)
 
+Install & setup (users):
+
+- Download a release binary from the GitHub Releases page or build a local binary and use the included installer to place it on your PATH:
+  - `./krnr install --user --from ./krnr --add-to-path` (Unix/macOS)
+  - `.\krnr.exe install --user --from .\krnr.exe --add-to-path` (PowerShell/Windows)
+- Verify with `krnr status` and start a new shell session if necessary.
+- See `docs/install.md` for full installation guidance, PATH handling details, and troubleshooting tips.
+
+
 Clean rebuild (dev):
 
 - If you see behavior that looks out of date (for example, after fixing runtime output), perform a clean rebuild to ensure you're running the latest code you have checked out:

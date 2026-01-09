@@ -20,6 +20,32 @@ It focuses on a pragmatic, low-risk first implementation (per-user installer CLI
 - I want `krnr install --dry-run` to show exactly what will change.
 - I want `krnr uninstall` to remove what the installer added.
 
+## Quick start — Install & setup (users)
+Follow these steps to install and verify `krnr` on your machine. These steps assume you've downloaded or built a `krnr` binary for your platform. For full details and advanced options, see this document.
+
+### Install (per-user)
+- Place the binary somewhere you control (recommended: `~/krnr/bin` on Unix/macOS, `%USERPROFILE%\krnr\bin` on Windows).
+- Run the installer to copy and optionally add the directory to PATH:
+  - `./krnr install --user --from ./krnr --add-to-path` (Unix/macOS)
+  - `.\krnr.exe install --user --from .\krnr.exe --add-to-path` (PowerShell on Windows)
+- To skip interactive prompts (for scripted installs), provide `--yes` (use with caution):
+  - `./krnr install --user --from ./krnr --add-to-path --yes`
+
+### Verify installation
+- Start a new shell (or restart your terminal) so PATH changes take effect.
+- Run `krnr status` to confirm `krnr` is installed and whether its directory is on PATH.
+- On Unix/macOS you can also run `which krnr` or `command -v krnr`; on Windows use `Get-Command krnr` in PowerShell.
+
+### Manual PATH (if you prefer to avoid the installer)
+- Unix/macOS: add the target dir to your shell rc (for example `export PATH="$HOME/krnr/bin:$PATH"`) and reload your shell.
+- Windows (PowerShell): add `%USERPROFILE%\krnr\bin` to your user PATH via System Settings, or use `setx`/PowerShell `Set-ItemProperty` (installer handles details and normalization).
+
+### Troubleshooting
+- If `krnr` is not found after install, ensure you started a new shell session or your PATH was updated correctly.
+- If PATH modifications were not allowed for system-level installs, rerun with elevated privileges (or use a per-user install).
+- For uninstall, run `krnr uninstall --yes` to remove installed files non-interactively; use `--dry-run` first to preview actions.
+
+
 ## Design decisions
 - Default behavior is **per-user** install.
   - Target dirs:
