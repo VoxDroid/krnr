@@ -91,9 +91,9 @@ Record commands from standard input into a new command set. After running the co
 
 ## delete
 
-`krnr delete <name> [--confirm]`
+`krnr delete <name> [--yes]`
 
-Delete a command set; use `--confirm` to prompt interactively before deleting.
+Delete a command set; an interactive y/n confirmation will be requested by default. Use `--yes` to skip prompts when running non-interactively (for example, in scripts).
 
 ## install
 

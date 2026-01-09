@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
   - `internal/recorder` provides `RecordCommands` and `SaveRecorded` to capture commands from stdin and save them into the registry.
   - Add `krnr record <name>` CLI command to record commands from stdin and persist them as a named command set.
   - `krnr record` now detects when the provided `<name>` already exists and will warn and prompt the user to enter a different name instead of failing with a DB constraint error.
+  - `krnr delete <name>` now prompts interactively for a y/n confirmation by default; use `--yes` to skip prompts for non-interactive use.
   - Add unit test for `RecordCommands` and integration test for `krnr record`.
 
 - Add E2E release test and CI workflow:

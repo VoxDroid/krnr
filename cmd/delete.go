@@ -16,7 +16,7 @@ var deleteCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		confirmFlag, _ := cmd.Flags().GetBool("confirm")
+		yesFlag, _ := cmd.Flags().GetBool("yes")
 
 		dbConn, err := db.InitDB()
 		if err != nil {
@@ -25,7 +25,8 @@ var deleteCmd = &cobra.Command{
 		defer func() { _ = dbConn.Close() }()
 
 		r := registry.NewRepository(dbConn)
-		if confirmFlag {
+		if !yesFlag {
+			// prompt interactively; use utils.Confirm which reads from stdin
 			if !utils.Confirm(fmt.Sprintf("Delete '%s' permanently?", name)) {
 				fmt.Println("aborted")
 				return nil
@@ -40,6 +41,6 @@ var deleteCmd = &cobra.Command{
 }
 
 func init() {
-	deleteCmd.Flags().Bool("confirm", false, "Ask for confirmation")
+	deleteCmd.Flags().Bool("yes", false, "Assume yes for prompts")
 	rootCmd.AddCommand(deleteCmd)
 }
