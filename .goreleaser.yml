@@ -45,7 +45,7 @@ nfpms:
 
 brews:
   - name: krnr
-    tap:
+    repository:
       owner: VoxDroid
       name: homebrew
     homepage: https://github.com/VoxDroid/krnr
