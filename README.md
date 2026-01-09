@@ -14,6 +14,7 @@ Install & setup (users):
   - `./krnr install --user --from ./krnr --add-to-path` (Unix/macOS)
   - `.\krnr.exe install --user --from .\krnr.exe --add-to-path` (PowerShell/Windows)
 - Verify with `krnr status` and start a new shell session if necessary.
+- When recording interactively with `krnr record`, you can end recording by typing `:end` on its own line (aliases `:save` and `:quit` are also accepted); this avoids relying on Ctrl+Z/EOF behavior across consoles.
 - See `docs/install.md` for full installation guidance, PATH handling details, and troubleshooting tips.
 
 

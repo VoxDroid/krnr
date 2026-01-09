@@ -12,20 +12,112 @@ import (
 
 // RecordCommands reads lines from r until EOF and returns non-empty, non-comment lines
 // as a slice of commands. Lines starting with '#' are treated as comments and ignored.
+// Special sentinel lines (single-line commands) `:end`, `:save`, and `:quit` stop
+// recording immediately when a line consisting only of that token (after trimming)
+// is encountered. This is a simple and robust mechanism that works across shells
+// and Windows consoles without relying on raw terminal mode. Ctrl+Z (0x1A) and
+// caret-Z sequences are still treated as immediate EOF when observed.
 func RecordCommands(r io.Reader) ([]string, error) {
-	s := bufio.NewScanner(r)
+	br := bufio.NewReader(r)
 	var out []string
-	for s.Scan() {
-		line := strings.TrimSpace(s.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+	var lineBuf strings.Builder
+	isSentinel := func(s string) bool {
+		trim := strings.TrimSpace(s)
+		switch trim {
+		case ":end", ":save", ":quit":
+			return true
+		default:
+			return false
+		}
+	}
+	for {
+		b, err := br.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				// flush any pending line
+				if lineBuf.Len() > 0 {
+					line := strings.TrimSpace(lineBuf.String())
+					if isSentinel(line) {
+						return out, nil
+					}
+					if line != "" && !strings.HasPrefix(line, "#") {
+						out = append(out, line)
+					}
+				}
+				return out, nil
+			}
+			return nil, fmt.Errorf("read commands: %w", err)
+		}
+		// ASCII SUB (Ctrl+Z) should stop reading immediately
+		if b == 0x1A {
+			if lineBuf.Len() > 0 {
+				line := strings.TrimSpace(lineBuf.String())
+				if isSentinel(line) {
+					return out, nil
+				}
+				if line != "" && !strings.HasPrefix(line, "#") {
+					out = append(out, line)
+				}
+			}
+			return out, nil
+		}
+
+		// Some Windows consoles echo a caret sequence '^Z' when Ctrl+Z is pressed
+		// (two characters '^' and 'Z' or 'z'). Treat that sequence as EOF and
+		// ignore it so the user doesn't have to press Enter after typing Ctrl+Z.
+		if b == '^' {
+			// attempt to read the next byte to see if it's Z/z
+			nb, err := br.ReadByte()
+			if err != nil {
+				if err == io.EOF {
+					// we read a trailing '^' at EOF, treat it as normal char
+					lineBuf.WriteByte('^')
+					if lineBuf.Len() > 0 {
+						line := strings.TrimSpace(lineBuf.String())
+						if isSentinel(line) {
+							return out, nil
+						}
+						if line != "" && !strings.HasPrefix(line, "#") {
+							out = append(out, line)
+						}
+					}
+					return out, nil
+				}
+				return nil, fmt.Errorf("read commands: %w", err)
+			}
+			if nb == 'Z' || nb == 'z' {
+				if lineBuf.Len() > 0 {
+					line := strings.TrimSpace(lineBuf.String())
+					if isSentinel(line) {
+						return out, nil
+					}
+					if line != "" && !strings.HasPrefix(line, "#") {
+						out = append(out, line)
+					}
+				}
+				return out, nil
+			}
+			// not a caret-Z sequence — append both to the buffer
+			lineBuf.WriteByte('^')
+			lineBuf.WriteByte(nb)
 			continue
 		}
-		out = append(out, line)
+
+		if b == '\n' {
+			line := strings.TrimSpace(lineBuf.String())
+			if isSentinel(line) {
+				return out, nil
+			}
+			if line != "" && !strings.HasPrefix(line, "#") {
+				out = append(out, line)
+			}
+			lineBuf.Reset()
+			continue
+		}
+
+		// accumulate bytes into the current line
+		lineBuf.WriteByte(b)
 	}
-	if err := s.Err(); err != nil {
-		return nil, fmt.Errorf("read commands: %w", err)
-	}
-	return out, nil
 }
 
 // SaveRecorded creates a command set with the given name/description and writes

@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
   - Add `krnr record <name>` CLI command to record commands from stdin and persist them as a named command set.
   - `krnr record` now detects when the provided `<name>` already exists and will warn and prompt the user to enter a different name instead of failing with a DB constraint error.
   - `krnr delete <name>` now prompts interactively for a y/n confirmation by default; use `--yes` to skip prompts for non-interactive use.
+  - `krnr record` supports sentinel stop commands: type `:end` on a line by itself to stop recording immediately; `:save` and `:quit` are accepted as aliases. This is documented in `docs/cli.md`.
   - Docs: add a short "Install & setup" quick-start to `docs/install.md` and a summary install note in `README.md` to help users get started.
   - Add unit test for `RecordCommands` and integration test for `krnr record`.
 
