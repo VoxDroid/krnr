@@ -1,7 +1,11 @@
+goreleaser:
+  config_version: 2
+
 project_name: krnr
 
 builds:
-  - binary: krnr
+  - id: krnr
+    binary: krnr
     main: ./main.go
     env:
       - CGO_ENABLED=0
@@ -13,7 +17,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X github.com/VoxDroid/krnr/internal/version.Version={{.Version}}
 
 archives:
   - format: tar.gz
@@ -26,10 +30,9 @@ archives:
       - LICENSE
       - README.md
 
-nfpm:
-  packages:
-    - file: packaging/nfpm/deb.yml
-    - file: packaging/nfpm/rpm.yml
+nfpms:
+  - file: packaging/nfpm/deb.yml
+  - file: packaging/nfpm/rpm.yml
 
 brews:
   - name: krnr
