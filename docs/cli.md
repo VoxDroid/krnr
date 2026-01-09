@@ -87,7 +87,7 @@ Interactive edit details:
 
 `krnr record <name> [-d "description"]`
 
-Record commands from standard input into a new command set. After running the command, type commands one per line and finish with EOF (Ctrl-D on Unix, Ctrl-Z on Windows). Blank lines and lines beginning with `#` are ignored. The recorded commands will be saved as a new command set named `<name>`.
+Record commands from standard input into a new command set. After running the command, type commands one per line and finish with EOF (Ctrl-D on Unix, Ctrl-Z on Windows). Blank lines and lines beginning with `#` are ignored. The recorded commands will be saved as a new command set named `<name>`. If the provided name already exists, `krnr` will warn and prompt you to enter a different name before recording.
 
 ## delete
 

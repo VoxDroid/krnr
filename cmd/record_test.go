@@ -44,3 +44,41 @@ func TestRecordCommand_SavesCommandsFromStdin(t *testing.T) {
 	// cleanup
 	_ = r.DeleteCommandSet("record-test")
 }
+
+func TestRecordCommand_PromptsOnDuplicateName(t *testing.T) {
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := registry.NewRepository(dbConn)
+	_ = r.DeleteCommandSet("record-dup")
+	// create a pre-existing set
+	if _, err := r.CreateCommandSet("record-dup", nil, nil, nil); err != nil {
+		t.Fatalf("CreateCommandSet: %v", err)
+	}
+
+	// prepare input: new name followed by two commands
+	input := "record-dup-2\necho record1\necho record2\n"
+	recordCmd.SetIn(bytes.NewBufferString(input))
+
+	if err := recordCmd.RunE(recordCmd, []string{"record-dup"}); err != nil {
+		t.Fatalf("recordCmd failed: %v", err)
+	}
+
+	cs, err := r.GetCommandSetByName("record-dup-2")
+	if err != nil {
+		t.Fatalf("GetCommandSetByName: %v", err)
+	}
+	if cs == nil {
+		t.Fatalf("expected command set created with new name")
+	}
+	if len(cs.Commands) != 2 {
+		t.Fatalf("expected 2 commands, got %d", len(cs.Commands))
+	}
+
+	// cleanup
+	_ = r.DeleteCommandSet("record-dup")
+	_ = r.DeleteCommandSet("record-dup-2")
+}
