@@ -19,29 +19,43 @@ builds:
       - -s -w -X github.com/VoxDroid/krnr/internal/version.Version={{.Version}}
 
 archives:
-  - format: tar.gz
+  - id: default
+    builds: [krnr]
+    format: tar.gz
     files:
       - LICENSE
       - README.md
-  - format: zip
-    goos: [windows]
-    files:
-      - LICENSE
-      - README.md
+    format_overrides:
+      - goos: windows
+        format: zip
 
 nfpms:
-  - path: packaging/nfpm/deb.yml
-  - path: packaging/nfpm/rpm.yml
+  - id: krnr
+    package_name: krnr
+    builds: [krnr]
+    vendor: VoxDroid
+    homepage: https://github.com/VoxDroid/krnr
+    maintainer: VoxDroid <izeno.contact@gmail.com>
+    description: Kernel-related CLI utility
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
 
 brews:
   - name: krnr
-    repo: VoxDroid/homebrew
+    tap:
+      owner: VoxDroid
+      name: homebrew
+    homepage: https://github.com/VoxDroid/krnr
+    description: Kernel-related CLI utility
     commit_author:
-      name: "VoxDroid"
-      email: "izeno.contact@gmail.com"
+      name: VoxDroid
+      email: izeno.contact@gmail.com
 
 snapshot:
-  name_template: 'krnr-{{ .Version }}'
+  name_template: "krnr-{{ .Version }}"
 
 release:
   github:
