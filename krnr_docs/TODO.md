@@ -15,18 +15,21 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ## Outstanding / To do (newest at top)
 
-- [x] Design installer strategy (priority: high) — decide scope (per-user `krnr install` CLI vs platform packages), security model, and test plan. (completed)
-- [x] Implement `krnr install` (priority: high) — add cross-platform per-user installer (dry-run, --user, --system, --path, --yes, --uninstall) with unit and integration tests. (completed)
-- [x] Add CI build/release jobs for installers (priority: medium) — build artifacts for each platform and upload to `dist/` during release workflows. (goreleaser integrated into `release.yml`)
-- [x] Test release & validate artifacts (release-validate.yml added; artifacts uploaded for inspection)
-- [x] Add install tests (priority: medium) — unit tests for install logic and a CI E2E job that runs `install --dry-run` and an install->run smoke test. (completed)
-- [x] Add uninstall/rollback and safety checks (priority: medium) — ensure changes are reversible and prompt before editing PATH or shell rc files. (completed)
-- [x] Update docs and CHANGELOG (priority: low) — add `docs/install.md`, update `docs/cli.md` examples, and add a `CHANGELOG` entry when released. (completed)
-- [x] Add CI Windows job to run `install/uninstall --dry-run` and tests to catch PATH regressions (priority: high). (completed)
+- No outstanding items at this time.
 
 ---
 
 ## Completed / Done (older beneath)
+
+### Installer & release (completed)
+- [x] Design installer strategy — decided scope (per-user `krnr install` CLI vs platform packages), security model, and test plan.
+- [x] Implement `krnr install` — cross-platform per-user installer with `--dry-run`, `--user`, `--system`, `--path`, `--yes`, and uninstall support plus tests.
+- [x] Add CI build/release jobs for installers — workflows build artifacts per platform and upload to `dist/` (GoReleaser integrated).
+- [x] Test release & validate artifacts — `release-validate.yml` and artifact inspection steps added.
+- [x] Add install tests — unit tests and a CI E2E `install --dry-run` smoke test.
+- [x] Add uninstall/rollback and safety checks — ensure changes are reversible and prompt before editing PATH or shell rc files.
+- [x] Update docs and CHANGELOG — added `docs/install.md` and updated CLI docs; documentation guidance added to README.
+- [x] Add CI Windows job to run `install/uninstall --dry-run` and tests to catch PATH regressions.
 
 ### 1) Initialize repository & dev environment (completed)
 - [x] Create `go.mod` and minimal package layout (`cmd/`, `internal/`)
