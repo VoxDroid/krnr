@@ -162,7 +162,25 @@ Building a local release:
 
 ## Contributing
 
-Contributions are welcome. See `CONTRIBUTING.md` for guidelines (create an issue first if in doubt). Please run formatters and linters before opening a PR. We also include a `.pre-commit-config.yaml` for basic checks.
+Contributions are welcome — please see `CONTRIBUTING.md` for the full guidelines (create an issue first if in doubt). Quick pointers:
+
+- Development: Go 1.22+ is recommended; build with `go build`.
+- Formatting & linting: run `./scripts/fmt.sh` and `./scripts/lint.sh` before opening a PR.
+- Tests: run `go test ./...` and add tests for new behavior.
+- Use the `.github` issue templates and the PR template when opening issues or pull requests.
+
+## Community & Support
+
+- Documentation and developer guides live in `docs/` and `README.md`.
+- For help, ask a question using the **Support Question** issue template or the Discussions tab: https://github.com/VoxDroid/krnr/discussions
+
+## Security
+
+If you discover a security vulnerability, follow `SECURITY.md`: we prefer private reports by email to [izeno.contact@gmail.com](mailto:izeno.contact@gmail.com) to avoid public disclosure until a fix is available.
+
+## Code of Conduct
+
+Please follow `CODE_OF_CONDUCT.md`. If you believe someone has violated the code, contact the maintainers at [izeno.contact@gmail.com](mailto:izeno.contact@gmail.com) or open a private issue labeled "Code of Conduct Violation."
 
 ---
 
