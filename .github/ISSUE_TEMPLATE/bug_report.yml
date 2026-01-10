@@ -1,0 +1,88 @@
+name: Bug Report
+description: Report a bug or issue with krnr
+labels: ["bug", "triage"]
+assignees: ["VoxDroid"] 
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please follow our [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md). Do not post unverified links or promotional content, as they will be considered spam and may lead to restrictions.
+  - type: checkboxes
+    id: guidelines
+    attributes:
+      label: Guidelines
+      description: Confirm that you have read and agree to follow our guidelines.
+      options:
+        - label: I have read the [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md) and agree to follow them.
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug.
+      placeholder: Describe what happened...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide detailed steps to reproduce the issue.
+      placeholder: |
+        1. Step 1
+        2. Step 2
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+      placeholder: Describe what should have happened...
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened.
+      placeholder: Describe what went wrong...
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: Which operating system are you using?
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: go-version
+    attributes:
+      label: Go Version
+      description: What version of Go are you using?
+      placeholder: e.g., 1.22
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: krnr Version
+      description: What version of krnr are you using?
+      placeholder: e.g., v0.1.0
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or Logs
+      description: If applicable, attach screenshots or logs to help explain the issue.
+      placeholder: Drag and drop files here or paste logs...
+    validations:
+      required: false

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: General Discussion
+    url: https://github.com/VoxDroid/krnr/discussions
+    about: For ideas, questions, or feedback, please use the Discussions tab.
+  - name: Support Resources
+    url: https://github.com/VoxDroid/krnr/blob/main/SUPPORT.md
+    about: Check the Support page for common issues and solutions.
+  - name: Security Contact
+    url: mailto:izeno.contact@gmail.com
+    about: For sensitive security issues, please email us directly instead of opening a public issue.

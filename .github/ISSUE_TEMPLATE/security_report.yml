@@ -1,0 +1,51 @@
+name: Security Report
+description: Report a security vulnerability in krnr
+labels: ["security", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please follow our [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md). Do not post unverified links or promotional content, as they will be considered spam and may lead to restrictions.
+        **Note**: For security issues, please consider emailing izeno.contact@gmail.com directly to avoid public disclosure. Use this template only if you are comfortable sharing details publicly.
+  - type: checkboxes
+    id: guidelines
+    attributes:
+      label: Guidelines
+      description: Confirm that you have read and agree to follow our guidelines.
+      options:
+        - label: I have read the [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md) and agree to follow them.
+          required: true
+  - type: textarea
+    id: vulnerability
+    attributes:
+      label: Vulnerability Description
+      description: Describe the security vulnerability in detail.
+      placeholder: e.g., Potential data leak in download function...
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is the potential impact of this vulnerability?
+      placeholder: e.g., Could allow unauthorized access to user data...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide steps to reproduce the vulnerability, if known.
+      placeholder: |
+        1. Step 1
+        2. Step 2
+    validations:
+      required: false
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+      description: If you have ideas for mitigating this issue, please describe them.
+      placeholder: e.g., Add input validation to prevent...
+    validations:
+      required: false

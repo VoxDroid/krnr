@@ -1,0 +1,49 @@
+name: Support Question
+description: Ask a question or seek help with using krnr
+labels: ["question", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please follow our [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md). Do not post unverified links or promotional content, as they will be considered spam and may lead to restrictions.
+        For general help, consider checking the [Support page](https://github.com/VoxDroid/krnr/blob/main/SUPPORT.md) or starting a thread in [Discussions](https://github.com/VoxDroid/krnr/discussions).
+  - type: checkboxes
+    id: guidelines
+    attributes:
+      label: Guidelines
+      description: Confirm that you have read and agree to follow our guidelines.
+      options:
+        - label: I have read the [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md) and agree to follow them.
+          required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Describe your question or issue in detail.
+      placeholder: Ask away...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any relevant details about your setup or what you’ve tried.
+      placeholder: |
+        - OS: [e.g., Windows 11]
+        - Go Version: [e.g., 1.22]
+        - What you’ve tried: [e.g., ran `go test ./...`]
+    validations:
+      required: false
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What is this question about?
+      options:
+        - Installation
+        - Usage
+        - Configuration
+        - Other
+      default: 0
+    validations:
+      required: true

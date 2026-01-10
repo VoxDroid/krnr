@@ -1,0 +1,54 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for krnr
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please follow our [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md). Do not post unverified links or promotional content, as they will be considered spam and may lead to restrictions.
+  - type: checkboxes
+    id: guidelines
+    attributes:
+      label: Guidelines
+      description: Confirm that you have read and agree to follow our guidelines.
+      options:
+        - label: I have read the [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md) and agree to follow them.
+          required: true
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Describe the feature and why it would be useful.
+      placeholder: Explain the feature...
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Provide examples of how this feature would be used.
+      placeholder: Describe scenarios where this feature would help...
+    validations:
+      required: false
+  - type: textarea
+    id: challenges
+    attributes:
+      label: Potential Challenges
+      description: Any challenges or considerations for implementing this feature?
+      placeholder: Note any technical or design challenges...
+    validations:
+      required: false
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What type of feature is this?
+      options:
+        - UI Improvement
+        - Download Functionality
+        - File Type Support
+        - Performance Optimization
+        - Other
+      default: 0
+    validations:
+      required: true

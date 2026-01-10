@@ -1,0 +1,40 @@
+name: Documentation Issue
+description: Report errors or suggest improvements to krnr documentation
+labels: ["documentation", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please follow our [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md). Do not post unverified links or promotional content, as they will be considered spam and may lead to restrictions.
+  - type: checkboxes
+    id: guidelines
+    attributes:
+      label: Guidelines
+      description: Confirm that you have read and agree to follow our guidelines.
+      options:
+        - label: I have read the [Contributing Guidelines](https://github.com/VoxDroid/krnr/blob/main/CONTRIBUTING.md) and agree to follow them.
+          required: true
+  - type: textarea
+    id: doc-issue
+    attributes:
+      label: Documentation Issue
+      description: Describe the issue or improvement needed in the documentation.
+      placeholder: e.g., Missing steps in README, unclear instructions in Help tab...
+    validations:
+      required: true
+  - type: input
+    id: doc-location
+    attributes:
+      label: Documentation Location
+      description: Where is the issue located?
+      placeholder: e.g., README.md, SUPPORT.md, in-app Help tab
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Fix
+      description: If you have a suggestion for how to fix this, please describe it.
+      placeholder: e.g., Add a section on installing Briefcase...
+    validations:
+      required: false
