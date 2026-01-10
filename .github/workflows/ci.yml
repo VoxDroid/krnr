@@ -176,3 +176,40 @@ jobs:
         with:
           name: krnr-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.BINARY }}
+
+  # Windows-focused install/uninstall e2e (test-mode: does not persistently modify PATH)
+  windows-install-e2e:
+    runs-on: windows-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Build krnr.exe
+        run: go build -ldflags "-s -w" -o krnr.exe .
+
+      - name: Prepare temp dirs
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force "$env:TEMP\krnr_test\bin" | Out-Null
+
+      - name: Install (test mode)
+        shell: powershell
+        env:
+          KRNR_TEST_NO_SETX: '1'
+          KRNR_HOME: ${{ runner.temp }}\krnr_home
+        run: |
+          $target = Join-Path $env:TEMP 'krnr_test\bin'
+          .\krnr.exe install --from .\krnr.exe --path $target --yes --add-to-path
+
+      - name: Uninstall (test mode)
+        shell: powershell
+        env:
+          KRNR_TEST_NO_SETX: '1'
+          KRNR_HOME: ${{ runner.temp }}\krnr_home
+        run: |
+          .\krnr.exe uninstall --yes --verbose
