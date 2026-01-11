@@ -8,6 +8,8 @@ This document describes the top-level CLI commands and usage.
 
 Saves a named command set with provided commands (use `-c` multiple times).
 
+If the provided name already exists, `krnr save` will warn and prompt you to enter a different name (interactive) instead of failing with a DB constraint error.
+
 Author metadata:
 
 - `--author` (`-a`) sets the author name for the saved command set and overrides any stored identity.

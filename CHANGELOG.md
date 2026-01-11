@@ -3,6 +3,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.1.0 - 2026-01-11
+
+- UX: `krnr save` will now detect when the provided name already exists and will prompt the user to enter a different name interactively (mirrors `krnr record` behavior). This prevents a DB constraint error when saving a duplicate name and improves CLI consistency.
+- Tests: add integration tests for `krnr save` prompting on duplicate names and normal save behavior.
+- Docs: update `docs/cli.md` to document the interactive duplicate-name prompt for `krnr save`.
+
 ## v1.0.0 - 2026-01-11 (released)
 
 - Major: v1.0.0 release candidate.

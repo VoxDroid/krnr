@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -46,6 +48,30 @@ var saveCmd = &cobra.Command{
 					authorEmailPtr = &p.Email
 				}
 			}
+		}
+
+		// Interactive duplicate name check (mirror record behavior)
+		rdr := bufio.NewReader(cmd.InOrStdin())
+		for {
+			existing, err := r.GetCommandSetByName(name)
+			if err != nil {
+				return err
+			}
+			if existing == nil {
+				break
+			}
+			cmd.Printf("name '%s' already exists; enter a new name: ", name)
+			newNameRaw, err := rdr.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("read new name: %w", err)
+			}
+			newName := strings.TrimSpace(newNameRaw)
+			if newName == "" {
+				cmd.Println("name cannot be empty")
+				name = ""
+				continue
+			}
+			name = newName
 		}
 
 		id, err := r.CreateCommandSet(name, &desc, authorNamePtr, authorEmailPtr)

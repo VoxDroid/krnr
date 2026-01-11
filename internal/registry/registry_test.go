@@ -209,6 +209,17 @@ func setupAlphaBeta(t *testing.T) *Repository {
 
 func TestRepository_Tags_List(t *testing.T) {
 	r := setupAlphaBeta(t)
+	// Clean up any pre-existing 'utils' tag associations to ensure test isolation
+	existingSets, err := r.ListCommandSetsByTag("utils")
+	if err != nil {
+		t.Fatalf("ListCommandSetsByTag pre-clean: %v", err)
+	}
+	for _, s := range existingSets {
+		if err := r.RemoveTagFromCommandSet(s.ID, "utils"); err != nil {
+			t.Fatalf("RemoveTagFromCommandSet cleanup: %v", err)
+		}
+	}
+
 	// Add a tag to alpha and then list by tag
 	csAlpha, err := r.GetCommandSetByName("alpha")
 	if err != nil {
