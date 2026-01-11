@@ -205,15 +205,30 @@ func ExecuteInstall(opts Options) ([]string, error) {
 		return nil, err
 	}
 
-	// If requested, add to PATH (user or system mode)
+	// Attempt to add to PATH if requested. For system installs on Unix this may fail
+	// due to lack of privileges; in that case we do not abort the install but record a
+	// warning in actions and still persist metadata so uninstall can locate the binary.
+	var pathFile, oldPath string
+	addedToPath := false
 	if opts.AddToPath {
-		pathFile, oldPath, err := addToPath(targetPath, opts.System)
+		pf, op, err := addToPath(targetPath, opts.System)
 		if err != nil {
-			return nil, fmt.Errorf("add to PATH: %w", err)
+			// For non-Windows system installs, prefer not to fail the whole install.
+			if opts.System && runtime.GOOS != "windows" {
+				actions = append(actions, fmt.Sprintf("Warning: could not modify system PATH: %v", err))
+			} else {
+				return nil, fmt.Errorf("add to PATH: %w", err)
+			}
+		} else {
+			pathFile = pf
+			oldPath = op
+			addedToPath = true
 		}
-		if err := saveMetadata(targetPath, true, pathFile, oldPath); err != nil {
-			return nil, fmt.Errorf("save metadata: %w", err)
-		}
+	}
+	// Persist metadata regardless of whether PATH modifications succeeded; this allows
+	// uninstall to locate and remove the installed binary even if PATH changes were skipped.
+	if err := saveMetadata(targetPath, addedToPath, pathFile, oldPath); err != nil {
+		return nil, fmt.Errorf("save metadata: %w", err)
 	}
 
 	return actions, nil

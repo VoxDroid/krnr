@@ -189,6 +189,32 @@ func TestSystemInstallAddToPathAndUninstall_WindowsOnly(t *testing.T) {
 	}
 }
 
+func TestSystemInstall_SavesMetadataEvenWithoutAddToPath(t *testing.T) {
+	// Verify that system installs record metadata even when not asked to modify PATH
+	tmp := t.TempDir()
+	// isolate data dir
+	t.Setenv("KRNR_HOME", tmp)
+	installDir := filepath.Join(tmp, "krnr")
+	_ = os.MkdirAll(installDir, 0o755)
+	src := filepath.Join(tmp, "srcbin")
+	_ = os.WriteFile(src, []byte("binstuff"), 0o644)
+	opts := Options{User: false, System: true, Path: installDir, From: src, DryRun: false, AddToPath: false}
+	_, err := ExecuteInstall(opts)
+	if err != nil {
+		t.Fatalf("ExecuteInstall system no-add-path: %v", err)
+	}
+	m, err := loadMetadata()
+	if err != nil {
+		t.Fatalf("expected metadata after system install: %v", err)
+	}
+	if m.TargetPath == "" {
+		t.Fatalf("expected metadata TargetPath set")
+	}
+	if m.AddedToPath {
+		t.Fatalf("expected AddedToPath to be false for no-add install")
+	}
+}
+
 func TestDetectBothScopes(t *testing.T) {
 	// Simulate both user and system installs and ensure Status detects both
 	tmp := t.TempDir()
