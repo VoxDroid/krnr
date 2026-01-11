@@ -28,6 +28,12 @@ func InitDB() (*sql.DB, error) {
 		return nil, err
 	}
 
+	// Set sensible pragmas to help cross-platform concurrency
+	// - busy_timeout (ms): wait for a short period before returning SQLITE_BUSY
+	// - journal_mode = WAL: improves concurrency for readers/writers
+	_, _ = db.Exec("PRAGMA busy_timeout = 5000")
+	_, _ = db.Exec("PRAGMA journal_mode = WAL")
+
 	if err := ApplyMigrations(db); err != nil {
 		_ = db.Close()
 		return nil, err

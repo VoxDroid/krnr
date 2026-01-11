@@ -15,12 +15,20 @@ import (
 	dbpkg "github.com/VoxDroid/krnr/internal/db"
 )
 
-// ExportDatabase copies the active krnr database to dstPath.
+// ExportDatabase copies the active krnr database to dstPath. It checkpoints WAL to
+// ensure recent transactions are flushed into the main DB file before copying.
 func ExportDatabase(dstPath string) error {
 	src, err := config.DBPath()
 	if err != nil {
 		return err
 	}
+	// Open a connection and attempt a WAL checkpoint so the copied file is consistent
+	dbConn, err := sql.Open("sqlite", src)
+	if err == nil {
+		_, _ = dbConn.Exec("PRAGMA wal_checkpoint(FULL)")
+		_ = dbConn.Close()
+	}
+
 	in, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("open source db: %w", err)
