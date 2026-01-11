@@ -37,7 +37,7 @@ func TestRepository_CRUD(t *testing.T) {
 	}
 
 	// Retrieve
-	cs, err := r.GetCommandSetByName("demo-set")
+	cs, err := r.GetCommandSetByName("demo")
 	if err != nil {
 		t.Fatalf("GetCommandSetByName: %v", err)
 	}
@@ -58,11 +58,11 @@ func TestRepository_CRUD(t *testing.T) {
 	}
 
 	// Delete
-	if err := r.DeleteCommandSet("demo-set"); err != nil {
+	if err := r.DeleteCommandSet("demo"); err != nil {
 		t.Fatalf("DeleteCommandSet: %v", err)
 	}
 
-	cs2, err := r.GetCommandSetByName("demo-set")
+	cs2, err := r.GetCommandSetByName("demo")
 	if err != nil {
 		t.Fatalf("GetCommandSetByName after delete: %v", err)
 	}
