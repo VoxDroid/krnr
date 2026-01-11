@@ -16,13 +16,15 @@ func main() {
 		return
 	}
 	tmp, err := os.MkdirTemp("", "debuginstall")
-	if err != nil { panic(err) }
+	if err != nil {
+		panic(err)
+	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	installDir := filepath.Join(tmp, "krnr")
 	_ = os.MkdirAll(installDir, 0o755)
 	src := filepath.Join(tmp, "srcbin")
 	_ = os.WriteFile(src, []byte("binstuff"), 0o644)
-	opts := install.Options{User:false, System:true, Path:installDir, From:src, DryRun:false, AddToPath:true}
+	opts := install.Options{User: false, System: true, Path: installDir, From: src, DryRun: false, AddToPath: true}
 	// test mode
 	t := os.Setenv("KRNR_TEST_NO_SETX", "1")
 	_ = t
@@ -36,6 +38,8 @@ func main() {
 	} else {
 		fmt.Println("installDir still exists: ", info.Name())
 		ents, _ := os.ReadDir(installDir)
-		for _, e := range ents { fmt.Println(" - entry:", e.Name()) }
+		for _, e := range ents {
+			fmt.Println(" - entry:", e.Name())
+		}
 	}
 }

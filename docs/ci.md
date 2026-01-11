@@ -34,4 +34,3 @@ maintainers should aim to keep functions small and testable.
   `internal/install.GetStatus`, `internal/recorder.RecordCommands`, and
   `internal/importer.ImportCommandSet`).
 - To run locally: `golangci-lint run --enable gocyclo` (or `./scripts/lint.sh`).
-

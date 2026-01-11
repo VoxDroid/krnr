@@ -670,7 +670,6 @@ func removeOtherInstallations(m *metadata) []string {
 	return actions
 }
 
-
 // removeFromPathWindows removes a single directory from the PATH for the given scope (User or Machine).
 // Returns a human-readable action message and an error if the operation failed.
 // computeNewPathString computes the new PATH value when removing dir from cur PATH string.

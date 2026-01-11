@@ -67,88 +67,88 @@ var runCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-// collect parameters from flags
-	paramVals, _ := cmd.Flags().GetStringArray("param")
-	params := map[string]string{}
-	paramEnvBound := map[string]bool{}
-	for _, p := range paramVals {
-		parts := strings.SplitN(p, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid --param value: %s (expected name=value)", p)
+		// collect parameters from flags
+		paramVals, _ := cmd.Flags().GetStringArray("param")
+		params := map[string]string{}
+		paramEnvBound := map[string]bool{}
+		for _, p := range paramVals {
+			parts := strings.SplitN(p, "=", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid --param value: %s (expected name=value)", p)
+			}
+			name := parts[0]
+			val := parts[1]
+			// env:NAME syntax reads from environment
+			if strings.HasPrefix(val, "env:") {
+				envKey := strings.TrimPrefix(val, "env:")
+				params[name] = os.Getenv(envKey)
+				paramEnvBound[name] = true
+			} else {
+				params[name] = val
+			}
 		}
-		name := parts[0]
-		val := parts[1]
-		// env:NAME syntax reads from environment
-		if strings.HasPrefix(val, "env:") {
-			envKey := strings.TrimPrefix(val, "env:")
-			params[name] = os.Getenv(envKey)
-			paramEnvBound[name] = true
-		} else {
-			params[name] = val
-		}
-	}
 
-	for _, c := range cs.Commands {
-		cmdText := c.Command
-		// Apply parameter substitution if present
-		if len(registry.FindParams(cmdText)) > 0 {
-			// gather missing params and prompt interactively if needed
-			required := registry.FindParams(cmdText)
-			for _, rname := range required {
-				if _, ok := params[rname]; !ok {
-					// interactive prompt
-					val := interactive.Prompt(fmt.Sprintf("Value for parameter %s", rname))
-					if val == "" {
-						return fmt.Errorf("missing value for parameter %s", rname)
+		for _, c := range cs.Commands {
+			cmdText := c.Command
+			// Apply parameter substitution if present
+			if len(registry.FindParams(cmdText)) > 0 {
+				// gather missing params and prompt interactively if needed
+				required := registry.FindParams(cmdText)
+				for _, rname := range required {
+					if _, ok := params[rname]; !ok {
+						// interactive prompt
+						val := interactive.Prompt(fmt.Sprintf("Value for parameter %s", rname))
+						if val == "" {
+							return fmt.Errorf("missing value for parameter %s", rname)
+						}
+						params[rname] = val
+						// prompted values are not marked env-bound; they may still be secrets
 					}
-					params[rname] = val
-					// prompted values are not marked env-bound; they may still be secrets
+				}
+				sub, err := registry.ApplyParams(cmdText, params)
+				if err != nil {
+					return err
+				}
+				cmdText = sub
+			}
+
+			// Build a redacted command for logging and dry-run/verbose output
+			redactedParams := map[string]string{}
+			for k, v := range params {
+				if security.IsSecretParamName(k) || paramEnvBound[k] {
+					redactedParams[k] = "<redacted>"
+				} else {
+					redactedParams[k] = v
 				}
 			}
-			sub, err := registry.ApplyParams(cmdText, params)
-			if err != nil {
-				return err
+			redactedCmd := cmdText
+			if len(registry.FindParams(c.Command)) > 0 {
+				if rsub, err := registry.ApplyParams(c.Command, redactedParams); err == nil {
+					redactedCmd = rsub
+				}
 			}
-			cmdText = sub
-		}
 
-		// Build a redacted command for logging and dry-run/verbose output
-		redactedParams := map[string]string{}
-		for k, v := range params {
-			if security.IsSecretParamName(k) || paramEnvBound[k] {
-				redactedParams[k] = "<redacted>"
+			// Security: check if command is allowed (use real substituted command)
+			if err := security.CheckAllowed(cmdText); err != nil && !force {
+				return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", redactedCmd, err)
+			}
+			if !suppress {
+				fmt.Printf("-> %s\n", redactedCmd)
+			}
+			stderr := io.Discard
+			if showStderr {
+				stderr = os.Stderr
+			}
+			// For dry-run, pass redacted command to the executor so verbose dry-run output doesn't leak secrets
+			if dry {
+				if err := e.Execute(ctx, redactedCmd, "", os.Stdout, stderr); err != nil {
+					return err
+				}
 			} else {
-				redactedParams[k] = v
+				if err := e.Execute(ctx, cmdText, "", os.Stdout, stderr); err != nil {
+					return err
+				}
 			}
-		}
-		redactedCmd := cmdText
-		if len(registry.FindParams(c.Command)) > 0 {
-			if rsub, err := registry.ApplyParams(c.Command, redactedParams); err == nil {
-				redactedCmd = rsub
-			}
-		}
-
-		// Security: check if command is allowed (use real substituted command)
-		if err := security.CheckAllowed(cmdText); err != nil && !force {
-			return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", redactedCmd, err)
-		}
-		if !suppress {
-			fmt.Printf("-> %s\n", redactedCmd)
-		}
-		stderr := io.Discard
-		if showStderr {
-			stderr = os.Stderr
-		}
-		// For dry-run, pass redacted command to the executor so verbose dry-run output doesn't leak secrets
-		if dry {
-			if err := e.Execute(ctx, redactedCmd, "", os.Stdout, stderr); err != nil {
-				return err
-			}
-		} else {
-			if err := e.Execute(ctx, cmdText, "", os.Stdout, stderr); err != nil {
-				return err
-			}
-		}
 		}
 
 		return nil

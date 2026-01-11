@@ -15,11 +15,11 @@ import (
 	dbpkg "github.com/VoxDroid/krnr/internal/db"
 )
 
-func fetchCommandSetAndCommands(srcDB *sql.DB, name string) (struct{
-	Name string
+func fetchCommandSetAndCommands(srcDB *sql.DB, name string) (struct {
+	Name        string
 	Description sql.NullString
-	CreatedAt string
-	LastRun sql.NullString
+	CreatedAt   string
+	LastRun     sql.NullString
 }, []string, error) {
 	row := srcDB.QueryRow("SELECT id, name, description, created_at, last_run FROM command_sets WHERE name = ?", name)
 	var id int64
@@ -28,12 +28,22 @@ func fetchCommandSetAndCommands(srcDB *sql.DB, name string) (struct{
 	var createdAt string
 	var lastRun sql.NullString
 	if err := row.Scan(&id, &csName, &description, &createdAt, &lastRun); err != nil {
-		return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{}, nil, fmt.Errorf("select command_set: %w", err)
+		return struct {
+			Name        string
+			Description sql.NullString
+			CreatedAt   string
+			LastRun     sql.NullString
+		}{}, nil, fmt.Errorf("select command_set: %w", err)
 	}
 
 	rows, err := srcDB.Query("SELECT position, command FROM commands WHERE command_set_id = ? ORDER BY position ASC", id)
 	if err != nil {
-		return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{}, nil, fmt.Errorf("select commands: %w", err)
+		return struct {
+			Name        string
+			Description sql.NullString
+			CreatedAt   string
+			LastRun     sql.NullString
+		}{}, nil, fmt.Errorf("select commands: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -42,12 +52,22 @@ func fetchCommandSetAndCommands(srcDB *sql.DB, name string) (struct{
 		var pos int
 		var cmd string
 		if err := rows.Scan(&pos, &cmd); err != nil {
-			return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{}, nil, err
+			return struct {
+				Name        string
+				Description sql.NullString
+				CreatedAt   string
+				LastRun     sql.NullString
+			}{}, nil, err
 		}
 		cmds = append(cmds, cmd)
 	}
 
-	return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{csName, description, createdAt, lastRun}, cmds, nil
+	return struct {
+		Name        string
+		Description sql.NullString
+		CreatedAt   string
+		LastRun     sql.NullString
+	}{csName, description, createdAt, lastRun}, cmds, nil
 }
 
 func createAndPopulateDst(dstDB *sql.DB, name string, description sql.NullString, createdAt string, lastRun sql.NullString, cmds []string) (int64, error) {

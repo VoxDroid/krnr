@@ -40,4 +40,3 @@ CREATE TABLE IF NOT EXISTS command_set_versions (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_command_set_versions_unique ON command_set_versions (command_set_id, version);
-

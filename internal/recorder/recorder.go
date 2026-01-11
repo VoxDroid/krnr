@@ -75,7 +75,6 @@ func RecordCommands(r io.Reader) ([]string, error) {
 			return nil, fmt.Errorf("read commands: %w", err)
 		}
 
-	
 		// Truncate at any stop markers (Ctrl+Z or ^Z/^z) and handle the prefix.
 		if prefix, stopped := truncateAtStop(s); stopped {
 			if stop, err := processLineAppend(&out, prefix); err != nil {
