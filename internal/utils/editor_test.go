@@ -1,4 +1,4 @@
-package utils
+package interactive_test
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	interactive "github.com/VoxDroid/krnr/internal/utils"
 )
 
 func TestOpenEditor_Success(t *testing.T) {
@@ -35,7 +37,7 @@ func TestOpenEditor_Success(t *testing.T) {
 	}
 
 	// call OpenEditor with a dummy file path
-	if err := OpenEditor(filepath.Join(d, "dummy.txt")); err != nil {
+	if err := interactive.OpenEditor(filepath.Join(d, "dummy.txt")); err != nil {
 		t.Fatalf("OpenEditor failed: %v", err)
 	}
 
@@ -73,7 +75,7 @@ func TestOpenEditor_Failure(t *testing.T) {
 		defer func() { _ = os.Unsetenv("EDITOR") }()
 	}
 
-	if err := OpenEditor(filepath.Join(d, "dummy.txt")); err == nil {
+	if err := interactive.OpenEditor(filepath.Join(d, "dummy.txt")); err == nil {
 		t.Fatalf("expected error from failing editor, got nil")
 	}
 }

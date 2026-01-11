@@ -24,7 +24,7 @@ Link to the issue this PR addresses, if applicable (e.g., `Fixes #123`).
 Describe how you tested your changes, including:
 
 - Platforms tested (e.g., Windows, macOS, Linux).
-- Go version (e.g., 1.22).
+- Go version (e.g., 1.25.5).
 - Commands used to build and test (e.g., `go build`, `go test ./...`).
 - Specific scenarios (e.g., running `krnr save/run`, integration tests).
 - Any automated tests added or updated.

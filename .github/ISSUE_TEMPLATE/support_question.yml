@@ -30,7 +30,7 @@ body:
       description: Provide any relevant details about your setup or what you’ve tried.
       placeholder: |
         - OS: [e.g., Windows 11]
-        - Go Version: [e.g., 1.22]
+        - Go Version: [e.g., 1.25.5]
         - What you’ve tried: [e.g., ran `go test ./...`]
     validations:
       required: false

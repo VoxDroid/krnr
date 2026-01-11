@@ -56,7 +56,7 @@ SQLite provides durability, indexing, versioning, and future extensibility.
 
 | Layer         | Technology                                              |
 | ------------- | ------------------------------------------------------- |
-| Language      | Go (≥ 1.22)                                             |
+| Language      | Go (≥ 1.25.5)                                             |
 | CLI Framework | Cobra                                                   |
 | Database      | SQLite (via `modernc.org/sqlite` or `mattn/go-sqlite3`) |
 | Config        | Dot-directory (`~/.krnr/`)                              |
@@ -304,7 +304,7 @@ repos:
       - id: end-of-file-fixer
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.55.2
+    rev: v2.8.0
     hooks:
       - id: golangci-lint
 

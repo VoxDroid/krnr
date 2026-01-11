@@ -46,14 +46,14 @@ var recordCmd = &cobra.Command{
 			if existing == nil {
 				break
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "name '%s' already exists; enter a new name: ", name)
+			cmd.Printf("name '%s' already exists; enter a new name: ", name)
 			newNameRaw, err := rdr.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("read new name: %w", err)
 			}
 			newName := strings.TrimSpace(newNameRaw)
 			if newName == "" {
-				fmt.Fprintln(cmd.OutOrStdout(), "name cannot be empty")
+				cmd.Println("name cannot be empty")
 				name = ""
 				continue
 			}

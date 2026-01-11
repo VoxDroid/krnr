@@ -10,7 +10,7 @@ import (
 
 	"github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/registry"
-	"github.com/VoxDroid/krnr/internal/utils"
+	interactive "github.com/VoxDroid/krnr/internal/utils"
 )
 
 var editCmd = &cobra.Command{
@@ -59,7 +59,7 @@ var editCmd = &cobra.Command{
 		_ = w.Flush()
 		_ = tmpf.Close()
 
-		if err := utils.OpenEditor(tmpf.Name()); err != nil {
+		if err := interactive.OpenEditor(tmpf.Name()); err != nil {
 			return err
 		}
 

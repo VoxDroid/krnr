@@ -15,7 +15,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.25.5'
 
       - name: Export Go cache paths to environment
         run: |
@@ -41,9 +41,9 @@ jobs:
           path: |
             ${{ env.GOCACHE }}
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-1.22-${{ github.job }}-gocache-v3-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-1.25.5-${{ github.job }}-gocache-v3-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-1.22-${{ github.job }}-gocache-v3-
+            ${{ runner.os }}-go-1.25.5-${{ github.job }}-gocache-v3-
 
       - name: Populate Go module cache
         run: |
@@ -82,7 +82,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.25.5'
 
       - name: Export Go cache paths to environment
         run: |
@@ -97,9 +97,9 @@ jobs:
           path: |
             ${{ env.GOCACHE }}
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-1.22-${{ matrix.os }}-gocache-v3-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-1.25.5-${{ matrix.os }}-gocache-v3-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-1.22-${{ matrix.os }}-gocache-v3-
+            ${{ runner.os }}-go-1.25.5-${{ matrix.os }}-gocache-v3-
 
       - name: Populate Go module cache
         run: |
@@ -133,7 +133,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.25.5'
 
       - name: Export Go cache paths to environment
         run: |
@@ -148,9 +148,9 @@ jobs:
           path: |
             ${{ env.GOCACHE }}
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-gocache-v3-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-1.25.5-${{ matrix.os }}-${{ matrix.arch }}-gocache-v3-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-1.22-${{ matrix.os }}-${{ matrix.arch }}-gocache-v3-
+            ${{ runner.os }}-go-1.25.5-${{ matrix.os }}-${{ matrix.arch }}-gocache-v3-
 
       - name: Populate Go module cache
         run: |
@@ -187,7 +187,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.25.5'
 
       - name: Build krnr.exe
         run: go build -ldflags "-s -w" -o krnr.exe .

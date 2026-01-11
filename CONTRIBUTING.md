@@ -48,7 +48,7 @@ Look through the [Issues page](https://github.com/VoxDroid/krnr/issues) and [Dis
    ```
 
 ### Development Environment
-1. Ensure you have **Go 1.22+** installed and `GOPATH`/`GOMOD` set up.
+1. Ensure you have **Go 1.25.5+** installed and `GOPATH`/`GOMOD` set up.
 2. Build locally:
    ```bash
    go build -v -o krnr .

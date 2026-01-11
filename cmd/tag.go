@@ -19,7 +19,7 @@ var tagAddCmd = &cobra.Command{
 	Use:   "add <set-name> <tag>",
 	Short: "Add a tag to a command set",
 	Args:  cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		name := args[0]
 		tag := args[1]
 
@@ -49,7 +49,7 @@ var tagRemoveCmd = &cobra.Command{
 	Use:   "remove <set-name> <tag>",
 	Short: "Remove a tag from a command set",
 	Args:  cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		name := args[0]
 		tag := args[1]
 
@@ -79,7 +79,7 @@ var tagListCmd = &cobra.Command{
 	Use:   "list <set-name>",
 	Short: "List tags for a command set",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		name := args[0]
 
 		dbConn, err := db.InitDB()

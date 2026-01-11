@@ -31,7 +31,7 @@ func TestPlanInstallDryRun(t *testing.T) {
 	if len(actions) == 0 {
 		t.Fatalf("expected actions, got none")
 	}
-	if filepath.Join(tmp, "krnr") != target && !(runtime.GOOS == "windows" && filepath.Join(tmp, "krnr.exe") == target) {
+	if filepath.Join(tmp, "krnr") != target && (runtime.GOOS != "windows" || filepath.Join(tmp, "krnr.exe") != target) {
 		t.Fatalf("unexpected target: %s", target)
 	}
 }

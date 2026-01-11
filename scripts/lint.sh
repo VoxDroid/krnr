@@ -91,18 +91,18 @@ if [ "$NEEDS_DOCKER" = true ]; then
     # expects a 'major.minor' value.
     if [ -n "$GO_TOOLCHAIN" ]; then
       GO_TOOLCHAIN_SHORT=$(echo "$GO_TOOLCHAIN" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
-      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2) with Go toolchain $GO_TOOLCHAIN_SHORT..."
+      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v2.8.0) with Go toolchain $GO_TOOLCHAIN_SHORT..."
       GOTOOLCHAIN_VAR="$GO_TOOLCHAIN_SHORT"
     else
-      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v1.55.2)..."
+      echo "Attempting Docker-based golangci-lint (image: golangci/golangci-lint:v2.8.0)..."
       GOTOOLCHAIN_VAR=""
     fi
 
     set +e
     if [ -n "$GOTOOLCHAIN_VAR" ]; then
-      DOCKER_OUT=$(docker run --rm -e "GOTOOLCHAIN=$GOTOOLCHAIN_VAR" -v "$(pwd)":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose 2>&1)
+      DOCKER_OUT=$(docker run --rm -e "GOTOOLCHAIN=$GOTOOLCHAIN_VAR" -v "$(pwd)":/app -w /app golangci/golangci-lint:v2.8.0 golangci-lint run --verbose 2>&1)
     else
-      DOCKER_OUT=$(docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose 2>&1)
+      DOCKER_OUT=$(docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v2.8.0 golangci-lint run --verbose 2>&1)
     fi
     DOCK_RC=$?
     set -e
@@ -126,7 +126,7 @@ if [ "$NEEDS_DOCKER" = true ]; then
     if contains_toolchain_error "$DOCKER_OUT"; then
       echo "Docker run failed due to toolchain mismatch or invalid GOTOOLCHAIN; retrying without GOTOOLCHAIN..."
       set +e
-      RETRY_OUT=$(docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose 2>&1)
+      RETRY_OUT=$(docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v2.8.0 golangci-lint run --verbose 2>&1)
       RETRY_RC=$?
       set -e
       echo "$RETRY_OUT"
@@ -149,7 +149,7 @@ fi
 # If we reach here, the local linter failed and Docker fallback wasn't possible or failed
     if contains_export_error "$OUT" || contains_toolchain_error "$DOCKER_OUT"; then
       echo "\ngolangci-lint encountered an export-data incompatible error or Docker/toolchain mismatch. This usually means the linter binary was built with a different Go toolchain version than the one used to build the project. Try one of the following fixes:"
-  echo "  - Use the Docker fallback: 'docker run --rm -v \"$(pwd)\":/app -w /app golangci/golangci-lint:v1.55.2 golangci-lint run --verbose'"
+  echo "  - Use the Docker fallback: 'docker run --rm -v "$(pwd)":/app -w /app golangci/golangci-lint:v2.8.0 golangci-lint run --verbose'"
   echo "  - Use the GitHub Action 'golangci/golangci-lint-action' in CI (this repo already does)."
   echo "  - Upgrade/downgrade your local Go toolchain to match the project's required Go version."
   # Do not treat an export-data incompatibility as a failed lint run in our test harness

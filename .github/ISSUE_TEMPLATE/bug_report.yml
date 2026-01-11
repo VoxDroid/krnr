@@ -67,7 +67,7 @@ body:
     attributes:
       label: Go Version
       description: What version of Go are you using?
-      placeholder: e.g., 1.22
+      placeholder: e.g., 1.25.5
     validations:
       required: true
   - type: input

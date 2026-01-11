@@ -1,5 +1,5 @@
-// Package utils provides utility functions.
-package utils
+// Package interactive provides utility functions for interactive prompts and editors.
+package interactive
 
 import (
 	"bufio"

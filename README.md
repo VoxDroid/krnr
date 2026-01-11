@@ -85,7 +85,7 @@ Developer quick start
 
 ```bash
 # Build locally
-go 1.22+ is recommended
+Go 1.25.5+ is recommended
 go build -v -o krnr .
 # Run interactively
 ./krnr --help
@@ -164,7 +164,8 @@ Building a local release:
 
 Contributions are welcome — please see `CONTRIBUTING.md` for the full guidelines (create an issue first if in doubt). Quick pointers:
 
-- Development: Go 1.22+ is recommended; build with `go build`.
+- Development: Go 1.25.5+ is recommended; build with `go build`.
+- Recommended tooling: `golangci-lint` v2.8.0 (use `scripts/lint.sh` to run it locally or the Docker fallback).
 - Formatting & linting: run `./scripts/fmt.sh` and `./scripts/lint.sh` before opening a PR.
 - Tests: run `go test ./...` and add tests for new behavior.
 - Use the `.github` issue templates and the PR template when opening issues or pull requests.

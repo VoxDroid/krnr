@@ -6,7 +6,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ## Project-level notes
 
-- Language: Go (>= 1.22)
+- Language: Go (>= 1.25.5)
 - CLI: Cobra
 - Database: SQLite (single-file at OS-specific path)
 - Cross-platform: Windows, Linux, macOS
@@ -60,7 +60,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 ### 1) Initialize repository & dev environment (completed)
 - [x] Create `go.mod` and minimal package layout (`cmd/`, `internal/`)
 - [x] Add `.gitignore`, `LICENSE`, and base `README.md`
-- [x] Ensure Go 1.22+ development environment instructions in README
+- [x] Ensure Go 1.25.5+ development environment instructions in README
 - Acceptance: `go build ./...` succeeds locally on Windows
 
 ### 2) Database layer & migrations (completed)

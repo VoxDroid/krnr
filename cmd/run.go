@@ -13,7 +13,7 @@ import (
 	"github.com/VoxDroid/krnr/internal/executor"
 	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/security"
-	"github.com/VoxDroid/krnr/internal/utils"
+	interactive "github.com/VoxDroid/krnr/internal/utils"
 )
 
 var execFactory = func(dry, verbose bool) executor.Runner {
@@ -50,7 +50,7 @@ var runCmd = &cobra.Command{
 		}
 
 		if confirmFlag {
-			if !utils.Confirm(fmt.Sprintf("Run '%s' now?", name)) {
+			if !interactive.Confirm(fmt.Sprintf("Run '%s' now?", name)) {
 				fmt.Println("aborted")
 				return nil
 			}

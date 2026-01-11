@@ -7,7 +7,7 @@ import (
 
 	"github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/registry"
-	"github.com/VoxDroid/krnr/internal/utils"
+	interactive "github.com/VoxDroid/krnr/internal/utils"
 )
 
 var deleteCmd = &cobra.Command{
@@ -27,7 +27,7 @@ var deleteCmd = &cobra.Command{
 		r := registry.NewRepository(dbConn)
 		if !yesFlag {
 			// prompt interactively; read from the command's input so tests can script it
-			if !utils.ConfirmReader(fmt.Sprintf("Delete '%s' permanently?", name), cmd.InOrStdin()) {
+			if !interactive.ConfirmReader(fmt.Sprintf("Delete '%s' permanently?", name), cmd.InOrStdin()) {
 				fmt.Println("aborted")
 				return nil
 			}

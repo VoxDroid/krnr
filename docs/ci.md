@@ -5,7 +5,7 @@ various environments.
 
 ## Linting
 
-We use `golangci-lint` for static analysis. Because `golangci-lint` binaries can
+We use `golangci-lint` (v2.8.0) for static analysis. Because `golangci-lint` binaries can
 be built against a different Go toolchain and produce `export-data` errors (e.g.
 "unsupported version" or "could not load export data"), the repository provides
 a resilient `scripts/lint.sh` script that:
