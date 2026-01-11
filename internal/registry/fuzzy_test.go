@@ -1,8 +1,11 @@
 package registry
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/VoxDroid/krnr/internal/config"
 	"github.com/VoxDroid/krnr/internal/db"
 )
 
@@ -29,6 +32,14 @@ func TestFuzzyMatchBasics(t *testing.T) {
 }
 
 func setupFuzzyRepo(t *testing.T) *Repository {
+	// Use a test-specific database file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	tdb := filepath.Join(tmp, "krnr_test.db")
+	// Set KRNR_DB for this test and ensure it is restored later
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, tdb)
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)

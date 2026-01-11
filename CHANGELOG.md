@@ -1,8 +1,9 @@
 # Changelog
 
+
 All notable changes to this project will be documented in this file.
 
-## Unreleased / v1.0.0 - 2026-01-11 (upcoming)
+## v1.0.0 - 2026-01-11 (released)
 
 - Major: v1.0.0 release candidate.
 - Key features included in v1.0.0:
@@ -13,6 +14,8 @@ All notable changes to this project will be documented in this file.
   - Unit tests and integration tests for tags, search, fuzzy matching, parameters, and versioning (CLI + repository tests).
   - CLI docs updated (`docs/cli.md`) with examples for `--tag`, `--filter`, `--fuzzy`, `history`, and `rollback`.
   - Security & Safety hardening: conservative destructive command checks with `--force` override, parameter redaction for env-bound and secret-like params, `krnr delete` and `krnr install` guardrails and confirmations, `docs/security.md` added, and safety tests; CI SAST scans planned.
+  - Packaging & Windows installer: Windows MSI (WiX) added with License dialog, Start Menu shortcuts, uninstall support, PATH handling, and ARP metadata (contact and links). The release workflow now builds and uploads the MSI to GitHub Releases on tag commits (see `.github/workflows/release.yml`).
+  - Packaging manifests: winget, Scoop, and Chocolatey manifest templates added under `packaging/windows/` and `packaging/` (placeholders for release URLs and SHA values); CI automation to replace placeholders and open PRs is pending.
   - Stability, packaging, and security checks validated; cross-platform tests added/updated (Windows, Linux, macOS).
   - Refactor: reduced cyclomatic complexity for several large functions (`internal/install.Uninstall`, `internal/install.addToPath`, `internal/install.GetStatus`, `internal/recorder.RecordCommands`, `internal/importer.ImportCommandSet`) and split large tests in `internal/registry` to improve maintainability and test isolation.
 - Upgrade notes:

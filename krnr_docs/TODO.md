@@ -29,9 +29,14 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
   - [x] Implement `krnr history <name>` and `krnr rollback <name> --version` commands and tests
   - Acceptance: History command lists versions and rollback restores a previous version (unit & CLI tests added)
 - Packaging & Releases
-  - [ ] Verify and extend `packaging/` manifests (Homebrew, Scoop, nfpm) and GoReleaser config
-  - [ ] Add CI job to build and validate packaging artifacts and manifests on tag/release
-  - Acceptance: Packaging artifacts generated and sample Homebrew/Scoop manifests validated in CI
+  - [x] Verify and extend `packaging/` manifests (Homebrew, Scoop, nfpm) and GoReleaser config (templates added)
+  - [x] Add CI job to build and validate packaging artifacts and manifests on tag/release (Windows MSI job added; GoReleaser still publishes portable and Linux packages)
+  - [ ] Automate manifest updates and PR submissions on release — moved to Long-term TODOs
+  - Acceptance: Packaging artifacts generated and sample Homebrew/Scoop manifests validated in CI; winget/Scoop/Chocolatey manifests require automation and PR submission to be fully complete
+
+
+### Long-term / nice-to-have
+- [ ] Automate manifest updates (winget/Scoop/Chocolatey): on release replace Url/Sha in manifest templates and open PRs automatically to the target registries (winget-pkgs, Scoop bucket, community Chocolatey); include PR template and validation checks.
 - Security & Safety Hardening
   - [x] Conduct a security review; document checklist in `docs/security.md`
   - [x] Add explicit confirmation/prompting for destructive ops and guardrails in `cmd/delete.go` and `internal/install`

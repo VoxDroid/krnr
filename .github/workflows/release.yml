@@ -3,6 +3,8 @@ name: Publish from version commit
 on:
   push:
     branches: [ main, master ]
+    # Also trigger on tag pushes like v1.0.0 so releases can be created from tags
+    tags: [ 'v*' ]
 
 permissions:
   contents: write
@@ -19,11 +21,27 @@ jobs:
       commit_sha: ${{ steps.decide.outputs.commit_sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # fetch full history and tags so we can inspect tags and head commits
+          fetch-depth: 0
 
       - name: Get latest commit message (subject only)
         id: get_message
         run: |
-          commit_message="$(git log -1 --pretty=%s | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          # Ensure tags are available locally (in case workflow triggered by tag push)
+          git fetch --tags || true
+
+          commit_message="$(git log -1 --pretty=%s 2>/dev/null | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+          # If commit subject is empty (detached/tag push), try to obtain annotated tag message
+          if [ -z "$commit_message" ]; then
+            # If there's a tag pointing to HEAD, use its annotation message (if annotated)
+            tag_at_head=$(git tag --points-at HEAD | head -n1 || true)
+            if [ -n "$tag_at_head" ]; then
+              commit_message="$(git for-each-ref --format='%(contents:subject)' refs/tags/$tag_at_head 2>/dev/null | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            fi
+          fi
+
           # safe base64-encoded output to avoid quote injection when used in later shell blocks
           commit_message_b64=$(printf '%s' "$commit_message" | base64 -w0)
           echo "commit_message_b64=$commit_message_b64" >> "$GITHUB_OUTPUT"
@@ -33,12 +51,68 @@ jobs:
         run: |
           # decode base64 commit message safely
           commit_message=$(printf '%s' "${{ steps.get_message.outputs.commit_message_b64 }}" | base64 --decode)
+
+          # First try to find a version in the commit message
           if echo "$commit_message" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+'; then
             ver=$(echo "$commit_message" | grep -oE '^v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+            source="commit"
+          else
+            # If no version in commit, check if this is a tag push (GITHUB_REF like refs/tags/v1.2.3)
+            if [[ "${GITHUB_REF##*/}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              ver="${GITHUB_REF##*/}"
+              source="tag"
+            else
+              ver=""
+              source="none"
+            fi
+          fi
+
+          if [[ -n "$ver" ]]; then
             if [[ $ver != v* ]]; then ver="v$ver"; fi
+
+            # If the version was derived from a tag, verify the tag signature using the GitHub API
+            if [[ "$source" == "tag" ]]; then
+              if [[ -z "${{ secrets.PERSONAL_TOKEN }}" ]]; then
+                echo "Error: PERSONAL_TOKEN secret is not set; cannot verify tag signature" >&2
+                exit 1
+              fi
+
+              repo="${{ github.repository }}"
+              tag_name="$ver"
+              # strip leading v for ref lookup
+              tag_ref_name="${tag_name#v}"
+
+              ref_json=$(curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" "https://api.github.com/repos/$repo/git/refs/tags/$tag_ref_name")
+              obj_sha=$(echo "$ref_json" | jq -r '.object.sha // empty')
+              obj_type=$(echo "$ref_json" | jq -r '.object.type // empty')
+
+              if [[ -z "$obj_sha" ]]; then
+                echo "Error: could not resolve tag '$tag_ref_name' via GitHub API" >&2
+                exit 1
+              fi
+
+              if [[ "$obj_type" == "tag" ]]; then
+                tag_obj=$(curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" "https://api.github.com/repos/$repo/git/tags/$obj_sha")
+                verified=$(echo "$tag_obj" | jq -r '.verification.verified // false')
+              else
+                commit_obj=$(curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" "https://api.github.com/repos/$repo/commits/$obj_sha")
+                verified=$(echo "$commit_obj" | jq -r '.commit.verification.verified // false')
+              fi
+
+              if [[ "$verified" != "true" ]]; then
+                echo "Error: tag '$tag_name' is not GPG-signed & verified by GitHub. Refusing to publish." >&2
+                exit 1
+              fi
+            fi
+
             echo "publish=true" >> "$GITHUB_OUTPUT"
             echo "version=$ver" >> "$GITHUB_OUTPUT"
-            echo "release_body=$commit_message" >> "$GITHUB_OUTPUT"
+            # Use commit message for release body when present, otherwise note the source
+            if [[ -n "$commit_message" ]]; then
+              echo "release_body=$commit_message" >> "$GITHUB_OUTPUT"
+            else
+              echo "release_body=Release generated from $source $ver" >> "$GITHUB_OUTPUT"
+            fi
             echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
@@ -66,8 +140,8 @@ jobs:
           fi
           echo "Version consistency check passed: $FILE_VER"
 
-  build-and-publish:
-    name: Build and publish
+  build:
+    name: Build artifacts (all platforms)
     needs: check
     if: needs.check.outputs.publish == 'true'
     runs-on: ubuntu-latest
@@ -149,22 +223,280 @@ jobs:
           curl -sSfL https://github.com/goreleaser/goreleaser/releases/latest/download/goreleaser_Linux_x86_64.tar.gz | tar xz -C /tmp
           sudo mv /tmp/goreleaser /usr/local/bin/
 
-      - name: Run GoReleaser (publish)
+      - name: Run GoReleaser (snapshot - do not publish)
         if: ${{ needs.check.outputs.publish == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Removing old dist/ and running GoReleaser in snapshot mode (do not publish)"
+          rm -rf dist || true
+          goreleaser release --snapshot
+
+      - name: Upload dist artifact
+        if: ${{ needs.check.outputs.publish == 'true' }}
+        id: upload_dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Confirm built artifacts
+        run: |
+          echo "Artifacts packaged in dist/"
+          ls -la dist || true
+
+  build-msi:
+    name: Build MSI (Windows)
+    needs: check
+    if: needs.check.outputs.publish == 'true'
+    runs-on: windows-latest
+    outputs:
+      msi-sha: ${{ steps.compute.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25.5'
+
+      - name: Install WiX Toolset
+        shell: powershell
+        run: |
+          choco install wixtoolset -y
+
+      - name: Build windows executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.check.outputs.version }}"
+          VERSION_NO_V="${VERSION#v}"
+          echo "Building krnr.exe for Windows (${VERSION_NO_V})"
+          mkdir -p build
+          env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X github.com/VoxDroid/krnr/internal/version.Version=${VERSION}" -o build/krnr.exe .
+
+      - name: Build MSI (PowerShell)
+        shell: pwsh
+        run: |
+          # Normalize and validate release tag into a 4-part numeric ProductVersion suitable for WiX/MSI
+          $raw = "${{ needs.check.outputs.version }}"
+          $ver = $raw.TrimStart('v')
+          if ([string]::IsNullOrWhiteSpace($ver)) { Write-Error "Release version is empty ($raw)"; exit 1 }
+
+          # Split into numeric parts and validate
+          $parts = $ver -split '\.'
+          $num = @()
+          foreach ($p in $parts) {
+            if (-not ($p -match '^[0-9]+$')) { Write-Error "Invalid version part '$p' in version '$ver'"; exit 1 }
+            $num += [int]$p
+          }
+
+          # Pad to 4 parts with zeros, fail if more than 4 parts
+          while ($num.Count -lt 4) { $num += 0 }
+          if ($num.Count -gt 4) { Write-Error "Version '$ver' has too many components; expected at most 4"; exit 1 }
+
+          # Validate numeric ranges (0..65534 as a conservative limit)
+          foreach ($n in $num) { if ($n -lt 0 -or $n -gt 65534) { Write-Error "Version component out of range: $n"; exit 1 } }
+
+          $productVersion = "$($num[0]).$($num[1]).$($num[2]).$($num[3])"
+          Write-Host "ProductVersion: $productVersion"
+
+          .\packaging\windows\wix\build.ps1 -BuildOutputPath "${{ github.workspace }}\build" -ProductVersion $productVersion
+
+      - name: Compute MSI SHA
+        id: compute
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path 'packaging' -Filter 'krnr-*.msi' -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $msi) { Write-Error "MSI not found"; exit 1 }
+          $sha = (Get-FileHash -Path $msi -Algorithm SHA256).Hash.ToUpper()
+          Write-Host "MSI: $msi"
+          Write-Host "SHA256: $sha"
+          echo "sha=$sha" >> $env:GITHUB_OUTPUT
+
+      - name: Copy MSI to root for artifact upload
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path 'packaging' -Filter 'krnr-*.msi' -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          if ($msi) {
+            Write-Host "Copying MSI to workspace root: $msi"
+            $destination = Join-Path $env:GITHUB_WORKSPACE (Split-Path -Leaf $msi)
+            Copy-Item -Path $msi -Destination $destination -Force
+            Write-Host "MSI copied to: $destination"
+            if (Test-Path $destination) {
+              Write-Host "MSI file size: $((Get-Item $destination).Length) bytes"
+            }
+          } else {
+            Write-Error "No MSI found to copy"
+            exit 1
+          }
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: krnr-msi
+          path: krnr-*.msi
+
+  publish-all:
+    name: Publish all artifacts to Release
+    needs: [check, build, build-msi]
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (required by GoReleaser)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist-download
+
+      - name: Download MSI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: krnr-msi
+          path: msi-download
+
+      - name: List downloaded artifacts
+        run: |
+          echo "=== Contents of dist-download ==="
+          ls -laR dist-download || echo "dist-download is empty"
+          echo ""
+          echo "=== Contents of msi-download ==="
+          ls -laR msi-download || echo "msi-download is empty"
+          echo ""
+          echo "=== Looking for MSI files ==="
+          find . -type f -name "*.msi" -ls || echo "No MSI files found"
+
+      - name: Require PERSONAL_TOKEN
+        run: |
+          if [ -z "${{ secrets.PERSONAL_TOKEN }}" ]; then
+            echo "PERSONAL_TOKEN secret is required to upload artifacts to the GitHub Release. Add it to repository secrets and re-run." >&2
+            exit 1
+          fi
+
+      - name: Install GoReleaser
+        run: |
+          curl -sSfL https://github.com/goreleaser/goreleaser/releases/latest/download/goreleaser_Linux_x86_64.tar.gz | tar xz -C /tmp
+          sudo mv /tmp/goreleaser /usr/local/bin/
+          echo "goreleaser version: $(goreleaser --version || true)"
+
+      - name: Prepare release notes
+        run: |
+          NOTES_FILE=$(mktemp)
+          if [ -n "${{ needs.check.outputs.release_body }}" ]; then
+            echo "${{ needs.check.outputs.release_body }}" > "$NOTES_FILE"
+          else
+            echo "Release ${{ needs.check.outputs.version }}" > "$NOTES_FILE"
+          fi
+          echo "NOTES_FILE=$NOTES_FILE" >> $GITHUB_ENV
+
+      - name: Preserve MSI files before cleaning
+        run: |
+          set -euo pipefail
+          echo "Moving MSI files to temporary location"
+          mkdir -p /tmp/msi-backup
+          find msi-download -type f -name "krnr-*.msi" -exec cp {} /tmp/msi-backup/ \; || true
+          ls -la /tmp/msi-backup/ || echo "No MSI files backed up"
+
+      - name: Clean downloaded artifacts to avoid dirty git state
+        run: |
+          set -euo pipefail
+          echo "Removing downloaded artifact directories"
+          rm -rf dist-download msi-download || true
+          git status
+
+      - name: Run GoReleaser (publish)
         env:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
         run: |
           set -euo pipefail
-          echo "Removing old dist/ and running GoReleaser to build and publish artifacts"
-          rm -rf dist || true
-          # Write release notes to a temp file to ensure GoReleaser reads them as content (not a filename).
-          NOTES_FILE="$(mktemp)"
-          echo "Release ${{ needs.check.outputs.version }}: ${{ needs.check.outputs.release_body }}" > "$NOTES_FILE"
-          goreleaser release --release-notes "$NOTES_FILE" --snapshot=false
+          echo "Running GoReleaser to publish all artifacts"
+          goreleaser release --release-notes "$NOTES_FILE"
 
-      - name: Confirm published artifacts
-        if: ${{ needs.check.outputs.publish == 'true' }}
+      - name: Upload MSI files to GitHub Release
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          TAG: ${{ needs.check.outputs.version }}
         run: |
-          echo "Listing generated artifacts in dist/"
-          ls -la dist || true
-          echo "GoReleaser should have published these to the GitHub Release and registries configured in .goreleaser.yml"
+          set -euo pipefail
+          
+          echo "Looking for MSI files to upload"
+          
+          # Find MSI files from backup location
+          if [ ! -d "/tmp/msi-backup" ]; then
+            echo "No MSI backup directory found"
+            exit 1
+          fi
+          
+          msi_files=$(find /tmp/msi-backup -type f -name "krnr-*.msi" 2>/dev/null || true)
+          
+          if [ -z "$msi_files" ]; then
+            echo "No MSI files found in backup directory"
+            exit 1
+          fi
+          
+          # Get release information
+          releaseJson=$(curl -s -H "Authorization: token $PERSONAL_TOKEN" "https://api.github.com/repos/$GITHUB_REPO/releases/tags/$TAG" || true)
+          uploadUrl=$(echo "$releaseJson" | jq -r '.upload_url // empty' | sed 's/{.*}//')
+          releaseId=$(echo "$releaseJson" | jq -r '.id // empty')
+          
+          if [ -z "$uploadUrl" ] || [ "$uploadUrl" == "null" ]; then
+            echo "Release for tag $TAG not found; aborting" >&2
+            exit 1
+          fi
+          
+          echo "Release ID: $releaseId"
+          echo "Upload URL: $uploadUrl"
+          
+          # Get version without 'v' prefix
+          VERSION_NO_V="${TAG#v}"
+          
+          # Upload each MSI file
+          for msi_path in $msi_files; do
+            if [ -f "$msi_path" ]; then
+              original_name=$(basename "$msi_path")
+              echo "Found MSI: $original_name (from $msi_path)"
+              
+              # Rename to format: krnr_X.Y.Z_windows_installer.msi
+              # Remove trailing .0 ONLY if version is X.Y.Z.0 (i.e., drop a fourth component)
+              clean_version=$(echo "$VERSION_NO_V" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)\.0$/\1/')
+              new_name="krnr_${clean_version}_windows_installer.msi"
+              
+              echo "Renaming: $original_name -> $new_name"
+              
+              # Calculate SHA256
+              sha=$(sha256sum "$msi_path" | awk '{print toupper($1)}')
+              echo "SHA256: $sha"
+              
+              # Upload the MSI file with new name
+              upload_response=$(curl -s -X POST \
+                -H "Authorization: token $PERSONAL_TOKEN" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary @"$msi_path" \
+                "$uploadUrl?name=$new_name")
+              
+              upload_state=$(echo "$upload_response" | jq -r '.state // empty')
+              if [ "$upload_state" == "uploaded" ]; then
+                echo "✓ Successfully uploaded $new_name"
+              else
+                echo "✗ Failed to upload $new_name"
+                echo "Response: $upload_response"
+              fi
+            fi
+          done
+
+      - name: Final release listing
+        run: |
+          echo "=== Release assets uploaded ==="
+          TAG="${{ needs.check.outputs.version }}"
+          curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" \
+            | jq -r '.assets[] | "- \(.name) (\(.size) bytes)"' || echo "Could not list assets"

@@ -1,0 +1,15 @@
+Id: VoxDroid.krnr
+Name: krnr
+Version: 0.0.0
+Publisher: VoxDroid
+Moniker: krnr
+License: MIT
+InstallerType: msi
+Installers:
+  - Arch: x64
+    Url: REPLACE_WITH_RELEASE_MSI_URL
+    Sha256: REPLACE_WITH_SHA256
+    InstallerType: msi
+    Scope: machine
+
+# Replace Url and Sha256 in CI prior to submitting to winget-pkgs

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>krnr</id>
+    <version>0.0.0</version>
+    <title>krnr</title>
+    <authors>VoxDroid</authors>
+    <owners>VoxDroid</owners>
+    <description>krnr CLI - execute and manage command sets</description>
+    <licenseUrl>https://opensource.org/licenses/MIT</licenseUrl>
+    <projectUrl>https://github.com/VoxDroid/krnr</projectUrl>
+    <tags>cli command-runner</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

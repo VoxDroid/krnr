@@ -1,0 +1,9 @@
+{
+  "version": "0.0.0",
+  "url": "REPLACE_WITH_RELEASE_ZIP_URL",
+  "hash": "REPLACE_WITH_SHA256",
+  "bin": [ "krnr.exe" ],
+  "homepage": "https://github.com/VoxDroid/krnr",
+  "description": "krnr - Kernel Runner CLI",
+  "license": "MIT"
+}

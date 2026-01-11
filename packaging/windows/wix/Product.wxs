@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="krnr" Language="1033" Version="$(var.ProductVersion)" Manufacturer="VoxDroid" UpgradeCode="PUT-GUID-HERE">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"/>
+    <MediaTemplate EmbedCab="yes"/>
+
+    <!-- Provide the license RTF to the Wix UI via preprocessor variable so the standard UI picks it up -->
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf"/>
+
+    
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="krnr">
+          <Component Id="cmp_krnr_exe" Guid="PUT-GUID-0001">
+            <File Id="fil_krnr_exe" Source="$(var.BuildOutputPath)\\krnr.exe" KeyPath="yes"/>
+
+            <!-- Ensure the installation folder is removed during uninstall if empty -->
+            <RemoveFolder Id="RemoveINSTALLFOLDER" On="uninstall"/>
+            <RegistryValue Root="HKLM" Key="Software\VoxDroid\krnr" Name="Installed" Type="integer" Value="1" KeyPath="no"/>
+          </Component>
+
+          <!-- Component that appends the install folder to the SYSTEM PATH -->
+          <Component Id="cmp_env" Guid="PUT-GUID-0002">
+            <!-- Registry key used as a KeyPath so the component can be tracked reliably -->
+            <RegistryValue Root="HKLM" Key="Software\VoxDroid\krnr" Name="InstalledEnv" Type="integer" Value="1" KeyPath="yes"/>
+            <!-- Append INSTALLFOLDER to the system PATH (Part="last" keeps existing PATH entries first) -->
+            <Environment Id="env_path" Name="PATH" Value="[INSTALLFOLDER]" Part="last" Action="set" System="yes" Permanent="no"/>
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="CommonProgramsFolder" Name="Programs">
+        <Component Id="cmp_shortcuts" Guid="PUT-GUID-0003">
+          <!-- Start Menu shortcut to launch krnr (per-machine in Common Programs) -->
+          <Shortcut Id="sft_Krnr_StartMenu" Directory="CommonProgramsFolder" Name="krnr" Advertise="no" Target="[INSTALLFOLDER]krnr.exe" WorkingDirectory="INSTALLFOLDER"/>
+
+          <!-- Shortcut that launches msiexec to remove this product -->
+          <Shortcut Id="sft_Krnr_Uninstall" Directory="CommonProgramsFolder" Name="Uninstall krnr" Advertise="no" Target="[SystemFolder]msiexec.exe" Arguments="/x [ProductCode]"/>
+
+          <!-- KeyPath so the component is tracked by the installer -->
+          <RegistryValue Root="HKLM" Key="Software\VoxDroid\krnr" Name="Shortcut" Type="integer" Value="1" KeyPath="yes"/>
+        </Component>
+      </Directory>
+    </Directory>
+
+    <Feature Id="ProductFeature" Title="krnr" Level="1">
+      <ComponentRef Id="cmp_krnr_exe"/>
+      <ComponentRef Id="cmp_env"/>
+      <ComponentRef Id="cmp_shortcuts"/>
+    </Feature>
+
+    <!-- Display a short helpful note on the final page after install -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="To run krnr, open your terminal and type: krnr --help"/>
+
+    <!-- ARP metadata (shows in Programs & Features / Control Panel) -->
+    <Property Id="ARPCONTACT" Value="izeno.contact@gmail.com"/>
+    <Property Id="ARPHELPLINK" Value="https://github.com/VoxDroid/krnr"/>
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/VoxDroid/krnr"/>
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/VoxDroid/krnr/releases"/>
+    <Property Id="Comments" Value="krnr — lightweight runner and recorder for commands"/>
+
+    <!-- Tell the InstallDir dialog which Folder property to edit (required by WixUI_InstallDir) -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER"/>
+
+    <!-- Use the standard InstallDir UI which includes a License Agreement dialog -->
+    <UIRef Id="WixUI_InstallDir"/>
+  </Product>
+</Wix>

@@ -45,6 +45,24 @@ Follow these steps to install and verify `krnr` on your machine. These steps ass
 - If PATH modifications were not allowed for system-level installs, rerun with elevated privileges (or use a per-user install).
 - For uninstall, run `krnr uninstall --yes` to remove installed files non-interactively; use `--dry-run` first to preview actions.
 
+### Official packages & release status
+We provide platform packages and release artifacts (created via GoReleaser) alongside the per-user `krnr install` CLI.
+
+Current release packaging status:
+- Windows: MSI installer (WiX) is produced and included in GitHub Releases by the release workflow; MSI includes the License Agreement dialog, Start Menu shortcuts, uninstall support, PATH handling, and ARP metadata (contact and links).
+- Winget / Scoop / Chocolatey: manifest templates are present in `packaging/windows/`; these contain placeholders for release URLs and SHA values and will be updated on release. CI automation to replace placeholders and open PRs to the respective registries is pending.
+- Linux: `.deb` and `.rpm` packages are produced by GoReleaser via `nfpm` in the release pipeline.
+
+How to get an official MSI now:
+- Visit the GitHub release for the latest tag and download `krnr-<version>.msi` and run it interactively (double-click or `msiexec /i <msi>`).
+
+Installing via winget / chocolatey / scoop (after manifests are merged):
+- Winget: `winget install --id VoxDroid.krnr` (once the PR is merged in winget-pkgs)
+- Scoop: `scoop install krnr` (after the bucket PR is merged)
+- Chocolatey: `choco install krnr` (after the package is published to Chocolatey.org)
+
+If you'd like, we can automate manifest replacement and PR submission on release; tell us whether to proceed with manifest PR automation in CI.
+
 
 ## Design decisions
 - Default behavior is **per-user** install.
@@ -102,7 +120,7 @@ Follow these steps to install and verify `krnr` on your machine. These steps ass
 6. Create GoReleaser config for packaging and add release CI. (2-3 days) (initial config and release-goreleaser.yml added)
 
 ### Packaging validation
-- Run `goreleaser` locally in snapshot mode to verify build and packaging output without publishing: `goreleaser release --snapshot --rm-dist`.
+- Run `goreleaser` locally in snapshot mode to verify build and packaging output without publishing: `rm -rf dist && goreleaser release --snapshot`.
 - Use the `release-validate.yml` workflow (manual `workflow_dispatch` or push a `v*` tag) to produce artifacts in CI and upload them as workflow artifacts for inspection.
 - Inspect generated artifacts (`dist/`) for expected package types: `*-portable.*`, Debian `.deb`, RPM `.rpm`, Homebrew artifacts, and Windows installers (ZIP/MSI as produced).
 - Verify checksums and signatures (if configured) and confirm package contents and installation paths prior to publishing.
