@@ -24,12 +24,15 @@ jobs:
         id: get_message
         run: |
           commit_message="$(git log -1 --pretty=%s | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-          echo "commit_message=$commit_message" >> "$GITHUB_OUTPUT"
+          # safe base64-encoded output to avoid quote injection when used in later shell blocks
+          commit_message_b64=$(printf '%s' "$commit_message" | base64 -w0)
+          echo "commit_message_b64=$commit_message_b64" >> "$GITHUB_OUTPUT"
 
       - name: Decide whether to publish
         id: decide
         run: |
-          commit_message="${{ steps.get_message.outputs.commit_message }}"
+          # decode base64 commit message safely
+          commit_message=$(printf '%s' "${{ steps.get_message.outputs.commit_message_b64 }}" | base64 --decode)
           if echo "$commit_message" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+'; then
             ver=$(echo "$commit_message" | grep -oE '^v?[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
             if [[ $ver != v* ]]; then ver="v$ver"; fi
