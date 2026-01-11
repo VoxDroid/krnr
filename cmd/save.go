@@ -74,7 +74,7 @@ var saveCmd = &cobra.Command{
 			name = newName
 		}
 
-		id, err := r.CreateCommandSet(name, &desc, authorNamePtr, authorEmailPtr)
+		id, err := r.CreateCommandSet(name, &desc, authorNamePtr, authorEmailPtr, cmds)
 		if err != nil {
 			return err
 		}

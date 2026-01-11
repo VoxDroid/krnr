@@ -18,7 +18,7 @@ func setupVersionRepo(t *testing.T) (*Repository, int64) {
 	// ensure clean state
 	_ = r.DeleteCommandSet("vtest")
 	desc := "version test"
-	id, err := r.CreateCommandSet("vtest", &desc, nil, nil)
+	id, err := r.CreateCommandSet("vtest", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

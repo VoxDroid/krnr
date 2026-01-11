@@ -25,7 +25,7 @@ func TestRunDryRunRedactsSecretsCLI(t *testing.T) {
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("secret-test")
 	desc := "secret param test"
-	id, err := r.CreateCommandSet("secret-test", &desc, nil, nil)
+	id, err := r.CreateCommandSet("secret-test", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

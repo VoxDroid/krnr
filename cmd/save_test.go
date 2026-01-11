@@ -63,7 +63,7 @@ func TestSaveCommand_PromptsOnDuplicateName(t *testing.T) {
 	_ = r.DeleteCommandSet("save-dup")
 	_ = r.DeleteCommandSet("save-dup-2")
 	// create a pre-existing set
-	if _, err := r.CreateCommandSet("save-dup", nil, nil, nil); err != nil {
+	if _, err := r.CreateCommandSet("save-dup", nil, nil, nil, nil); err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
 

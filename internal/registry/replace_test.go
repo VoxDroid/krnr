@@ -17,7 +17,7 @@ func TestReplaceCommands(t *testing.T) {
 	// ensure a clean state if a previous run left artifacts
 	_ = r.DeleteCommandSet("rep-set")
 	desc := "replace"
-	id, err := r.CreateCommandSet("rep-set", &desc, nil, nil)
+	id, err := r.CreateCommandSet("rep-set", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

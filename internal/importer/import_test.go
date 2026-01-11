@@ -25,7 +25,7 @@ func TestImportCommandSet(t *testing.T) {
 
 	r := registry.NewRepository(dbConn)
 	desc := "imp"
-	id, err := r.CreateCommandSet("imp-set", &desc, nil, nil)
+	id, err := r.CreateCommandSet("imp-set", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

@@ -51,7 +51,7 @@ func setupFuzzyRepo(t *testing.T) *Repository {
 	_ = r.DeleteCommandSet("beta")
 
 	d1 := "alpha description"
-	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet alpha: %v", err)
 	}
@@ -63,7 +63,7 @@ func setupFuzzyRepo(t *testing.T) *Repository {
 	}
 
 	d2 := "beta demo"
-	id2, err := r.CreateCommandSet("beta", &d2, nil, nil)
+	id2, err := r.CreateCommandSet("beta", &d2, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet beta: %v", err)
 	}

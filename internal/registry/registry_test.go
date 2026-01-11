@@ -18,7 +18,7 @@ func setupDemoRepo(t *testing.T) (*Repository, int64) {
 	// ensure clean state
 	_ = r.DeleteCommandSet("demo")
 	desc := "demo"
-	id, err := r.CreateCommandSet("demo", &desc, nil, nil)
+	id, err := r.CreateCommandSet("demo", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestRepository_Delete(t *testing.T) {
 	// ensure clean state
 	_ = r.DeleteCommandSet("demo")
 	desc := "demo"
-	id, err := r.CreateCommandSet("demo", &desc, nil, nil)
+	id, err := r.CreateCommandSet("demo", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestRepository_Tags_Add(t *testing.T) {
 	// Create set alpha
 	_ = r.DeleteCommandSet("alpha")
 	d1 := "alpha description"
-	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet alpha: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestRepository_Tags_Remove(t *testing.T) {
 	// Create set alpha
 	_ = r.DeleteCommandSet("alpha")
 	d1 := "alpha description"
-	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet alpha: %v", err)
 	}
@@ -188,7 +188,7 @@ func setupAlphaBeta(t *testing.T) *Repository {
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")
 	d1 := "alpha description"
-	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet alpha: %v", err)
 	}
@@ -197,7 +197,7 @@ func setupAlphaBeta(t *testing.T) *Repository {
 	}
 
 	d2 := "beta demo"
-	id2, err := r.CreateCommandSet("beta", &d2, nil, nil)
+	id2, err := r.CreateCommandSet("beta", &d2, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet beta: %v", err)
 	}
@@ -275,7 +275,7 @@ func setupAlphaBetaForSearch(t *testing.T) *Repository {
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")
 	d1 := "alpha description"
-	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet alpha: %v", err)
 	}
@@ -284,7 +284,7 @@ func setupAlphaBetaForSearch(t *testing.T) *Repository {
 	}
 
 	d2 := "beta demo"
-	id2, err := r.CreateCommandSet("beta", &d2, nil, nil)
+	id2, err := r.CreateCommandSet("beta", &d2, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet beta: %v", err)
 	}

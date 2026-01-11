@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Version represents a saved snapshot of a command set.
@@ -125,10 +126,17 @@ func (r *Repository) ApplyVersionByName(name string, versionNum int) error {
 	if v == nil {
 		return fmt.Errorf("version %d not found for %s", versionNum, name)
 	}
-	// replace commands
-	if err := r.ReplaceCommands(cs.ID, v.Commands); err != nil {
+	// Filter out empty/whitespace-only commands to avoid restoring blank entries
+	var filtered []string
+	for _, c := range v.Commands {
+		if strings.TrimSpace(c) != "" {
+			filtered = append(filtered, c)
+		}
+	}
+	// replace commands with filtered list
+	if err := r.ReplaceCommands(cs.ID, filtered); err != nil {
 		return err
 	}
 	// record rollback as a new version
-	return r.RecordVersion(cs.ID, nil, nil, nil, v.Commands, "rollback")
+	return r.RecordVersion(cs.ID, nil, nil, nil, filtered, "rollback")
 }

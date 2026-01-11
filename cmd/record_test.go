@@ -91,7 +91,7 @@ func TestRecordCommand_PromptsOnDuplicateName(t *testing.T) {
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("record-dup")
 	// create a pre-existing set
-	if _, err := r.CreateCommandSet("record-dup", nil, nil, nil); err != nil {
+	if _, err := r.CreateCommandSet("record-dup", nil, nil, nil, nil); err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
 

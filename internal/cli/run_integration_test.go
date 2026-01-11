@@ -26,7 +26,7 @@ func TestRunIntegrationDryRun(t *testing.T) {
 
 	r := registry.NewRepository(dbConn)
 	desc := "integration"
-	id, err := r.CreateCommandSet("int-set", &desc, nil, nil)
+	id, err := r.CreateCommandSet("int-set", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

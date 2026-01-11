@@ -19,9 +19,9 @@ func TestEditCommand_Interactive(t *testing.T) {
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("edit-test")
-	id, err := r.CreateCommandSet("edit-test", nil, nil, nil)
+	id, err := r.CreateCommandSet("edit-test", nil, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("CreateCommandSet: %v", err)
+		t.Fatalf("CreateCommand: %v", err)
 	}
 	if _, err := r.AddCommand(id, 1, "oldcmd"); err != nil {
 		t.Fatalf("AddCommand: %v", err)

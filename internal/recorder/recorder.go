@@ -102,7 +102,7 @@ func RecordCommands(r io.Reader) ([]string, error) {
 // SaveRecorded creates a command set with the given name/description and writes
 // the provided commands into it using the repository. Returns the created command set ID.
 func SaveRecorded(r *registry.Repository, name string, description *string, commands []string) (int64, error) {
-	id, err := r.CreateCommandSet(name, description, nil, nil)
+	id, err := r.CreateCommandSet(name, description, nil, nil, commands)
 	if err != nil {
 		return 0, err
 	}

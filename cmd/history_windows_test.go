@@ -24,7 +24,7 @@ func TestHistoryCLI_UnicodeAndLong(t *testing.T) {
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("unicöde")
 	d := "unicode history"
-	id, err := r.CreateCommandSet("unicöde", &d, nil, nil)
+	id, err := r.CreateCommandSet("unicöde", &d, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

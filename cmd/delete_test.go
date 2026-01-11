@@ -17,7 +17,7 @@ func TestDeleteCommand_PromptsAndDeletesWhenConfirmed(t *testing.T) {
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("del-test")
-	if _, err := r.CreateCommandSet("del-test", nil, nil, nil); err != nil {
+	if _, err := r.CreateCommandSet("del-test", nil, nil, nil, nil); err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
 
@@ -45,7 +45,7 @@ func TestDeleteCommand_AbortsOnNo(t *testing.T) {
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("del-abort")
-	if _, err := r.CreateCommandSet("del-abort", nil, nil, nil); err != nil {
+	if _, err := r.CreateCommandSet("del-abort", nil, nil, nil, nil); err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
 
@@ -76,7 +76,7 @@ func TestDeleteCommand_SkipsPromptWithYesFlag(t *testing.T) {
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("del-yes")
-	if _, err := r.CreateCommandSet("del-yes", nil, nil, nil); err != nil {
+	if _, err := r.CreateCommandSet("del-yes", nil, nil, nil, nil); err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
 

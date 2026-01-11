@@ -22,7 +22,7 @@ func TestRunOutputsUnescaped(t *testing.T) {
 
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("yeet-output")
-	id, err := r.CreateCommandSet("yeet-output", nil, nil, nil)
+	id, err := r.CreateCommandSet("yeet-output", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

@@ -18,7 +18,7 @@ func setupWinRepo(t *testing.T) (*Repository, int64, []string) {
 	r := NewRepository(dbConn)
 	_ = r.DeleteCommandSet("win-α")
 	desc := "win path and unicode test"
-	id, err := r.CreateCommandSet("win-α", &desc, nil, nil)
+	id, err := r.CreateCommandSet("win-α", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestVersions_LongHistory(t *testing.T) {
 	r := NewRepository(dbConn)
 	_ = r.DeleteCommandSet("longhist")
 	desc := "long history test"
-	id, err := r.CreateCommandSet("longhist", &desc, nil, nil)
+	id, err := r.CreateCommandSet("longhist", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

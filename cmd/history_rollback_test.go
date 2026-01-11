@@ -27,7 +27,7 @@ func setupHistoryRepo(t *testing.T) *registry.Repository {
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("hst")
 	desc := "history test"
-	id, err := r.CreateCommandSet("hst", &desc, nil, nil)
+	id, err := r.CreateCommandSet("hst", &desc, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

@@ -16,7 +16,8 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 // CreateCommandSet inserts a new command set and returns its ID.
-func (r *Repository) CreateCommandSet(name string, description *string, authorName *string, authorEmail *string) (int64, error) {
+// initialCommands, if provided, will be recorded as the initial version snapshot.
+func (r *Repository) CreateCommandSet(name string, description *string, authorName *string, authorEmail *string, initialCommands []string) (int64, error) {
 	trx, err := r.db.Begin()
 	if err != nil {
 		return 0, err
@@ -34,8 +35,8 @@ func (r *Repository) CreateCommandSet(name string, description *string, authorNa
 	if err := trx.Commit(); err != nil {
 		return 0, err
 	}
-	// record an initial version (empty commands) for history
-	_ = r.RecordVersion(id, authorName, authorEmail, description, []string{}, "create")
+	// record an initial version (may include provided commands)
+	_ = r.RecordVersion(id, authorName, authorEmail, description, initialCommands, "create")
 	return id, nil
 }
 

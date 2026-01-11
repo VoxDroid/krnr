@@ -82,7 +82,7 @@ func TestRun_DefaultPrints(t *testing.T) {
 	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("hello", nil, nil, nil)
+	id, err := r.CreateCommandSet("hello", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestRun_SuppressCommand(t *testing.T) {
 	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("hello", nil, nil, nil)
+	id, err := r.CreateCommandSet("hello", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestRun_ShowStderr(t *testing.T) {
 	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("hello", nil, nil, nil)
+	id, err := r.CreateCommandSet("hello", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestRunDryRunAndVerbose(t *testing.T) {
 	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("dry", nil, nil, nil)
+	id, err := r.CreateCommandSet("dry", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestRunConfirmBehavior(t *testing.T) {
 	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("confirm", nil, nil, nil)
+	id, err := r.CreateCommandSet("confirm", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestRunForceBehavior(t *testing.T) {
 	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("unsafe", nil, nil, nil)
+	id, err := r.CreateCommandSet("unsafe", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestRunShellFlagWiresExecutor(t *testing.T) {
 	defer func() { _ = dbConn.Close() }()
 
 	r := registry.NewRepository(dbConn)
-	id, err := r.CreateCommandSet("shell-test", nil, nil, nil)
+	id, err := r.CreateCommandSet("shell-test", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
