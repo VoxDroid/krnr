@@ -7,9 +7,9 @@ import (
 )
 
 func TestFuzzyMatchBasics(t *testing.T) {
-	cases := []struct{
+	cases := []struct {
 		target string
-		query string
+		query  string
 		expect bool
 	}{
 		{"alpha", "al", true},
