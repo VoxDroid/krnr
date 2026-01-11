@@ -100,23 +100,9 @@ func ImportCommandSet(srcPath string) error {
 			return err
 		}
 		// copy commands
-		crows, err := src.Query("SELECT position, command FROM commands WHERE command_set_id = ? ORDER BY position ASC", id)
-		if err != nil {
+		if err := copyCommands(src, id, dst, newID); err != nil {
 			return err
 		}
-		for crows.Next() {
-			var pos int
-			var cmd string
-			if err := crows.Scan(&pos, &cmd); err != nil {
-				_ = crows.Close()
-				return err
-			}
-			if _, err := dst.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", newID, pos, cmd); err != nil {
-				_ = crows.Close()
-				return err
-			}
-		}
-		_ = crows.Close()
 	}
 	return nil
 }

@@ -267,19 +267,7 @@ func GetStatus() (*Status, error) {
 	// Check PATH membership (current process PATH)
 	st.UserOnPath = ContainsPath(os.Getenv("PATH"), filepath.Dir(userPath))
 	if runtime.GOOS == "windows" {
-		// Check Machine and User PATH for system / user installs
-		getCmd := exec.Command("powershell", "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','Machine')")
-		if out, err := getCmd.Output(); err == nil {
-			if ContainsPath(strings.TrimSpace(string(out)), filepath.Dir(sysPath)) {
-				st.SystemOnPath = true
-			}
-		}
-		getCmd2 := exec.Command("powershell", "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','User')")
-		if out2, err := getCmd2.Output(); err == nil {
-			if ContainsPath(strings.TrimSpace(string(out2)), filepath.Dir(userPath)) {
-				st.UserOnPath = true
-			}
-		}
+		checkWindowsPathMembership(st)
 	} else {
 		st.SystemOnPath = ContainsPath(os.Getenv("PATH"), filepath.Dir(sysPath))
 	}
@@ -290,6 +278,31 @@ func GetStatus() (*Status, error) {
 		}
 	}
 	// If PATH checks above didn't mark on-path, try resolving the command via LookPath/where
+	adjustFromLookPath(st)
+	return st, nil
+}
+
+// checkWindowsPathMembership inspects Machine and User PATH environment variables
+// and updates the Status accordingly.
+func checkWindowsPathMembership(st *Status) {
+	// Check Machine and User PATH for system / user installs
+	getCmd := exec.Command("powershell", "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','Machine')")
+	if out, err := getCmd.Output(); err == nil {
+		if ContainsPath(strings.TrimSpace(string(out)), filepath.Dir(st.SystemPath)) {
+			st.SystemOnPath = true
+		}
+	}
+	getCmd2 := exec.Command("powershell", "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','User')")
+	if out2, err := getCmd2.Output(); err == nil {
+		if ContainsPath(strings.TrimSpace(string(out2)), filepath.Dir(st.UserPath)) {
+			st.UserOnPath = true
+		}
+	}
+}
+
+// adjustFromLookPath resolves the krnr executable via exec.LookPath and updates
+// installation/path flags based on the resolved path.
+func adjustFromLookPath(st *Status) {
 	bin := "krnr"
 	if runtime.GOOS == "windows" {
 		bin = "krnr.exe"
@@ -316,64 +329,70 @@ func GetStatus() (*Status, error) {
 			}
 		}
 	}
-	return st, nil
 }
 
 func addToPath(targetPath string, system bool) (string, string, error) {
 	dir := filepath.Dir(targetPath)
 	if runtime.GOOS == "windows" {
-		// Decide scope: User or Machine
-		scope := "User"
-		pathLabel := "UserEnv"
-		if system {
-			scope = "Machine"
-			pathLabel = "MachineEnv"
-		}
-		// Retrieve current PATH for scope
-		getCmd := exec.Command("powershell", "-NoProfile", "-Command", fmt.Sprintf("[Environment]::GetEnvironmentVariable('Path','%s')", scope))
-		out, err := getCmd.Output()
-		old := ""
-		if err == nil {
-			old = strings.TrimSpace(string(out))
-		}
-		// If already present in that PATH or current process PATH, nothing to do
-		if ContainsPath(old, dir) || ContainsPath(os.Getenv("PATH"), dir) {
-			return pathLabel, old, nil
-		}
-		// Test mode: don't modify actual environment
-		if os.Getenv("KRNR_TEST_NO_SETX") != "" {
-			return pathLabel, old, nil
-		}
-		// Compose new PATH and set it persistently
-		newPath := old
-		if newPath == "" {
-			newPath = dir
-		} else {
-			newPath = newPath + ";" + dir
-		}
-		// Build an encoded PowerShell command to set the PATH safely (avoids quoting/escaping issues)
-		script := fmt.Sprintf("[Environment]::SetEnvironmentVariable('Path', %s, '%s')", toPowerShellString(newPath), scope)
-		enc := encodePowerShellCommand(script)
-		setCmd := exec.Command("powershell", "-NoProfile", "-EncodedCommand", enc)
-		if out, err := setCmd.CombinedOutput(); err != nil {
-			return "", old, fmt.Errorf("set %s PATH: %v (%s)", scope, err, string(out))
-		}
-		// Attempt to correct doubled backslashes if they appear after setting
-		if fixMsg, fixed, err := ensureNoDoubleBackslashes(scope, false); err != nil {
-			return "", old, fmt.Errorf("set %s PATH succeeded but post-fix failed: %v", scope, err)
-		} else if fixed {
-			_ = fixMsg // caller can log if needed; we return pathLabel
-		}
-		return pathLabel, old, nil
+		return addToPathWindows(dir, system)
 	}
 	// Non-Windows behavior
 	if system {
 		// For system installs on Unix we prefer instructing the admin rather than editing system files.
 		return "", "", fmt.Errorf("system PATH modifications require admin privileges; move the binary to %s or add %s to system PATH manually", systemBin(), filepath.Dir(targetPath))
 	}
-	// Attempt to find shell rc for user. Prefer an existing rc file (e.g., a
-	// test that creates ~/.bashrc expects us to append there) and otherwise
-	// fall back to shell detection or ~/.profile.
+	return addToPathUnix(dir)
+}
+
+// addToPathWindows adds dir to the PATH for the given scope (User or Machine) and returns the path label and previous value
+func addToPathWindows(dir string, system bool) (string, string, error) {
+	// Decide scope: User or Machine
+	scope := "User"
+	pathLabel := "UserEnv"
+	if system {
+		scope = "Machine"
+		pathLabel = "MachineEnv"
+	}
+	// Retrieve current PATH for scope
+	getCmd := exec.Command("powershell", "-NoProfile", "-Command", fmt.Sprintf("[Environment]::GetEnvironmentVariable('Path','%s')", scope))
+	out, err := getCmd.Output()
+	old := ""
+	if err == nil {
+		old = strings.TrimSpace(string(out))
+	}
+	// If already present in that PATH or current process PATH, nothing to do
+	if ContainsPath(old, dir) || ContainsPath(os.Getenv("PATH"), dir) {
+		return pathLabel, old, nil
+	}
+	// Test mode: don't modify actual environment
+	if os.Getenv("KRNR_TEST_NO_SETX") != "" {
+		return pathLabel, old, nil
+	}
+	// Compose new PATH and set it persistently
+	newPath := old
+	if newPath == "" {
+		newPath = dir
+	} else {
+		newPath = newPath + ";" + dir
+	}
+	// Build an encoded PowerShell command to set the PATH safely (avoids quoting/escaping issues)
+	script := fmt.Sprintf("[Environment]::SetEnvironmentVariable('Path', %s, '%s')", toPowerShellString(newPath), scope)
+	enc := encodePowerShellCommand(script)
+	setCmd := exec.Command("powershell", "-NoProfile", "-EncodedCommand", enc)
+	if out, err := setCmd.CombinedOutput(); err != nil {
+		return "", old, fmt.Errorf("set %s PATH: %v (%s)", scope, err, string(out))
+	}
+	// Attempt to correct doubled backslashes if they appear after setting
+	if fixMsg, fixed, err := ensureNoDoubleBackslashes(scope, false); err != nil {
+		return "", old, fmt.Errorf("set %s PATH succeeded but post-fix failed: %v", scope, err)
+	} else if fixed {
+		_ = fixMsg // caller can log if needed; we return pathLabel
+	}
+	return pathLabel, old, nil
+}
+
+// addToPathUnix appends a PATH export to the appropriate shell rc file and returns the file path
+func addToPathUnix(dir string) (string, string, error) {
 	shell := os.Getenv("SHELL")
 	homedir := os.Getenv("HOME")
 	if homedir == "" {
@@ -415,10 +434,46 @@ func Uninstall(verbose bool) ([]string, error) {
 		return nil, fmt.Errorf("load metadata: %w", err)
 	}
 	actions := []string{}
-	// remove binary
+
+	// 1) remove the installed target binary
+	actions = append(actions, removeTargetBinary(m)...) // returns []string
+
+	// 2) remove recorded PATH modification
+	if m.AddedToPath {
+		if runtime.GOOS == "windows" {
+			if msgs, err := removeWindowsPathEntry(m, verbose); err != nil {
+				actions = append(actions, fmt.Sprintf("failed to remove PATH entry (windows): %v", err))
+			} else {
+				actions = append(actions, msgs...)
+			}
+		} else {
+			msgs := removeUnixPathEntry(m)
+			actions = append(actions, msgs...)
+		}
+	}
+
+	// 3) remove other installations if present
+	actions = append(actions, removeOtherInstallations(m)...) // returns []string
+
+	// 4) ensure PATH entries removed for both scopes (windows helper)
+	if runtime.GOOS == "windows" {
+		if msg, err := removeFromPathWindows("User", filepath.Dir(filepath.Join(DefaultUserBin(), "krnr.exe")), verbose); err == nil && msg != "" {
+			actions = append(actions, msg)
+		}
+		if msg, err := removeFromPathWindows("Machine", filepath.Dir(filepath.Join(systemBin(), "krnr.exe")), verbose); err == nil && msg != "" {
+			actions = append(actions, msg)
+		}
+	}
+
+	_ = removeMetadata()
+	return actions, nil
+}
+
+// Helper: remove the recorded target binary and return human-readable actions
+func removeTargetBinary(m *metadata) []string {
+	actions := []string{}
 	if _, err := os.Stat(m.TargetPath); err == nil {
 		if err := os.Remove(m.TargetPath); err != nil {
-			// Could be in use or permission denied - report and suggest a workaround
 			actions = append(actions, fmt.Sprintf("Failed to remove %s: %v", m.TargetPath, err))
 			actions = append(actions, "If the file is in use, run the downloaded krnr binary outside the installation directory (for example from Downloads) and re-run uninstall, or stop any running instances and retry.")
 		} else {
@@ -445,125 +500,108 @@ func Uninstall(verbose bool) ([]string, error) {
 	} else {
 		actions = append(actions, fmt.Sprintf("Target %s not found; skipping", m.TargetPath))
 	}
+	return actions
+}
 
-	// remove PATH modification for Unix if present
-	if m.AddedToPath && runtime.GOOS != "windows" {
-		rcfile := m.PathFile
-		if rcfile == "" {
-			homedir, _ := os.UserHomeDir()
-			rcfile = filepath.Join(homedir, ".profile")
-			if _, err := os.Stat(filepath.Join(homedir, ".bashrc")); err == nil {
-				rcfile = filepath.Join(homedir, ".bashrc")
-			}
-		}
-		// read file and remove krnr lines
-		b, err := os.ReadFile(rcfile)
-		if err == nil {
-			s := string(b)
-			// remove any line containing krnr and target dir
-			newLines := []string{}
-			for _, line := range strings.Split(s, "\n") {
-				if strings.Contains(line, filepath.Dir(m.TargetPath)) && strings.Contains(line, "krnr") {
-					continue
-				}
-				newLines = append(newLines, line)
-			}
-			_ = os.WriteFile(rcfile, []byte(strings.Join(newLines, "\n")), 0o644)
-			actions = append(actions, fmt.Sprintf("Removed PATH entry from %s", rcfile))
-		} else {
-			actions = append(actions, fmt.Sprintf("No PATH file %s found; nothing to remove", rcfile))
+// Helper: remove PATH entry on Unix-like systems, if present
+func removeUnixPathEntry(m *metadata) []string {
+	actions := []string{}
+	rcfile := m.PathFile
+	if rcfile == "" {
+		homedir, _ := os.UserHomeDir()
+		rcfile = filepath.Join(homedir, ".profile")
+		if _, err := os.Stat(filepath.Join(homedir, ".bashrc")); err == nil {
+			rcfile = filepath.Join(homedir, ".bashrc")
 		}
 	}
-
-	// On Windows remove the added PATH entry for the recorded scope (User or Machine)
-	if m.AddedToPath && runtime.GOOS == "windows" {
-		scope := "User"
-		if m.PathFile == "MachineEnv" {
-			scope = "Machine"
-		}
-		d := filepath.Dir(m.TargetPath)
-		// If we recorded a full previous PATH value, prefer full restore (best-effort)
-		if m.OldUserPath != "" {
-			if os.Getenv("KRNR_TEST_NO_SETX") != "" {
-				actions = append(actions, fmt.Sprintf("Note: would restore %s PATH to previous value (test mode)", scope))
-			} else {
-				// Use encoded command and a safe PowerShell string to avoid quoting issues
-				script := fmt.Sprintf("[Environment]::SetEnvironmentVariable('Path', %s, '%s')", toPowerShellString(m.OldUserPath), scope)
-				enc := encodePowerShellCommand(script)
-				setCmd := exec.Command("powershell", "-NoProfile", "-EncodedCommand", enc)
-				if out, err := setCmd.CombinedOutput(); err != nil {
-					actions = append(actions, fmt.Sprintf("failed to restore %s PATH: %v (%s)", scope, err, string(out)))
-				} else {
-					actions = append(actions, fmt.Sprintf("Restored %s PATH to previous value", scope))
-					// Attempt to correct doubled backslashes after restoring
-					if fixMsg, fixed, err := ensureNoDoubleBackslashes(scope, verbose); err != nil {
-						actions = append(actions, fmt.Sprintf("set %s PATH succeeded but post-fix failed: %v", scope, err))
-					} else if fixed {
-						actions = append(actions, fixMsg)
-					}
-				}
+	b, err := os.ReadFile(rcfile)
+	if err == nil {
+		s := string(b)
+		newLines := []string{}
+		for _, line := range strings.Split(s, "\n") {
+			if strings.Contains(line, filepath.Dir(m.TargetPath)) && strings.Contains(line, "krnr") {
+				continue
 			}
-		} else {
-			// No recorded previous PATH; attempt to remove the specific entry
-			msg, err := removeFromPathWindows(scope, d, verbose)
-			if err != nil {
-				actions = append(actions, fmt.Sprintf("failed to remove %s from %s PATH: %v", d, scope, err))
-			} else {
-				actions = append(actions, msg)
-			}
+			newLines = append(newLines, line)
 		}
+		_ = os.WriteFile(rcfile, []byte(strings.Join(newLines, "\n")), 0o644)
+		actions = append(actions, fmt.Sprintf("Removed PATH entry from %s", rcfile))
+	} else {
+		actions = append(actions, fmt.Sprintf("No PATH file %s found; nothing to remove", rcfile))
 	}
+	return actions
+}
 
-	// Additionally, detect and remove other installations if present (both user and system)
+// Helper: remove recorded PATH entry on Windows (restores or removes depending on metadata)
+func removeWindowsPathEntry(m *metadata, verbose bool) ([]string, error) {
+	actions := []string{}
+	scope := "User"
+	if m.PathFile == "MachineEnv" {
+		scope = "Machine"
+	}
+	d := filepath.Dir(m.TargetPath)
+	if m.OldUserPath != "" {
+		if os.Getenv("KRNR_TEST_NO_SETX") != "" {
+			actions = append(actions, fmt.Sprintf("Note: would restore %s PATH to previous value (test mode)", scope))
+			return actions, nil
+		}
+		// Attempt full restore
+		script := fmt.Sprintf("[Environment]::SetEnvironmentVariable('Path', %s, '%s')", toPowerShellString(m.OldUserPath), scope)
+		enc := encodePowerShellCommand(script)
+		setCmd := exec.Command("powershell", "-NoProfile", "-EncodedCommand", enc)
+		if out, err := setCmd.CombinedOutput(); err != nil {
+			actions = append(actions, fmt.Sprintf("failed to restore %s PATH: %v (%s)", scope, err, string(out)))
+			return actions, nil
+		}
+		actions = append(actions, fmt.Sprintf("Restored %s PATH to previous value", scope))
+		if fixMsg, fixed, err := ensureNoDoubleBackslashes(scope, verbose); err != nil {
+			actions = append(actions, fmt.Sprintf("set %s PATH succeeded but post-fix failed: %v", scope, err))
+		} else if fixed {
+			actions = append(actions, fixMsg)
+		}
+		return actions, nil
+	}
+	// Otherwise remove specific entry
+	msg, err := removeFromPathWindows(scope, d, verbose)
+	if err != nil {
+		return actions, err
+	}
+	actions = append(actions, msg)
+	return actions, nil
+}
+
+// Helper: remove other installations (user/system targets) that are not the recorded target
+func removeOtherInstallations(m *metadata) []string {
+	actions := []string{}
 	binName := "krnr"
 	if runtime.GOOS == "windows" {
 		binName = "krnr.exe"
 	}
 	userTarget := filepath.Join(DefaultUserBin(), binName)
 	sysTarget := filepath.Join(systemBin(), binName)
-	// Remove user install if present and not already handled
 	if userTarget != m.TargetPath {
 		if _, err := os.Stat(userTarget); err == nil {
 			if err := os.Remove(userTarget); err != nil {
 				actions = append(actions, fmt.Sprintf("Failed to remove %s: %v", userTarget, err))
 			} else {
 				actions = append(actions, fmt.Sprintf("Removed %s", userTarget))
-				// attempt to remove parent dir if empty
-				parent := filepath.Dir(userTarget)
-				_ = os.Remove(parent)
+				_ = os.Remove(filepath.Dir(userTarget))
 			}
 		}
 	}
-	// For systemTarget
 	if sysTarget != m.TargetPath {
 		if _, err := os.Stat(sysTarget); err == nil {
 			if err := os.Remove(sysTarget); err != nil {
 				actions = append(actions, fmt.Sprintf("Failed to remove %s: %v", sysTarget, err))
 			} else {
 				actions = append(actions, fmt.Sprintf("Removed %s", sysTarget))
-				parent := filepath.Dir(sysTarget)
-				_ = os.Remove(parent)
+				_ = os.Remove(filepath.Dir(sysTarget))
 			}
 		}
 	}
-
-	// Also ensure PATH entries removed for both scopes
-	if runtime.GOOS == "windows" {
-		// attempt to remove user PATH entry
-		msg, err := removeFromPathWindows("User", filepath.Dir(userTarget), verbose)
-		if err == nil && msg != "" {
-			actions = append(actions, msg)
-		}
-		// attempt to remove machine PATH entry
-		msg2, err2 := removeFromPathWindows("Machine", filepath.Dir(sysTarget), verbose)
-		if err2 == nil && msg2 != "" {
-			actions = append(actions, msg2)
-		}
-	}
-
-	_ = removeMetadata()
-	return actions, nil
+	return actions
 }
+
 
 // removeFromPathWindows removes a single directory from the PATH for the given scope (User or Machine).
 // Returns a human-readable action message and an error if the operation failed.

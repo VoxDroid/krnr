@@ -30,33 +30,40 @@ func RecordCommands(r io.Reader) ([]string, error) {
 			return false
 		}
 	}
+	processLine := func(line string) (bool, error) {
+		trim := strings.TrimSpace(line)
+		if isSentinel(trim) {
+			return true, nil
+		}
+		if trim != "" && !strings.HasPrefix(trim, "#") {
+			out = append(out, trim)
+		}
+		return false, nil
+	}
+
 	for {
 		b, err := br.ReadByte()
 		if err != nil {
 			if err == io.EOF {
-				// flush any pending line
 				if lineBuf.Len() > 0 {
-					line := strings.TrimSpace(lineBuf.String())
-					if isSentinel(line) {
+					if stop, err := processLine(lineBuf.String()); err != nil {
+						return nil, err
+					} else if stop {
 						return out, nil
-					}
-					if line != "" && !strings.HasPrefix(line, "#") {
-						out = append(out, line)
 					}
 				}
 				return out, nil
 			}
 			return nil, fmt.Errorf("read commands: %w", err)
 		}
+
 		// ASCII SUB (Ctrl+Z) should stop reading immediately
 		if b == 0x1A {
 			if lineBuf.Len() > 0 {
-				line := strings.TrimSpace(lineBuf.String())
-				if isSentinel(line) {
+				if stop, err := processLine(lineBuf.String()); err != nil {
+					return nil, err
+				} else if stop {
 					return out, nil
-				}
-				if line != "" && !strings.HasPrefix(line, "#") {
-					out = append(out, line)
 				}
 			}
 			return out, nil
@@ -66,19 +73,15 @@ func RecordCommands(r io.Reader) ([]string, error) {
 		// (two characters '^' and 'Z' or 'z'). Treat that sequence as EOF and
 		// ignore it so the user doesn't have to press Enter after typing Ctrl+Z.
 		if b == '^' {
-			// attempt to read the next byte to see if it's Z/z
 			nb, err := br.ReadByte()
 			if err != nil {
 				if err == io.EOF {
-					// we read a trailing '^' at EOF, treat it as normal char
 					lineBuf.WriteByte('^')
 					if lineBuf.Len() > 0 {
-						line := strings.TrimSpace(lineBuf.String())
-						if isSentinel(line) {
+						if stop, err := processLine(lineBuf.String()); err != nil {
+							return nil, err
+						} else if stop {
 							return out, nil
-						}
-						if line != "" && !strings.HasPrefix(line, "#") {
-							out = append(out, line)
 						}
 					}
 					return out, nil
@@ -87,29 +90,24 @@ func RecordCommands(r io.Reader) ([]string, error) {
 			}
 			if nb == 'Z' || nb == 'z' {
 				if lineBuf.Len() > 0 {
-					line := strings.TrimSpace(lineBuf.String())
-					if isSentinel(line) {
+					if stop, err := processLine(lineBuf.String()); err != nil {
+						return nil, err
+					} else if stop {
 						return out, nil
-					}
-					if line != "" && !strings.HasPrefix(line, "#") {
-						out = append(out, line)
 					}
 				}
 				return out, nil
 			}
-			// not a caret-Z sequence — append both to the buffer
 			lineBuf.WriteByte('^')
 			lineBuf.WriteByte(nb)
 			continue
 		}
 
 		if b == '\n' {
-			line := strings.TrimSpace(lineBuf.String())
-			if isSentinel(line) {
+			if stop, err := processLine(lineBuf.String()); err != nil {
+				return nil, err
+			} else if stop {
 				return out, nil
-			}
-			if line != "" && !strings.HasPrefix(line, "#") {
-				out = append(out, line)
 			}
 			lineBuf.Reset()
 			continue

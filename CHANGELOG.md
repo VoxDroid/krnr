@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
   - Unit tests and integration tests for tags, search, and fuzzy matching (CLI + repository tests).
   - CLI docs updated (`docs/cli.md`) with examples for `--tag`, `--filter`, and `--fuzzy`.
   - Stability, packaging, and security checks validated; cross-platform tests added/updated (Windows, Linux, macOS).
+  - Refactor: reduced cyclomatic complexity for several large functions (`internal/install.Uninstall`, `internal/install.addToPath`, `internal/install.GetStatus`, `internal/recorder.RecordCommands`, `internal/importer.ImportCommandSet`) and split large tests in `internal/registry` to improve maintainability and test isolation.
 - Upgrade notes:
   - No DB schema changes are required for tagging and fuzzy search — backward compatible with prior versions.
 - Acceptance criteria:

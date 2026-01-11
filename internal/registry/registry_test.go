@@ -71,7 +71,7 @@ func TestRepository_CRUD(t *testing.T) {
 	}
 }
 
-func TestRepository_TagsAndSearch(t *testing.T) {
+func TestRepository_Tags(t *testing.T) {
 	// init DB
 	dbConn, err := db.InitDB()
 	if err != nil {
@@ -135,25 +135,6 @@ func TestRepository_TagsAndSearch(t *testing.T) {
 		t.Fatalf("expected only alpha for tag 'utils', got %+v", setsWithUtils)
 	}
 
-	// Search
-	results, err := r.SearchCommandSets("demo")
-	if err != nil {
-		t.Fatalf("SearchCommandSets: %v", err)
-	}
-	if len(results) == 0 {
-		t.Fatalf("expected search results for 'demo'")
-	}
-	foundBeta := false
-	for _, s := range results {
-		if s.Name == "beta" {
-			foundBeta = true
-			break
-		}
-	}
-	if !foundBeta {
-		t.Fatalf("expected 'beta' in search results")
-	}
-
 	// GetCommandSetByName includes tags
 	csAlpha, err := r.GetCommandSetByName("alpha")
 	if err != nil {
@@ -178,5 +159,56 @@ func TestRepository_TagsAndSearch(t *testing.T) {
 		if tg == "utils" {
 			t.Fatalf("expected tag 'utils' to be removed")
 		}
+	}
+}
+
+func TestRepository_Search(t *testing.T) {
+	// init DB
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := NewRepository(dbConn)
+
+	// ensure clean state
+	_ = r.DeleteCommandSet("alpha")
+	_ = r.DeleteCommandSet("beta")
+	d1 := "alpha description"
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet alpha: %v", err)
+	}
+	if _, err := r.AddCommand(id1, 1, "echo alpha"); err != nil {
+		t.Fatalf("AddCommand alpha: %v", err)
+	}
+
+	d2 := "beta demo"
+	id2, err := r.CreateCommandSet("beta", &d2, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet beta: %v", err)
+	}
+	if _, err := r.AddCommand(id2, 1, "echo beta"); err != nil {
+		t.Fatalf("AddCommand beta: %v", err)
+	}
+
+	// Search
+	results, err := r.SearchCommandSets("demo")
+	if err != nil {
+		t.Fatalf("SearchCommandSets: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatalf("expected search results for 'demo'")
+	}
+	foundBeta := false
+	for _, s := range results {
+		if s.Name == "beta" {
+			foundBeta = true
+			break
+		}
+	}
+	if !foundBeta {
+		t.Fatalf("expected 'beta' in search results")
 	}
 }

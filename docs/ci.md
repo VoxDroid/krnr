@@ -20,3 +20,18 @@ a resilient `scripts/lint.sh` script that:
 The CI workflow runs the formatter and the linter on Unix runners and uses the
 Docker fallback in environments where the local linter is unavailable or
 incompatible.
+
+## Cyclomatic complexity (gocyclo)
+
+We run `gocyclo` as part of `golangci-lint` to keep cyclomatic complexity in
+check. The project warns on functions with cyclomatic complexity > 15 and
+maintainers should aim to keep functions small and testable.
+
+- If `gocyclo` flags a function (e.g., `gocyclo` reports complexity > 15), prefer
+  extracting helper functions and adding focused unit tests, rather than writing
+  long monolithic functions. Recent work reduced complexity for several functions
+  (`internal/install.Uninstall`, `internal/install.addToPath`,
+  `internal/install.GetStatus`, `internal/recorder.RecordCommands`, and
+  `internal/importer.ImportCommandSet`).
+- To run locally: `golangci-lint run --enable gocyclo` (or `./scripts/lint.sh`).
+
