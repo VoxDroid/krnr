@@ -29,6 +29,20 @@ krnr is a cross-platform CLI that provides a global, persistent registry of name
 
 For a longer introduction and design notes, see `krnr_docs/PROJECT_OVERVIEW.md` and `docs/architecture.md`.
 
+
+## What's new — v1.0.0 (First official release) 🔖
+
+v1.0.0 is the project's first official stable release (2026-01-11). Key improvements include:
+
+- Tagging & discovery: `krnr tag` and `krnr list --tag` for organizing and filtering command sets.
+- Better search: `krnr list --filter <text>` and `--fuzzy` for substring and fuzzy subsequence matches.
+- Parameters & env sourcing: `{{param}}` substitution, `--param name=value`, and `env:VAR` support.
+- Versioning & history: `krnr history <name>` and `krnr rollback <name> --version` to manage snapshots.
+- Packaging & installers: Windows MSI (WiX) and package manifests for Homebrew/Scoop/Winget; release automation produces installers and archives.
+- Security & safety: conservative destructive checks, parameter redaction, and confirmation prompts.
+
+See the full release notes: `docs/releases/v1.0.0.md` and the detailed changelog in `CHANGELOG.md`.
+
 ---
 
 ## Badges & Status
