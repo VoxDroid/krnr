@@ -50,11 +50,11 @@ Maintainers who do not follow or enforce this Code of Conduct in good faith may 
 
 The maintainers will consider the following community impact guidelines when determining the consequences of a violation:
 
-- **Minor Violation**: Use of inappropriate language or behavior deemed unprofessional.  
+- **Minor Violation**: Use of inappropriate language or behavior deemed unprofessional.
   **Consequence**: A private warning, with an opportunity to correct the behavior.
-- **Moderate Violation**: A single incident or series of actions that violate community standards.  
+- **Moderate Violation**: A single incident or series of actions that violate community standards.
   **Consequence**: A warning with a temporary ban if the behavior continues.
-- **Severe Violation**: Sustained inappropriate behavior, harassment, or actions that harm the community (e.g., promoting illegal use of the tool, public disclosure of security vulnerabilities).  
+- **Severe Violation**: Sustained inappropriate behavior, harassment, or actions that harm the community (e.g., promoting illegal use of the tool, public disclosure of security vulnerabilities).
   **Consequence**: A permanent ban from the project.
 
 ## Attribution
