@@ -10,7 +10,7 @@ This roadmap outlines short-, medium-, and long-term priorities for `krnr`.
 
 ## Medium-term (v1.0)
 - Add advanced features:
-  - Tagging and search operations UI (`tags`, filters, fuzzy search)
+  - Tagging and search operations UI (`tags`, filters, fuzzy search) — **Implemented** (CLI + registry helpers + tests)
   - Parameters & variable substitution for commands
   - Versioning/history of command sets
 - Security review & safety hardening (prevent accidental destructive operations)
@@ -23,6 +23,6 @@ This roadmap outlines short-, medium-, and long-term priorities for `krnr`.
 ## Milestones
 - v0.1: Core features (save, run, list, describe, edit, delete) + DB + basic tests
 - v0.5: Import/Export, cross-platform builds, comprehensive tests
-- v1.0: Stability, full docs, packaging, security checklist complete
+- v1.0: Stability, full docs, packaging, security checklist complete — see `docs/releases/v1.0.0.md` for release notes
 
 Contributions welcome — see `CONTRIBUTING.md` for guidelines (TODO).

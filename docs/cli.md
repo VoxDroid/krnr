@@ -25,9 +25,21 @@ Author metadata:
 
 ## list
 
-`krnr list`
+`krnr list [--tag <tag>] [--filter <text>] [--fuzzy]`
 
 Lists saved command sets.
+
+Flags:
+
+- `--tag <tag>` — filter results to command sets that have the given tag
+- `--filter <text>` — text search against name, description, commands, and tags (substring match by default)
+- `--fuzzy` — enable fuzzy matching for `--filter` (case-insensitive subsequence matching)
+
+Examples:
+
+- `krnr list --tag utils`
+- `krnr list --filter demo`
+- `krnr list --filter dmo --fuzzy`  # fuzzy-matches `demo`
 
 ## describe
 

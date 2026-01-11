@@ -17,9 +17,9 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 ### Medium-term (v1.0) — Prioritized TODOs
 - Tagging & Search UI
-  - [ ] Add CLI commands: `krnr tag add|remove|list` and integrate `--tag`/`--filter` flags for `krnr list` and `krnr search`
-  - [ ] Implement fuzzy search and filter helpers in `internal/registry`
-  - Acceptance: Unit tests for tag attach/detach and search; CLI examples in `docs/cli.md`
+  - [x] Add CLI commands: `krnr tag add|remove|list` and integrate `--tag`/`--filter` flags for `krnr list` and `krnr search`
+  - [x] Implement fuzzy search and filter helpers in `internal/registry`
+  - Acceptance: Unit tests for tag attach/detach and search; CLI examples in `docs/cli.md` — **Done** (unit tests + CLI examples added) 
 - Parameters & Variable Substitution
   - [ ] Define parameter syntax (e.g., `{{param}}`) and parser in `internal/registry`/executor
   - [ ] Add runtime prompts/flags for supplying parameter values (`--param name=value`) and environment-binding support
@@ -148,9 +148,9 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 - Acceptance: Security checklist reviewed and documented (safety check + docs added)
 
 ### 15) Final polish & release
-- [ ] Versioning, changelog, and tag (semver)
+- [x] Versioning, changelog, and tag (semver)
 - [ ] Publish binaries / provide install instructions
-- Acceptance: v1.0 release candidate ready
+- Acceptance: v1.0 release candidate ready (changelog and release notes added; packaging/publishing remaining)
 
 ---
 

@@ -17,8 +17,10 @@ func TestRepository_CRUD(t *testing.T) {
 	r := NewRepository(dbConn)
 
 	// Create a command set
+	// ensure clean state from previous runs
+	_ = r.DeleteCommandSet("demo")
 	desc := "demo"
-	id, err := r.CreateCommandSet("demo-set", &desc, nil, nil)
+	id, err := r.CreateCommandSet("demo", &desc, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}

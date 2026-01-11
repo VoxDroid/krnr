@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased / v1.0.0 - 2026-01-11 (upcoming)
+
+- Major: v1.0.0 release candidate.
+- Key features included in v1.0.0:
+  - Tagging & Search UI: `krnr tag add|remove|list` and `--tag` filtering for `krnr list`.
+  - Text search and fuzzy search: `--filter` (substring search) and `--fuzzy` (case-insensitive subsequence matching) implemented in `internal/registry`.
+  - Unit tests and integration tests for tags, search, and fuzzy matching (CLI + repository tests).
+  - CLI docs updated (`docs/cli.md`) with examples for `--tag`, `--filter`, and `--fuzzy`.
+  - Stability, packaging, and security checks validated; cross-platform tests added/updated (Windows, Linux, macOS).
+- Upgrade notes:
+  - No DB schema changes are required for tagging and fuzzy search — backward compatible with prior versions.
+- Acceptance criteria:
+  - Unit/integration tests added and passing locally; CLI examples documented in `docs/cli.md`.
+
 ## v0.2.1 - 2026-01-10
 
 - Packaging & release automation improvements:
