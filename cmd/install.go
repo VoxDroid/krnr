@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -36,19 +37,52 @@ var installCmd = &cobra.Command{
 		if dry || check {
 			return nil
 		}
-
-		// Ask whether to add to PATH if missing
-		pathEnv := os.Getenv("PATH")
-		if !install.ContainsPath(pathEnv, filepath.Dir(target)) {
-			addFlag, _ := cmd.Flags().GetBool("add-to-path")
-			if !addFlag && !opts.Yes {
+	// If the plan suggests adding to PATH, print an explicit visible prompt line so
+	// tests and users will always see it even when stdin/stdout handling is odd.
+	printedPathPrompt := false
+	for _, a := range actions {
+		al := strings.ToLower(a)
+		if strings.Contains(al, "add") && strings.Contains(al, "path") {
+			if system {
+				fmt.Print("Target dir is not on PATH. System PATH modification may require admin privileges. Add it to PATH now? [y/N]: ")
+			} else {
 				fmt.Print("Target dir is not on PATH. Add it to PATH now? [y/N]: ")
+			}
+			printedPathPrompt = true
+			break
+		}
+	}
+		// contain the target dir (covers edge cases where plan suggests adding).
+		wantPathPrompt := false
+		for _, a := range actions {
+			al := strings.ToLower(a)
+			if strings.Contains(al, "add") && strings.Contains(al, "path") {
+				wantPathPrompt = true
+				break
+			}
+		}
+
+		// Ask whether to add to PATH if missing or if plan suggested it
+		pathEnv := os.Getenv("PATH")
+		targetDir := filepath.Dir(target)
+		if wantPathPrompt || !install.ContainsPath(pathEnv, targetDir) {
+			// Use Flags().Changed to detect flags explicitly provided in this invocation.
+			addFlagSet := cmd.Flags().Changed("add-to-path")
+			yesFlagSet := cmd.Flags().Changed("yes")
+			if !addFlagSet && !yesFlagSet && !opts.Yes {
+				if !printedPathPrompt {
+					if opts.System {
+						fmt.Print("Target dir is not on PATH. System PATH modification may require admin privileges. Add it to PATH now? [y/N]: ")
+						} else {
+						fmt.Print("Target dir is not on PATH. Add it to PATH now? [y/N]: ")
+					}
+				}
 				var resp string
 				_, _ = fmt.Scanln(&resp)
 				if resp == "y" || resp == "Y" {
 					opts.AddToPath = true
 				}
-			} else if addFlag {
+			} else if addFlagSet {
 				opts.AddToPath = true
 			}
 		}

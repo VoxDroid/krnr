@@ -208,22 +208,12 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	// Attempt to add to PATH if requested. For system installs on Unix this may fail
 	// due to lack of privileges; in that case we do not abort the install but record a
 	// warning in actions and still persist metadata so uninstall can locate the binary.
-	var pathFile, oldPath string
-	addedToPath := false
-	if opts.AddToPath {
-		pf, op, err := addToPath(targetPath, opts.System)
-		if err != nil {
-			// For non-Windows system installs, prefer not to fail the whole install.
-			if opts.System && runtime.GOOS != "windows" {
-				actions = append(actions, fmt.Sprintf("Warning: could not modify system PATH: %v", err))
-			} else {
-				return nil, fmt.Errorf("add to PATH: %w", err)
-			}
-		} else {
-			pathFile = pf
-			oldPath = op
-			addedToPath = true
-		}
+	pathFile, oldPath, addedToPath, addActions, err := handleAddToPath(opts, targetPath)
+	if err != nil {
+		return nil, err
+	}
+	if len(addActions) > 0 {
+		actions = append(actions, addActions...)
 	}
 	// Persist metadata regardless of whether PATH modifications succeeded; this allows
 	// uninstall to locate and remove the installed binary even if PATH changes were skipped.
@@ -232,6 +222,24 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	}
 
 	return actions, nil
+
+}
+
+// handleAddToPath centralizes add-to-PATH behavior for ExecuteInstall to reduce
+// cyclomatic complexity and return both human actions and binary metadata.
+func handleAddToPath(opts Options, targetPath string) (string, string, bool, []string, error) {
+	if !opts.AddToPath {
+		return "", "", false, nil, nil
+	}
+	pf, op, err := addToPath(targetPath, opts.System)
+	if err != nil {
+		// For non-Windows system installs, prefer not to fail the whole install.
+		if opts.System && runtime.GOOS != "windows" {
+			return "", "", false, []string{fmt.Sprintf("Warning: could not modify system PATH: %v", err)}, nil
+		}
+		return "", "", false, nil, fmt.Errorf("add to PATH: %w", err)
+	}
+	return pf, op, true, nil, nil
 }
 
 // resolveSourceExecutable resolves the source path for the install. If from is empty
