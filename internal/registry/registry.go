@@ -34,6 +34,8 @@ func (r *Repository) CreateCommandSet(name string, description *string, authorNa
 	if err := trx.Commit(); err != nil {
 		return 0, err
 	}
+	// record an initial version (empty commands) for history
+	_ = r.RecordVersion(id, authorName, authorEmail, description, []string{}, "create")
 	return id, nil
 }
 
@@ -116,6 +118,26 @@ func (r *Repository) DeleteCommandSet(name string) error {
 		return err
 	}
 
+	// snapshot commands before deletion
+	rows, err := trx.Query("SELECT command FROM commands WHERE command_set_id = ? ORDER BY position ASC", id)
+	if err != nil {
+		return err
+	}
+	var cmds []string
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		cmds = append(cmds, c)
+	}
+	_ = rows.Close()
+	// record deletion snapshot using the same transaction to avoid nested writes
+	if err := r.recordVersionTx(trx, id, nil, nil, nil, cmds, "delete"); err != nil {
+		return err
+	}
+
 	if _, err := trx.Exec("DELETE FROM commands WHERE command_set_id = ?", id); err != nil {
 		return err
 	}
@@ -143,7 +165,12 @@ func (r *Repository) ReplaceCommands(commandSetID int64, commands []string) erro
 			return err
 		}
 	}
-	return trx.Commit()
+	if err := trx.Commit(); err != nil {
+		return err
+	}
+	// record update as a new version
+	_ = r.RecordVersion(commandSetID, nil, nil, nil, commands, "update")
+	return nil
 }
 
 // attachTags loads tags for a command set into the provided CommandSet.

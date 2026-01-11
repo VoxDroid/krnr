@@ -47,6 +47,25 @@ Examples:
 
 Shows details of a command set and its commands.
 
+## history
+
+`krnr history <name>`
+
+Shows version history for a named command set. Each row includes the version number, timestamp, operation (create/update/delete/rollback), and author when present.
+
+Examples:
+
+- `krnr history hello`
+
+## rollback
+
+`krnr rollback <name> --version <n>`
+
+Rollback a command set to the specified version. Rollback replaces the current commands with the snapshot from the requested version and records the rollback as a new version.
+
+Examples:
+
+- `krnr rollback hello --version 2`
 ## run
 
 `krnr run <name> [--dry-run] [--confirm] [--verbose] [--shell <shell>] [--param <name>=<value>]`

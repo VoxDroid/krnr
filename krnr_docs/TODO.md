@@ -25,9 +25,9 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
   - [x] Add runtime prompts/flags for supplying parameter values (`--param name=value`) and environment-binding support
   - Acceptance: Integration test that runs a saved command with substituted parameters — **Done** (unit tests + CLI integration test added)
 - Versioning & History
-  - [ ] Add version/history model for `command_sets` (DB migration and schema updates)
-  - [ ] Implement `krnr history <name>` and `krnr rollback <name> --version` commands and tests
-  - Acceptance: History command lists versions and rollback restores a previous version
+  - [x] Add version/history model for `command_sets` (DB migration and schema updates)
+  - [x] Implement `krnr history <name>` and `krnr rollback <name> --version` commands and tests
+  - Acceptance: History command lists versions and rollback restores a previous version (unit & CLI tests added)
 - Packaging & Releases
   - [ ] Verify and extend `packaging/` manifests (Homebrew, Scoop, nfpm) and GoReleaser config
   - [ ] Add CI job to build and validate packaging artifacts and manifests on tag/release
