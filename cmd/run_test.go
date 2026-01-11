@@ -72,7 +72,7 @@ func captureOutput(f func()) (string, string) {
 	return out, err
 }
 
-func TestRunSuppressAndStderrFlags(t *testing.T) {
+func TestRun_DefaultPrints(t *testing.T) {
 	setupTempDB(t)
 
 	dbConn, err := db.InitDB()
@@ -98,7 +98,7 @@ func TestRunSuppressAndStderrFlags(t *testing.T) {
 		return fake
 	}
 
-	// Case 1: default (do not suppress, do not show-stderr)
+	// default (do not suppress, do not show-stderr)
 	out, errOut := captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "hello"})
 		if err := rootCmd.Execute(); err != nil {
@@ -117,9 +117,36 @@ func TestRunSuppressAndStderrFlags(t *testing.T) {
 	if fake.stderrWriter != io.Discard {
 		t.Fatalf("expected executor to receive io.Discard for stderr, got: %v", fake.stderrWriter)
 	}
+}
 
-	// Case 2: suppress command printing
-	out, errOut = captureOutput(func() {
+func TestRun_SuppressCommand(t *testing.T) {
+	setupTempDB(t)
+
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := registry.NewRepository(dbConn)
+	id, err := r.CreateCommandSet("hello", nil, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet: %v", err)
+	}
+	if _, err := r.AddCommand(id, 1, "echo hello"); err != nil {
+		t.Fatalf("AddCommand: %v", err)
+	}
+
+	origFactory := execFactory
+	defer func() { execFactory = origFactory }()
+
+	fake := &fakeRunner{}
+	execFactory = func(_, _ bool) executor.Runner {
+		return fake
+	}
+
+	// suppress command printing
+	out, errOut := captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "hello", "--suppress-command"})
 		if err := rootCmd.Execute(); err != nil {
 			t.Fatalf("run command failed: %v", err)
@@ -134,12 +161,39 @@ func TestRunSuppressAndStderrFlags(t *testing.T) {
 	if errOut != "" {
 		t.Fatalf("expected no stderr output, got: %q", errOut)
 	}
+}
 
-	// Case 3: show stderr
+func TestRun_ShowStderr(t *testing.T) {
+	setupTempDB(t)
+
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := registry.NewRepository(dbConn)
+	id, err := r.CreateCommandSet("hello", nil, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet: %v", err)
+	}
+	if _, err := r.AddCommand(id, 1, "echo hello"); err != nil {
+		t.Fatalf("AddCommand: %v", err)
+	}
+
+	origFactory := execFactory
+	defer func() { execFactory = origFactory }()
+
+	fake := &fakeRunner{}
+	execFactory = func(_, _ bool) executor.Runner {
+		return fake
+	}
+
+	// show stderr
 	// Ensure flag state is clean
 	_ = runCmd.Flags().Set("suppress-command", "false")
 	_ = runCmd.Flags().Set("show-stderr", "true")
-	_, errOut = captureOutput(func() {
+	_, errOut := captureOutput(func() {
 		rootCmd.SetArgs([]string{"run", "hello", "--show-stderr"})
 		if err := rootCmd.Execute(); err != nil {
 			t.Fatalf("run command failed: %v", err)

@@ -86,24 +86,23 @@ func PlanInstall(opts Options) ([]string, string, error) {
 	}
 	// PATH hint
 	pathEnv := os.Getenv("PATH")
-	if !ContainsPath(pathEnv, targetDir) {
-		if runtime.GOOS == "windows" {
-			actions = append(actions, fmt.Sprintf("Add %s to user PATH (e.g., via setx)", targetDir))
-		} else {
-			actions = append(actions, fmt.Sprintf("Add 'export PATH=\"%s:$PATH\"' to your shell rc (e.g., ~/.bashrc) or move to a location already on PATH", targetDir))
-		}
-	}
-
-	// If targetDir not on PATH, include an action suggesting adding to PATH
-
-	if !ContainsPath(pathEnv, targetDir) {
-		if runtime.GOOS == "windows" {
-			actions = append(actions, fmt.Sprintf("(Suggestion) Add %s to your user PATH (run: setx PATH \"%%PATH%%;%s\")", targetDir, targetDir))
-		} else {
-			actions = append(actions, fmt.Sprintf("(Suggestion) Add 'export PATH=\"%s:$PATH\"' to your shell rc (e.g., ~/.bashrc), or move binary into a directory already on PATH", targetDir))
-		}
-	}
+	appendPathHints(&actions, pathEnv, targetDir)
 	return actions, targetPath, nil
+
+}
+
+// appendPathHints appends human-friendly PATH hints to actions if the target directory
+// is not currently on PATH.
+func appendPathHints(actions *[]string, pathEnv, targetDir string) {
+	if !ContainsPath(pathEnv, targetDir) {
+		if runtime.GOOS == "windows" {
+			*actions = append(*actions, fmt.Sprintf("Add %s to user PATH (e.g., via setx)", targetDir))
+			*actions = append(*actions, fmt.Sprintf("(Suggestion) Add %s to your user PATH (run: setx PATH \"%%PATH%%;%s\")", targetDir, targetDir))
+		} else {
+			*actions = append(*actions, fmt.Sprintf("Add 'export PATH=\"%s:$PATH\"' to your shell rc (e.g., ~/.bashrc) or move to a location already on PATH", targetDir))
+			*actions = append(*actions, fmt.Sprintf("(Suggestion) Add 'export PATH=\"%s:$PATH\"' to your shell rc (e.g., ~/.bashrc), or move binary into a directory already on PATH", targetDir))
+		}
+	}
 }
 
 // ContainsPath checks if the given directory is in the PATH environment variable.
@@ -196,32 +195,14 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return nil, fmt.Errorf("create target dir: %w", err)
 	}
-	src := opts.From
-	if src == "" {
-		ex, err := os.Executable()
-		if err != nil {
-			return nil, fmt.Errorf("determine current executable: %w", err)
-		}
-		src = ex
+	// resolve source executable
+	src, err := resolveSourceExecutable(opts.From)
+	if err != nil {
+		return nil, fmt.Errorf("determine source executable: %w", err)
 	}
 	// Copy file
-	in, err := os.Open(src)
-	if err != nil {
-		return nil, fmt.Errorf("open source: %w", err)
-	}
-	defer func() { _ = in.Close() }()
-	out, err := os.Create(targetPath)
-	if err != nil {
-		return nil, fmt.Errorf("create target: %w", err)
-	}
-	defer func() { _ = out.Close() }()
-	if _, err := io.Copy(out, in); err != nil {
-		return nil, fmt.Errorf("copy: %w", err)
-	}
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(targetPath, 0o755); err != nil {
-			return nil, fmt.Errorf("chmod: %w", err)
-		}
+	if err := copyExecutable(src, targetPath); err != nil {
+		return nil, err
 	}
 
 	// If requested, add to PATH (user or system mode)
@@ -236,6 +217,93 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	}
 
 	return actions, nil
+}
+
+// resolveSourceExecutable resolves the source path for the install. If from is empty
+// it returns the current running executable path.
+func resolveSourceExecutable(from string) (string, error) {
+	if from != "" {
+		// If explicit source provided, ensure it exists
+		if _, err := os.Stat(from); err != nil {
+			return "", err
+		}
+		return from, nil
+	}
+	ex, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return ex, nil
+}
+
+// copyExecutable copies the source file to the destination atomically and sets
+// executable permissions on non-Windows platforms.
+func copyExecutable(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open source: %w", err)
+	}
+	defer func() { _ = in.Close() }()
+	// Ensure destination dir exists
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("create dest dir: %w", err)
+	}
+	tmpFile, terr := os.CreateTemp("", "krnr_tmp_")
+	if terr != nil {
+		return fmt.Errorf("create temp dest: %w", terr)
+	}
+	tmp := tmpFile.Name()
+	// ensure temp file gets removed if something goes wrong
+	defer func() { _ = os.Remove(tmp) }()
+	// Write to temp file
+	if _, err := io.Copy(tmpFile, in); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("copy: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
+	// On non-windows ensure the executable bit is set
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(tmp, 0o755); err != nil {
+			return fmt.Errorf("set exec bit: %w", err)
+		}
+	}
+	if err := doRenameOrFallback(tmp, dst); err != nil {
+		return err
+	}
+	return nil
+}
+
+// doRenameOrFallback attempts an atomic rename of tmp -> dst and falls back to a copy
+// if the rename fails (useful on Windows where rename may fail if the target is in use).
+func doRenameOrFallback(tmp, dst string) error {
+	if err := os.Rename(tmp, dst); err == nil {
+		return nil
+	}
+	renameErr := fmt.Errorf("rename failed")
+	f, ferr := os.Open(tmp)
+	if ferr != nil {
+		return fmt.Errorf("rename: %v; fallback open tmp failed: %w", renameErr, ferr)
+	}
+	defer func() { _ = f.Close() }()
+	dstF, derr := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	if derr != nil {
+		return fmt.Errorf("rename: %v; fallback open dst failed: %w", renameErr, derr)
+	}
+	_, copyErr := io.Copy(dstF, f)
+	_ = dstF.Close()
+	// Ensure tmp is cleaned up even if the OS has transient locks (Windows).
+	for i := 0; i < 5; i++ {
+		if rerr := os.Remove(tmp); rerr == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if copyErr != nil {
+		return fmt.Errorf("rename: %v; fallback copy failed: %w", renameErr, copyErr)
+	}
+	return nil
 }
 
 // Status represents the presence of krnr in user and system locations and PATH.

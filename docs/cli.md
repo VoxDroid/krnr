@@ -97,6 +97,8 @@ Behavior and notes:
 - If the requested shell executable is not present on `PATH`, execution will
   fail with an "executable file not found" error from the OS. Use
   `where pwsh` (or `Get-Command pwsh`) to check availability on Windows.
+- `krnr run` performs a conservative safety check and will refuse to run
+  obviously destructive commands (e.g., `rm -rf /`) unless `--force` is used; use `--dry-run` and `--confirm` to preview actions safely.
 
 Examples:
 

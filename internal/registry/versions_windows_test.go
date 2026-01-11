@@ -7,12 +7,13 @@ import (
 	"github.com/VoxDroid/krnr/internal/db"
 )
 
-func TestVersions_WindowsPathAndUnicode(t *testing.T) {
+func setupWinRepo(t *testing.T) (*Repository, int64, []string) {
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer func() { _ = dbConn.Close() }()
+	// cleanup
+	t.Cleanup(func() { _ = dbConn.Close() })
 
 	r := NewRepository(dbConn)
 	_ = r.DeleteCommandSet("win-α")
@@ -32,7 +33,11 @@ func TestVersions_WindowsPathAndUnicode(t *testing.T) {
 	if err := r.ReplaceCommands(id, cmds2); err != nil {
 		t.Fatalf("ReplaceCommands2: %v", err)
 	}
+	return r, id, cmds1
+}
 
+func TestVersions_WindowsPathAndUnicode_VerifyVersions(t *testing.T) {
+	r, id, _ := setupWinRepo(t)
 	// verify versions exist and commands preserved
 	vers, err := r.ListVersions(id)
 	if err != nil {
@@ -41,7 +46,10 @@ func TestVersions_WindowsPathAndUnicode(t *testing.T) {
 	if len(vers) < 3 {
 		t.Fatalf("expected at least 3 versions, got %d", len(vers))
 	}
+}
 
+func TestVersions_WindowsPathAndUnicode_ApplyVersion(t *testing.T) {
+	r, _, cmds1 := setupWinRepo(t)
 	// apply first non-empty update (version 2) and verify commands match cmds1
 	if err := r.ApplyVersionByName("win-α", 2); err != nil {
 		t.Fatalf("ApplyVersionByName: %v", err)

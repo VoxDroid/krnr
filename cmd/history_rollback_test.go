@@ -10,18 +10,20 @@ import (
 	"github.com/VoxDroid/krnr/internal/registry"
 )
 
-func TestHistoryAndRollbackCLI(t *testing.T) {
+func setupHistoryRepo(t *testing.T) *registry.Repository {
 	tmp := t.TempDir()
 	oldHome := os.Getenv("HOME")
 	_ = os.Setenv("HOME", tmp)
-	defer func() { _ = os.Setenv("HOME", oldHome) }()
+	// cleanup env
+	t.Cleanup(func() { _ = os.Setenv("HOME", oldHome) })
 
 	// init DB and repo
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer func() { _ = dbConn.Close() }()
+	// cleanup DB
+	t.Cleanup(func() { _ = dbConn.Close() })
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet("hst")
 	desc := "history test"
@@ -35,7 +37,11 @@ func TestHistoryAndRollbackCLI(t *testing.T) {
 	if err := r.ReplaceCommands(id, []string{"c"}); err != nil {
 		t.Fatalf("ReplaceCommands2: %v", err)
 	}
+	return r
+}
 
+func TestHistoryCLIOutputsSomething(t *testing.T) {
+	_ = setupHistoryRepo(t)
 	// Capture stdout
 	oldOut := os.Stdout
 	rOut, wOut, _ := os.Pipe()
@@ -47,12 +53,6 @@ func TestHistoryAndRollbackCLI(t *testing.T) {
 		t.Fatalf("history CLI failed: %v", err)
 	}
 
-	// run rollback CLI to version 1
-	rootCmd.SetArgs([]string{"rollback", "hst", "--version", "1"})
-	if err := rootCmd.Execute(); err != nil {
-		t.Fatalf("rollback CLI failed: %v", err)
-	}
-
 	_ = wOut.Close()
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, rOut)
@@ -60,9 +60,17 @@ func TestHistoryAndRollbackCLI(t *testing.T) {
 
 	out := buf.String()
 	if out == "" {
-		t.Fatalf("expected output from history/rollback commands, got empty")
+		t.Fatalf("expected output from history command, got empty")
 	}
+}
 
+func TestRollbackCLIAppliesVersion(t *testing.T) {
+	r := setupHistoryRepo(t)
+	// run rollback CLI to version 1
+	rootCmd.SetArgs([]string{"rollback", "hst", "--version", "1"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("rollback CLI failed: %v", err)
+	}
 	// Verify rollback applied
 	cs, err := r.GetCommandSetByName("hst")
 	if err != nil {

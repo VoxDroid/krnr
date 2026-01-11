@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
   - Versioning & History: add `command_set_versions` snapshots, `krnr history <name>` and `krnr rollback <name> --version` CLI commands with tests and migration support.
   - Unit tests and integration tests for tags, search, fuzzy matching, parameters, and versioning (CLI + repository tests).
   - CLI docs updated (`docs/cli.md`) with examples for `--tag`, `--filter`, `--fuzzy`, `history`, and `rollback`.
+  - Security & Safety hardening: conservative destructive command checks with `--force` override, parameter redaction for env-bound and secret-like params, `krnr delete` and `krnr install` guardrails and confirmations, `docs/security.md` added, and safety tests; CI SAST scans planned.
   - Stability, packaging, and security checks validated; cross-platform tests added/updated (Windows, Linux, macOS).
   - Refactor: reduced cyclomatic complexity for several large functions (`internal/install.Uninstall`, `internal/install.addToPath`, `internal/install.GetStatus`, `internal/recorder.RecordCommands`, `internal/importer.ImportCommandSet`) and split large tests in `internal/registry` to improve maintainability and test isolation.
 - Upgrade notes:

@@ -10,111 +10,93 @@ import (
 	"github.com/VoxDroid/krnr/internal/registry"
 )
 
+// sentinel tokens that stop recording
+var sentinelTokens = map[string]struct{}{
+	":end":  {},
+	":save": {},
+	":quit": {},
+}
+
+func isSentinel(s string) bool {
+	_, ok := sentinelTokens[strings.TrimSpace(s)]
+	return ok
+}
+
+func shouldKeepLine(s string) bool {
+	t := strings.TrimSpace(s)
+	if t == "" {
+		return false
+	}
+	if strings.HasPrefix(t, "#") {
+		return false
+	}
+	return true
+}
+
+func processLineAppend(out *[]string, line string) (bool, error) {
+	trim := strings.TrimSpace(line)
+	if isSentinel(trim) {
+		return true, nil
+	}
+	if shouldKeepLine(trim) {
+		*out = append(*out, trim)
+	}
+	return false, nil
+}
+
+// truncateAtStop looks for Ctrl+Z (0x1A) or caret sequences '^Z'/'^z' and returns
+// the prefix before the stop marker and a boolean indicating whether a stop was found.
+func truncateAtStop(s string) (string, bool) {
+	if idx := strings.IndexByte(s, 0x1A); idx >= 0 {
+		return s[:idx], true
+	}
+	if idx := strings.Index(s, "^Z"); idx >= 0 {
+		return s[:idx], true
+	}
+	if idx := strings.Index(s, "^z"); idx >= 0 {
+		return s[:idx], true
+	}
+	return s, false
+}
+
 // RecordCommands reads lines from r until EOF and returns non-empty, non-comment lines
 // as a slice of commands. Lines starting with '#' are treated as comments and ignored.
 // Special sentinel lines (single-line commands) `:end`, `:save`, and `:quit` stop
 // recording immediately when a line consisting only of that token (after trimming)
-// is encountered. This is a simple and robust mechanism that works across shells
-// and Windows consoles without relying on raw terminal mode. Ctrl+Z (0x1A) and
-// caret-Z sequences are still treated as immediate EOF when observed.
+// is encountered. This implementation reads by line using bufio.Reader.ReadString and
+// handles Ctrl+Z (0x1A) and '^Z' sequences by truncating input at the first occurrence
+// so behavior is unchanged while simplifying control flow and reducing cyclomatic complexity.
 func RecordCommands(r io.Reader) ([]string, error) {
 	br := bufio.NewReader(r)
 	var out []string
-	var lineBuf strings.Builder
-	isSentinel := func(s string) bool {
-		trim := strings.TrimSpace(s)
-		switch trim {
-		case ":end", ":save", ":quit":
-			return true
-		default:
-			return false
-		}
-	}
-	processLine := func(line string) (bool, error) {
-		trim := strings.TrimSpace(line)
-		if isSentinel(trim) {
-			return true, nil
-		}
-		if trim != "" && !strings.HasPrefix(trim, "#") {
-			out = append(out, trim)
-		}
-		return false, nil
-	}
-
 	for {
-		b, err := br.ReadByte()
-		if err != nil {
-			if err == io.EOF {
-				if lineBuf.Len() > 0 {
-					if stop, err := processLine(lineBuf.String()); err != nil {
-						return nil, err
-					} else if stop {
-						return out, nil
-					}
-				}
-				return out, nil
-			}
+		s, err := br.ReadString('\n')
+		if err != nil && err != io.EOF {
 			return nil, fmt.Errorf("read commands: %w", err)
 		}
 
-		// ASCII SUB (Ctrl+Z) should stop reading immediately
-		if b == 0x1A {
-			if lineBuf.Len() > 0 {
-				if stop, err := processLine(lineBuf.String()); err != nil {
-					return nil, err
-				} else if stop {
-					return out, nil
-				}
-			}
-			return out, nil
-		}
-
-		// Some Windows consoles echo a caret sequence '^Z' when Ctrl+Z is pressed
-		// (two characters '^' and 'Z' or 'z'). Treat that sequence as EOF and
-		// ignore it so the user doesn't have to press Enter after typing Ctrl+Z.
-		if b == '^' {
-			nb, err := br.ReadByte()
-			if err != nil {
-				if err == io.EOF {
-					lineBuf.WriteByte('^')
-					if lineBuf.Len() > 0 {
-						if stop, err := processLine(lineBuf.String()); err != nil {
-							return nil, err
-						} else if stop {
-							return out, nil
-						}
-					}
-					return out, nil
-				}
-				return nil, fmt.Errorf("read commands: %w", err)
-			}
-			if nb == 'Z' || nb == 'z' {
-				if lineBuf.Len() > 0 {
-					if stop, err := processLine(lineBuf.String()); err != nil {
-						return nil, err
-					} else if stop {
-						return out, nil
-					}
-				}
-				return out, nil
-			}
-			lineBuf.WriteByte('^')
-			lineBuf.WriteByte(nb)
-			continue
-		}
-
-		if b == '\n' {
-			if stop, err := processLine(lineBuf.String()); err != nil {
+	
+		// Truncate at any stop markers (Ctrl+Z or ^Z/^z) and handle the prefix.
+		if prefix, stopped := truncateAtStop(s); stopped {
+			if stop, err := processLineAppend(&out, prefix); err != nil {
 				return nil, err
 			} else if stop {
 				return out, nil
 			}
-			lineBuf.Reset()
-			continue
+			return out, nil
 		}
 
-		// accumulate bytes into the current line
-		lineBuf.WriteByte(b)
+		// Process the line (without trailing newline)
+		line := strings.TrimRight(s, "\r\n")
+		if stop, err := processLineAppend(&out, line); err != nil {
+			return nil, err
+		} else if stop {
+			return out, nil
+		}
+
+		if err == io.EOF {
+			return out, nil
+		}
 	}
 }
 

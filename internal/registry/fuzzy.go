@@ -28,6 +28,28 @@ func FuzzyMatch(target, query string) bool {
 	return false
 }
 
+// fuzzyMatchesCommandSet returns true if the command set matches the query
+// by checking name, description, commands, and tags.
+func fuzzyMatchesCommandSet(cs *CommandSet, query string) bool {
+	if FuzzyMatch(cs.Name, query) {
+		return true
+	}
+	if cs.Description.Valid && FuzzyMatch(cs.Description.String, query) {
+		return true
+	}
+	for _, c := range cs.Commands {
+		if FuzzyMatch(c.Command, query) {
+			return true
+		}
+	}
+	for _, tg := range cs.Tags {
+		if FuzzyMatch(tg, query) {
+			return true
+		}
+	}
+	return false
+}
+
 // FuzzySearchCommandSets searches command sets by fuzzy-matching name, description,
 // commands, and tags. It loads full command sets and applies fuzzy matching in Go.
 func (r *Repository) FuzzySearchCommandSets(query string) ([]CommandSet, error) {
@@ -44,30 +66,8 @@ func (r *Repository) FuzzySearchCommandSets(query string) ([]CommandSet, error) 
 		if cs == nil {
 			continue
 		}
-		if FuzzyMatch(cs.Name, query) {
+		if fuzzyMatchesCommandSet(cs, query) {
 			out = append(out, *cs)
-			continue
-		}
-		if cs.Description.Valid && FuzzyMatch(cs.Description.String, query) {
-			out = append(out, *cs)
-			continue
-		}
-		matched := false
-		for _, c := range cs.Commands {
-			if FuzzyMatch(c.Command, query) {
-				matched = true
-				break
-			}
-		}
-		if matched {
-			out = append(out, *cs)
-			continue
-		}
-		for _, tg := range cs.Tags {
-			if FuzzyMatch(tg, query) {
-				out = append(out, *cs)
-				break
-			}
 		}
 	}
 	return out, nil

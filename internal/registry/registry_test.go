@@ -6,18 +6,16 @@ import (
 	"github.com/VoxDroid/krnr/internal/db"
 )
 
-func TestRepository_CRUD(t *testing.T) {
-	// init DB
+func setupDemoRepo(t *testing.T) (*Repository, int64) {
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer func() { _ = dbConn.Close() }()
+	// cleanup
+	t.Cleanup(func() { _ = dbConn.Close() })
 
 	r := NewRepository(dbConn)
-
-	// Create a command set
-	// ensure clean state from previous runs
+	// ensure clean state
 	_ = r.DeleteCommandSet("demo")
 	desc := "demo"
 	id, err := r.CreateCommandSet("demo", &desc, nil, nil)
@@ -27,16 +25,17 @@ func TestRepository_CRUD(t *testing.T) {
 	if id == 0 {
 		t.Fatalf("expected non-zero id")
 	}
-
-	// Add commands
 	if _, err := r.AddCommand(id, 1, "echo hello"); err != nil {
 		t.Fatalf("AddCommand: %v", err)
 	}
 	if _, err := r.AddCommand(id, 2, "echo world"); err != nil {
 		t.Fatalf("AddCommand: %v", err)
 	}
+	return r, id
+}
 
-	// Retrieve
+func TestRepository_CreateAndRetrieve(t *testing.T) {
+	r, _ := setupDemoRepo(t)
 	cs, err := r.GetCommandSetByName("demo")
 	if err != nil {
 		t.Fatalf("GetCommandSetByName: %v", err)
@@ -47,14 +46,38 @@ func TestRepository_CRUD(t *testing.T) {
 	if len(cs.Commands) != 2 {
 		t.Fatalf("expected 2 commands, got %d", len(cs.Commands))
 	}
+}
 
-	// List
+func TestRepository_List(t *testing.T) {
+	r, _ := setupDemoRepo(t)
 	sets, err := r.ListCommandSets()
 	if err != nil {
 		t.Fatalf("ListCommandSets: %v", err)
 	}
 	if len(sets) == 0 {
 		t.Fatalf("expected at least one command set")
+	}
+}
+
+func TestRepository_Delete(t *testing.T) {
+	// init DB
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := NewRepository(dbConn)
+
+	// ensure clean state
+	_ = r.DeleteCommandSet("demo")
+	desc := "demo"
+	id, err := r.CreateCommandSet("demo", &desc, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet: %v", err)
+	}
+	if _, err := r.AddCommand(id, 1, "echo hello"); err != nil {
+		t.Fatalf("AddCommand: %v", err)
 	}
 
 	// Delete
@@ -71,7 +94,7 @@ func TestRepository_CRUD(t *testing.T) {
 	}
 }
 
-func TestRepository_Tags(t *testing.T) {
+func TestRepository_Tags_Add(t *testing.T) {
 	// init DB
 	dbConn, err := db.InitDB()
 	if err != nil {
@@ -81,7 +104,87 @@ func TestRepository_Tags(t *testing.T) {
 
 	r := NewRepository(dbConn)
 
-	// Create sets (ensure clean state from previous runs)
+	// Create set alpha
+	_ = r.DeleteCommandSet("alpha")
+	d1 := "alpha description"
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet alpha: %v", err)
+	}
+	if _, err := r.AddCommand(id1, 1, "echo alpha"); err != nil {
+		t.Fatalf("AddCommand alpha: %v", err)
+	}
+
+	// Add tag
+	if err := r.AddTagToCommandSet(id1, "utils"); err != nil {
+		t.Fatalf("AddTagToCommandSet: %v", err)
+	}
+
+	tags1, err := r.ListTagsForCommandSet(id1)
+	if err != nil {
+		t.Fatalf("ListTagsForCommandSet: %v", err)
+	}
+	found := false
+	for _, tg := range tags1 {
+		if tg == "utils" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected tag 'utils' for alpha")
+	}
+}
+
+func TestRepository_Tags_Remove(t *testing.T) {
+	// init DB
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := NewRepository(dbConn)
+
+	// Create set alpha
+	_ = r.DeleteCommandSet("alpha")
+	d1 := "alpha description"
+	id1, err := r.CreateCommandSet("alpha", &d1, nil, nil)
+	if err != nil {
+		t.Fatalf("CreateCommandSet alpha: %v", err)
+	}
+	if _, err := r.AddCommand(id1, 1, "echo alpha"); err != nil {
+		t.Fatalf("AddCommand alpha: %v", err)
+	}
+
+	// Add and remove tag
+	if err := r.AddTagToCommandSet(id1, "utils"); err != nil {
+		t.Fatalf("AddTagToCommandSet: %v", err)
+	}
+	if err := r.RemoveTagFromCommandSet(id1, "utils"); err != nil {
+		t.Fatalf("RemoveTagFromCommandSet: %v", err)
+	}
+	tagsAfter, err := r.ListTagsForCommandSet(id1)
+	if err != nil {
+		t.Fatalf("ListTagsForCommandSet after remove: %v", err)
+	}
+	for _, tg := range tagsAfter {
+		if tg == "utils" {
+			t.Fatalf("expected tag 'utils' to be removed")
+		}
+	}
+}
+
+func setupAlphaBeta(t *testing.T) *Repository {
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	// cleanup
+	t.Cleanup(func() { _ = dbConn.Close() })
+
+	r := NewRepository(dbConn)
+	// ensure clean state and create sets
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")
 	d1 := "alpha description"
@@ -101,41 +204,12 @@ func TestRepository_Tags(t *testing.T) {
 	if _, err := r.AddCommand(id2, 1, "echo beta"); err != nil {
 		t.Fatalf("AddCommand beta: %v", err)
 	}
+	return r
+}
 
-	// Tags
-	if err := r.AddTagToCommandSet(id1, "utils"); err != nil {
-		t.Fatalf("AddTagToCommandSet: %v", err)
-	}
-	if err := r.AddTagToCommandSet(id2, "demo"); err != nil {
-		t.Fatalf("AddTagToCommandSet: %v", err)
-	}
-
-	// List tags
-	tags1, err := r.ListTagsForCommandSet(id1)
-	if err != nil {
-		t.Fatalf("ListTagsForCommandSet: %v", err)
-	}
-	found := false
-	for _, tg := range tags1 {
-		if tg == "utils" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected tag 'utils' for alpha")
-	}
-
-	// List by tag
-	setsWithUtils, err := r.ListCommandSetsByTag("utils")
-	if err != nil {
-		t.Fatalf("ListCommandSetsByTag: %v", err)
-	}
-	if len(setsWithUtils) != 1 || setsWithUtils[0].Name != "alpha" {
-		t.Fatalf("expected only alpha for tag 'utils', got %+v", setsWithUtils)
-	}
-
-	// GetCommandSetByName includes tags
+func TestRepository_Tags_List(t *testing.T) {
+	r := setupAlphaBeta(t)
+	// Add a tag to alpha and then list by tag
 	csAlpha, err := r.GetCommandSetByName("alpha")
 	if err != nil {
 		t.Fatalf("GetCommandSetByName alpha: %v", err)
@@ -143,35 +217,49 @@ func TestRepository_Tags(t *testing.T) {
 	if csAlpha == nil {
 		t.Fatalf("expected alpha command set")
 	}
-	if len(csAlpha.Tags) == 0 {
-		t.Fatalf("expected tags on alpha, got none")
+	if err := r.AddTagToCommandSet(csAlpha.ID, "utils"); err != nil {
+		t.Fatalf("AddTagToCommandSet: %v", err)
 	}
-
-	// Remove tag
-	if err := r.RemoveTagFromCommandSet(id1, "utils"); err != nil {
-		t.Fatalf("RemoveTagFromCommandSet: %v", err)
-	}
-	tagsAfter, err := r.ListTagsForCommandSet(id1)
+	setsWithUtils, err := r.ListCommandSetsByTag("utils")
 	if err != nil {
-		t.Fatalf("ListTagsForCommandSet after remove: %v", err)
+		t.Fatalf("ListCommandSetsByTag: %v", err)
 	}
-	for _, tg := range tagsAfter {
-		if tg == "utils" {
-			t.Fatalf("expected tag 'utils' to be removed")
-		}
+	if len(setsWithUtils) != 1 || setsWithUtils[0].Name != "alpha" {
+		t.Fatalf("expected only alpha for tag 'utils', got %+v", setsWithUtils)
 	}
 }
 
-func TestRepository_Search(t *testing.T) {
-	// init DB
+func TestRepository_Tags_GetIncludesTags(t *testing.T) {
+	r := setupAlphaBeta(t)
+	csAlpha, err := r.GetCommandSetByName("alpha")
+	if err != nil {
+		t.Fatalf("GetCommandSetByName alpha: %v", err)
+	}
+	if csAlpha == nil {
+		t.Fatalf("expected alpha command set")
+	}
+	// ensure a tag is present
+	if err := r.AddTagToCommandSet(csAlpha.ID, "utils"); err != nil {
+		t.Fatalf("AddTagToCommandSet: %v", err)
+	}
+	csAlpha2, err := r.GetCommandSetByName("alpha")
+	if err != nil {
+		t.Fatalf("GetCommandSetByName alpha 2: %v", err)
+	}
+	if len(csAlpha2.Tags) == 0 {
+		t.Fatalf("expected tags on alpha, got none")
+	}
+}
+
+func setupAlphaBetaForSearch(t *testing.T) *Repository {
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer func() { _ = dbConn.Close() }()
+	// cleanup
+	t.Cleanup(func() { _ = dbConn.Close() })
 
 	r := NewRepository(dbConn)
-
 	// ensure clean state
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")
@@ -192,7 +280,11 @@ func TestRepository_Search(t *testing.T) {
 	if _, err := r.AddCommand(id2, 1, "echo beta"); err != nil {
 		t.Fatalf("AddCommand beta: %v", err)
 	}
+	return r
+}
 
+func TestRepository_Search_FindsDemo(t *testing.T) {
+	r := setupAlphaBetaForSearch(t)
 	// Search
 	results, err := r.SearchCommandSets("demo")
 	if err != nil {

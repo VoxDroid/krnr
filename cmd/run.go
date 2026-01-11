@@ -70,6 +70,7 @@ var runCmd = &cobra.Command{
 // collect parameters from flags
 	paramVals, _ := cmd.Flags().GetStringArray("param")
 	params := map[string]string{}
+	paramEnvBound := map[string]bool{}
 	for _, p := range paramVals {
 		parts := strings.SplitN(p, "=", 2)
 		if len(parts) != 2 {
@@ -78,9 +79,10 @@ var runCmd = &cobra.Command{
 		name := parts[0]
 		val := parts[1]
 		// env:NAME syntax reads from environment
-	if strings.HasPrefix(val, "env:") {
+		if strings.HasPrefix(val, "env:") {
 			envKey := strings.TrimPrefix(val, "env:")
 			params[name] = os.Getenv(envKey)
+			paramEnvBound[name] = true
 		} else {
 			params[name] = val
 		}
@@ -100,6 +102,7 @@ var runCmd = &cobra.Command{
 						return fmt.Errorf("missing value for parameter %s", rname)
 					}
 					params[rname] = val
+					// prompted values are not marked env-bound; they may still be secrets
 				}
 			}
 			sub, err := registry.ApplyParams(cmdText, params)
@@ -109,20 +112,43 @@ var runCmd = &cobra.Command{
 			cmdText = sub
 		}
 
-		// Security: check if command is allowed
+		// Build a redacted command for logging and dry-run/verbose output
+		redactedParams := map[string]string{}
+		for k, v := range params {
+			if security.IsSecretParamName(k) || paramEnvBound[k] {
+				redactedParams[k] = "<redacted>"
+			} else {
+				redactedParams[k] = v
+			}
+		}
+		redactedCmd := cmdText
+		if len(registry.FindParams(c.Command)) > 0 {
+			if rsub, err := registry.ApplyParams(c.Command, redactedParams); err == nil {
+				redactedCmd = rsub
+			}
+		}
+
+		// Security: check if command is allowed (use real substituted command)
 		if err := security.CheckAllowed(cmdText); err != nil && !force {
-			return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", cmdText, err)
+			return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", redactedCmd, err)
 		}
 		if !suppress {
-			fmt.Printf("-> %s\n", cmdText)
+			fmt.Printf("-> %s\n", redactedCmd)
 		}
 		stderr := io.Discard
 		if showStderr {
 			stderr = os.Stderr
 		}
-		if err := e.Execute(ctx, cmdText, "", os.Stdout, stderr); err != nil {
+		// For dry-run, pass redacted command to the executor so verbose dry-run output doesn't leak secrets
+		if dry {
+			if err := e.Execute(ctx, redactedCmd, "", os.Stdout, stderr); err != nil {
 				return err
 			}
+		} else {
+			if err := e.Execute(ctx, cmdText, "", os.Stdout, stderr); err != nil {
+				return err
+			}
+		}
 		}
 
 		return nil

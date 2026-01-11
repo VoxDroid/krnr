@@ -13,7 +13,7 @@ This roadmap outlines short-, medium-, and long-term priorities for `krnr`.
   - Tagging and search operations UI (`tags`, filters, fuzzy search) — **Implemented** (CLI + registry helpers + tests)
   - Parameters & variable substitution for commands
   - Versioning/history of command sets
-- Security review & safety hardening (prevent accidental destructive operations)
+- Security review & safety hardening (prevent accidental destructive operations) — **Completed** (conservative checks, redaction, prompts/tests; CI SAST planned)
 
 ## Long-term (v1.x+)
 - Collaboration & sharing: remote registries, publishable command sets

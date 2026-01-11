@@ -33,9 +33,9 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
   - [ ] Add CI job to build and validate packaging artifacts and manifests on tag/release
   - Acceptance: Packaging artifacts generated and sample Homebrew/Scoop manifests validated in CI
 - Security & Safety Hardening
-  - [ ] Conduct a security review; document checklist in `docs/security.md`
-  - [ ] Add explicit confirmation/prompting for destructive ops and guardrails in `cmd/delete.go` and `internal/install`
-  - Acceptance: Security checklist added and tests enforce safety defaults
+  - [x] Conduct a security review; document checklist in `docs/security.md`
+  - [x] Add explicit confirmation/prompting for destructive ops and guardrails in `cmd/delete.go` and `internal/install`
+  - Acceptance: Security checklist added and tests enforce safety defaults (implemented: `docs/security.md`, conservative destructive checks in `internal/security`, parameter redaction, and CLI tests)
 - Documentation & Migration Notes
   - [ ] Update `docs/roadmap.md` with status summaries and dates
   - [ ] Add migration notes for any DB schema changes in `docs/database.md`

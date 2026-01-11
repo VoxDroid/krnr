@@ -15,6 +15,58 @@ import (
 	dbpkg "github.com/VoxDroid/krnr/internal/db"
 )
 
+func fetchCommandSetAndCommands(srcDB *sql.DB, name string) (struct{
+	Name string
+	Description sql.NullString
+	CreatedAt string
+	LastRun sql.NullString
+}, []string, error) {
+	row := srcDB.QueryRow("SELECT id, name, description, created_at, last_run FROM command_sets WHERE name = ?", name)
+	var id int64
+	var csName string
+	var description sql.NullString
+	var createdAt string
+	var lastRun sql.NullString
+	if err := row.Scan(&id, &csName, &description, &createdAt, &lastRun); err != nil {
+		return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{}, nil, fmt.Errorf("select command_set: %w", err)
+	}
+
+	rows, err := srcDB.Query("SELECT position, command FROM commands WHERE command_set_id = ? ORDER BY position ASC", id)
+	if err != nil {
+		return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{}, nil, fmt.Errorf("select commands: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	cmds := []string{}
+	for rows.Next() {
+		var pos int
+		var cmd string
+		if err := rows.Scan(&pos, &cmd); err != nil {
+			return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{}, nil, err
+		}
+		cmds = append(cmds, cmd)
+	}
+
+	return struct{ Name string; Description sql.NullString; CreatedAt string; LastRun sql.NullString }{csName, description, createdAt, lastRun}, cmds, nil
+}
+
+func createAndPopulateDst(dstDB *sql.DB, name string, description sql.NullString, createdAt string, lastRun sql.NullString, cmds []string) (int64, error) {
+	res, err := dstDB.Exec("INSERT INTO command_sets (name, description, created_at, last_run) VALUES (?, ?, ?, ?)", name, description, createdAt, lastRun)
+	if err != nil {
+		return 0, fmt.Errorf("insert command_set: %w", err)
+	}
+	newID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	for i, c := range cmds {
+		if _, err := dstDB.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", newID, i+1, c); err != nil {
+			return 0, fmt.Errorf("insert command: %w", err)
+		}
+	}
+	return newID, nil
+}
+
 // ExportDatabase copies the active krnr database to dstPath. It checkpoints WAL to
 // ensure recent transactions are flushed into the main DB file before copying.
 func ExportDatabase(dstPath string) error {
@@ -51,33 +103,10 @@ func ExportDatabase(dstPath string) error {
 // ExportCommandSet exports a single named command set into a standalone SQLite DB
 // at dstPath. If the named set does not exist an error is returned.
 func ExportCommandSet(srcDB *sql.DB, name string, dstPath string) error {
-	// Query the command set
-	row := srcDB.QueryRow("SELECT id, name, description, created_at, last_run FROM command_sets WHERE name = ?", name)
-	var id int64
-	var csName string
-	var description sql.NullString
-	var createdAt string
-	var lastRun sql.NullString
-	if err := row.Scan(&id, &csName, &description, &createdAt, &lastRun); err != nil {
-		return fmt.Errorf("select command_set: %w", err)
-	}
-
-	rows, err := srcDB.Query("SELECT position, command FROM commands WHERE command_set_id = ? ORDER BY position ASC", id)
+	cs, cmds, err := fetchCommandSetAndCommands(srcDB, name)
 	if err != nil {
-		return fmt.Errorf("select commands: %w", err)
+		return err
 	}
-	defer func() { _ = rows.Close() }()
-
-	cmds := []string{}
-	for rows.Next() {
-		var pos int
-		var cmd string
-		if err := rows.Scan(&pos, &cmd); err != nil {
-			return err
-		}
-		cmds = append(cmds, cmd)
-	}
-
 	// Create destination DB and apply schema
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
 		return fmt.Errorf("create dst dir: %w", err)
@@ -92,19 +121,9 @@ func ExportCommandSet(srcDB *sql.DB, name string, dstPath string) error {
 		return fmt.Errorf("apply schema: %w", err)
 	}
 
-	// Insert command set
-	res, err := dstDB.Exec("INSERT INTO command_sets (name, description, created_at, last_run) VALUES (?, ?, ?, ?)", csName, description, createdAt, lastRun)
-	if err != nil {
-		return fmt.Errorf("insert command_set: %w", err)
-	}
-	newID, err := res.LastInsertId()
-	if err != nil {
+	// create and populate destination DB
+	if _, err := createAndPopulateDst(dstDB, cs.Name, cs.Description, cs.CreatedAt, cs.LastRun, cmds); err != nil {
 		return err
-	}
-	for i, c := range cmds {
-		if _, err := dstDB.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", newID, i+1, c); err != nil {
-			return fmt.Errorf("insert command: %w", err)
-		}
 	}
 	return nil
 }

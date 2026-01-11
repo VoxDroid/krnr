@@ -6,12 +6,13 @@ import (
 	"github.com/VoxDroid/krnr/internal/db"
 )
 
-func TestVersions_RecordAndListAndRollback(t *testing.T) {
+func setupVersionRepo(t *testing.T) (*Repository, int64) {
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer func() { _ = dbConn.Close() }()
+	// cleanup
+	t.Cleanup(func() { _ = dbConn.Close() })
 
 	r := NewRepository(dbConn)
 	// ensure clean state
@@ -21,7 +22,11 @@ func TestVersions_RecordAndListAndRollback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
+	return r, id
+}
 
+func TestVersions_RecordAndList(t *testing.T) {
+	r, id := setupVersionRepo(t)
 	// initial replace -> create an update version
 	if err := r.ReplaceCommands(id, []string{"echo one", "echo two"}); err != nil {
 		t.Fatalf("ReplaceCommands: %v", err)
@@ -46,6 +51,19 @@ func TestVersions_RecordAndListAndRollback(t *testing.T) {
 	}
 	if vers[0].Operation != "update" {
 		t.Fatalf("expected operation 'update', got %s", vers[0].Operation)
+	}
+}
+
+func TestVersions_Rollback(t *testing.T) {
+	r, id := setupVersionRepo(t)
+	// initial replace -> create an update version
+	if err := r.ReplaceCommands(id, []string{"echo one", "echo two"}); err != nil {
+		t.Fatalf("ReplaceCommands: %v", err)
+	}
+
+	// second update
+	if err := r.ReplaceCommands(id, []string{"echo three"}); err != nil {
+		t.Fatalf("ReplaceCommands2: %v", err)
 	}
 
 	// rollback to version 1 (initial empty commands)

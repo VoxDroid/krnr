@@ -27,27 +27,7 @@ func TestEditCommand_Interactive(t *testing.T) {
 		t.Fatalf("AddCommand: %v", err)
 	}
 
-	// create an editor script that overwrites the temp file with two commands
-	d := t.TempDir()
-	var scriptPath string
-	if runtime.GOOS == "windows" {
-		scriptPath = filepath.Join(d, "edit.bat")
-		// write the new commands to the file passed as the first argument (%~1) so the CLI reads them back
-		script := "@echo off\r\necho new1 > \"%~1\"\r\necho new2 >> \"%~1\"\r\nexit /b 0\r\n"
-		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-			t.Fatalf("write script: %v", err)
-		}
-	} else {
-		scriptPath = filepath.Join(d, "edit.sh")
-		// write the new commands to the file passed as $1 so the CLI reads them back
-		script := "#!/bin/sh\nprintf 'new1\nnew2\n' > \"$1\"\nexit 0\n"
-		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-			t.Fatalf("write script: %v", err)
-		}
-		if err := os.Chmod(scriptPath, 0o755); err != nil {
-			t.Fatalf("chmod script: %v", err)
-		}
-	}
+	scriptPath := writeEditorScript(t)
 	_ = os.Setenv("EDITOR", scriptPath)
 	defer func() { _ = os.Unsetenv("EDITOR") }()
 
@@ -72,4 +52,36 @@ func TestEditCommand_Interactive(t *testing.T) {
 
 	// cleanup
 	_ = r.DeleteCommandSet("edit-test")
+}
+
+func writeEditorScript(t *testing.T) string {
+	if runtime.GOOS == "windows" {
+		return writeEditorScriptWindows(t)
+	}
+	return writeEditorScriptUnix(t)
+}
+
+func writeEditorScriptWindows(t *testing.T) string {
+	d := t.TempDir()
+	scriptPath := filepath.Join(d, "edit.bat")
+	// write the new commands to the file passed as the first argument (%~1) so the CLI reads them back
+	script := "@echo off\r\necho new1 > \"%~1\"\r\necho new2 >> \"%~1\"\r\nexit /b 0\r\n"
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	return scriptPath
+}
+
+func writeEditorScriptUnix(t *testing.T) string {
+	d := t.TempDir()
+	scriptPath := filepath.Join(d, "edit.sh")
+	// write the new commands to the file passed as $1 so the CLI reads them back
+	script := "#!/bin/sh\nprintf 'new1\nnew2\n' > \"$1\"\nexit 0\n"
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	if err := os.Chmod(scriptPath, 0o755); err != nil {
+		t.Fatalf("chmod script: %v", err)
+	}
+	return scriptPath
 }

@@ -43,6 +43,23 @@ func ImportDatabase(srcPath string, overwrite bool) error {
 	return nil
 }
 
+func ensureUniqueName(dst *sql.DB, orig string) (string, error) {
+	name := orig
+	si := 1
+	for {
+		var cnt int
+		r := dst.QueryRow("SELECT count(*) FROM command_sets WHERE name = ?", name)
+		if err := r.Scan(&cnt); err != nil {
+			return "", err
+		}
+		if cnt == 0 {
+			return name, nil
+		}
+		name = fmt.Sprintf("%s-import-%d", orig, si)
+		si++
+	}
+}
+
 // ImportCommandSet imports all command sets from srcPath into the active DB. If
 // name collisions occur, the function appends a suffix to the imported name.
 func ImportCommandSet(srcPath string) error {
@@ -76,26 +93,11 @@ func ImportCommandSet(srcPath string) error {
 		if err := rows.Scan(&id, &name, &desc, &created, &lastRun); err != nil {
 			return err
 		}
-		// Ensure unique name in dst
-		orig := name
-		si := 1
-		for {
-			var cnt int
-			r := dst.QueryRow("SELECT count(*) FROM command_sets WHERE name = ?", name)
-			if err := r.Scan(&cnt); err != nil {
-				return err
-			}
-			if cnt == 0 {
-				break
-			}
-			name = fmt.Sprintf("%s-import-%d", orig, si)
-			si++
-		}
-		res, err := dst.Exec("INSERT INTO command_sets (name, description, created_at, last_run) VALUES (?, ?, ?, ?)", name, desc, created, lastRun)
+		uName, err := ensureUniqueName(dst, name)
 		if err != nil {
 			return err
 		}
-		newID, err := res.LastInsertId()
+		newID, err := insertCommandSet(dst, uName, desc, created, lastRun)
 		if err != nil {
 			return err
 		}
@@ -105,4 +107,16 @@ func ImportCommandSet(srcPath string) error {
 		}
 	}
 	return nil
+}
+
+func insertCommandSet(dst *sql.DB, name string, desc sql.NullString, created string, lastRun sql.NullString) (int64, error) {
+	res, err := dst.Exec("INSERT INTO command_sets (name, description, created_at, last_run) VALUES (?, ?, ?, ?)", name, desc, created, lastRun)
+	if err != nil {
+		return 0, err
+	}
+	newID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return newID, nil
 }

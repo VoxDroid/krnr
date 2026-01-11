@@ -37,3 +37,10 @@ func CheckAllowed(command string) error {
 	}
 	return nil
 }
+
+var secretParamNameRe = regexp.MustCompile(`(?i)(pass(word)?|pwd|token|secret|key|credential|api|auth)`) // common secret-like param names
+
+// IsSecretParamName returns true if a parameter name looks like it holds a secret.
+func IsSecretParamName(name string) bool {
+	return secretParamNameRe.MatchString(name)
+}

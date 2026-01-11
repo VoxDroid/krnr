@@ -8,26 +8,25 @@ import (
 )
 
 // PlanUninstall returns a list of actions that would be performed by Uninstall.
-func PlanUninstall() ([]string, error) {
-	m, err := loadMetadata()
-	if err != nil {
-		// No metadata: suggest likely locations to inspect
-		userTarget := filepath.Join(DefaultUserBin(), "krnr")
-		if runtime.GOOS == "windows" {
-			userTarget = userTarget + ".exe"
-		}
-		sysTarget := filepath.Join(systemBin(), "krnr")
-		if runtime.GOOS == "windows" {
-			sysTarget = sysTarget + ".exe"
-		}
-		return []string{
-			"No install metadata found.",
-			fmt.Sprintf("Check for binaries at: %s", userTarget),
-			fmt.Sprintf("Or at system location: %s", sysTarget),
-			"If you installed manually, remove those files and any PATH entries yourself, or re-run install with --add-to-path and then uninstall.",
-			"If you encounter 'access denied' when uninstalling, run the downloaded krnr binary from a different directory (for example, your Downloads folder) so the installed binary isn't in use, then re-run uninstall.",
-		}, nil
+func planWhenNoMetadata() []string {
+	userTarget := filepath.Join(DefaultUserBin(), "krnr")
+	if runtime.GOOS == "windows" {
+		userTarget = userTarget + ".exe"
 	}
+	sysTarget := filepath.Join(systemBin(), "krnr")
+	if runtime.GOOS == "windows" {
+		sysTarget = sysTarget + ".exe"
+	}
+	return []string{
+		"No install metadata found.",
+		fmt.Sprintf("Check for binaries at: %s", userTarget),
+		fmt.Sprintf("Or at system location: %s", sysTarget),
+		"If you installed manually, remove those files and any PATH entries yourself, or re-run install with --add-to-path and then uninstall.",
+		"If you encounter 'access denied' when uninstalling, run the downloaded krnr binary from a different directory (for example, your Downloads folder) so the installed binary isn't in use, then re-run uninstall.",
+	}
+}
+
+func planWithMetadata(m *metadata) []string {
 	actions := []string{fmt.Sprintf("Remove binary: %s", m.TargetPath)}
 	// Also detect and mention user/system install targets if present
 	binName := "krnr"
@@ -37,14 +36,10 @@ func PlanUninstall() ([]string, error) {
 	userTarget := filepath.Join(DefaultUserBin(), binName)
 	sysTarget := filepath.Join(systemBin(), binName)
 	if userTarget != m.TargetPath {
-		if _, err := os.Stat(userTarget); err == nil {
-			actions = append(actions, fmt.Sprintf("Also remove user binary: %s", userTarget))
-		}
+		addIfExists(userTarget, "Also remove user binary: %s", &actions)
 	}
 	if sysTarget != m.TargetPath {
-		if _, err := os.Stat(sysTarget); err == nil {
-			actions = append(actions, fmt.Sprintf("Also remove system binary: %s", sysTarget))
-		}
+		addIfExists(sysTarget, "Also remove system binary: %s", &actions)
 	}
 	if m.AddedToPath {
 		if runtime.GOOS == "windows" {
@@ -68,5 +63,21 @@ func PlanUninstall() ([]string, error) {
 		actions = append(actions, fmt.Sprintf("Check and remove %s from Machine and User PATH if present", filepath.Dir(sysTarget)))
 		actions = append(actions, fmt.Sprintf("Check and remove %s from User PATH if present", filepath.Dir(userTarget)))
 	}
-	return actions, nil
+	return actions
+
+}
+
+func addIfExists(path, fmtStr string, actions *[]string) {
+	if _, err := os.Stat(path); err == nil {
+		*actions = append(*actions, fmt.Sprintf(fmtStr, path))
+	}
+}
+
+// PlanUninstall returns a list of actions that would be performed by Uninstall.
+func PlanUninstall() ([]string, error) {
+	m, err := loadMetadata()
+	if err != nil {
+		return planWhenNoMetadata(), nil
+	}
+	return planWithMetadata(m), nil
 }

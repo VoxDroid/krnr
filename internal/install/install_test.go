@@ -59,7 +59,7 @@ func TestExecuteInstallCopiesFile(t *testing.T) {
 	}
 }
 
-func TestInstallAddToPathAndUninstall(t *testing.T) {
+func TestInstallAddToPath(t *testing.T) {
 	// Simulate a shell rc in a temporary HOME
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
@@ -96,6 +96,28 @@ func TestInstallAddToPathAndUninstall(t *testing.T) {
 		if !strings.Contains(string(b), "krnr") {
 			t.Fatalf("expected krnr line in rc, got: %s", string(b))
 		}
+	}
+}
+
+func TestInstallAddToPathAndUninstall(t *testing.T) {
+	// Simulate a shell rc in a temporary HOME
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	// Make a .bashrc
+	rc := filepath.Join(tmp, ".bashrc")
+	_ = os.WriteFile(rc, []byte("# existing\n"), 0o644)
+
+	src := filepath.Join(tmp, "srcbin")
+	_ = os.WriteFile(src, []byte("binstuff"), 0o644)
+	opts := Options{User: true, Path: tmp, From: src, DryRun: false, AddToPath: true}
+	// On Windows, enable test-mode BEFORE calling ExecuteInstall so we don't invoke PowerShell
+	if runtime.GOOS == "windows" {
+		_ = os.Setenv("KRNR_TEST_NO_SETX", "1")
+		defer func() { _ = os.Unsetenv("KRNR_TEST_NO_SETX") }()
+	}
+	_, err := ExecuteInstall(opts)
+	if err != nil {
+		t.Fatalf("ExecuteInstall add-to-path: %v", err)
 	}
 	// Now uninstall
 	actions, err := Uninstall(false)
@@ -167,8 +189,8 @@ func TestSystemInstallAddToPathAndUninstall_WindowsOnly(t *testing.T) {
 	}
 }
 
-func TestDetectAndUninstallBothScopes(t *testing.T) {
-	// Simulate both user and system installs and ensure Status detects both and Uninstall removes both
+func TestDetectBothScopes(t *testing.T) {
+	// Simulate both user and system installs and ensure Status detects both
 	tmp := t.TempDir()
 	userDir := filepath.Join(tmp, "krnr", "bin")
 	sysDir := filepath.Join(tmp, "sys")
@@ -211,17 +233,48 @@ func TestDetectAndUninstallBothScopes(t *testing.T) {
 	if !st.UserOnPath {
 		t.Fatalf("expected user to be detected on PATH: %+v", st)
 	}
+}
+
+func TestUninstallBothScopes(t *testing.T) {
+	// Similar setup to ensure uninstall removes both scopes
+	tmp := t.TempDir()
+	userDir := filepath.Join(tmp, "krnr", "bin")
+	sysDir := filepath.Join(tmp, "sys")
+	_ = os.MkdirAll(userDir, 0o755)
+	_ = os.MkdirAll(sysDir, 0o755)
+	// write dummy binaries
+	binName := "krnr"
+	if runtime.GOOS == "windows" {
+		binName = "krnr.exe"
+	}
+	userBin := filepath.Join(userDir, binName)
+	sysBin := filepath.Join(sysDir, binName)
+	_ = os.WriteFile(userBin, []byte("u"), 0o644)
+	_ = os.WriteFile(sysBin, []byte("s"), 0o644)
+	// Set overrides so DefaultUserBin and systemBin point to these test dirs
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", filepath.Join(tmp))
+	defer func() { _ = os.Setenv("HOME", oldHome) }()
+	if runtime.GOOS == "windows" {
+		oldUser := os.Getenv("USERPROFILE")
+		_ = os.Setenv("USERPROFILE", filepath.Join(tmp))
+		defer func() { _ = os.Setenv("USERPROFILE", oldUser) }()
+	}
+	// override system bin via env var
+	oldSys := os.Getenv("KRNR_TEST_SYSTEM_BIN")
+	_ = os.Setenv("KRNR_TEST_SYSTEM_BIN", sysDir)
+	defer func() { _ = os.Setenv("KRNR_TEST_SYSTEM_BIN", oldSys) }()
 	// Now call Uninstall; create metadata that points to user install
-	_ = saveMetadata(st.UserPath, true, "UserEnv", "")
+	_ = saveMetadata(filepath.Join(userDir, binName), true, "UserEnv", "")
 	actions, err := Uninstall(false)
 	if err != nil {
 		t.Fatalf("Uninstall failed: %v", err)
 	}
 	// both files should be removed
-	if _, err := os.Stat(st.UserPath); err == nil {
+	if _, err := os.Stat(filepath.Join(userDir, binName)); err == nil {
 		t.Fatalf("expected user binary removed")
 	}
-	if _, err := os.Stat(st.SystemPath); err == nil {
+	if _, err := os.Stat(filepath.Join(sysDir, binName)); err == nil {
 		t.Fatalf("expected system binary removed")
 	}
 	if len(actions) == 0 {

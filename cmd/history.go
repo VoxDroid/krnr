@@ -14,7 +14,7 @@ var historyCmd = &cobra.Command{
 	Short: "Show version history for a named command set",
 	Long:  "Show version history for a named command set (versions, timestamps, author, operation)",
 	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		name := args[0]
 		dbConn, err := db.InitDB()
 		if err != nil {

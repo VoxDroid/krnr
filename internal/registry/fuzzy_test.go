@@ -28,17 +28,14 @@ func TestFuzzyMatchBasics(t *testing.T) {
 	}
 }
 
-func TestFuzzySearchCommandSets(t *testing.T) {
-	// init DB
+func setupFuzzyRepo(t *testing.T) *Repository {
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer func() { _ = dbConn.Close() }()
-
+	// ensure cleanup
+	t.Cleanup(func() { _ = dbConn.Close() })
 	r := NewRepository(dbConn)
-
-	// clean state names
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")
 
@@ -65,28 +62,34 @@ func TestFuzzySearchCommandSets(t *testing.T) {
 	if err := r.AddTagToCommandSet(id2, "demo"); err != nil {
 		t.Fatalf("AddTagToCommandSet beta: %v", err)
 	}
+	return r
+}
 
-	res1, err := r.FuzzySearchCommandSets("alp")
+func TestFuzzySearchCommandSets_AlphaMatches(t *testing.T) {
+	r := setupFuzzyRepo(t)
+	res, err := r.FuzzySearchCommandSets("alp")
 	if err != nil {
 		t.Fatalf("FuzzySearchCommandSets: %v", err)
 	}
-	if len(res1) == 0 || res1[0].Name != "alpha" {
-		t.Fatalf("expected alpha in fuzzy search for 'alp', got: %+v", res1)
+	if len(res) == 0 || res[0].Name != "alpha" {
+		t.Fatalf("expected alpha in fuzzy search for 'alp', got: %+v", res)
 	}
+}
 
-	res2, err := r.FuzzySearchCommandSets("dmo")
+func TestFuzzySearchCommandSets_BetaMatches(t *testing.T) {
+	r := setupFuzzyRepo(t)
+	res, err := r.FuzzySearchCommandSets("dmo")
 	if err != nil {
 		t.Fatalf("FuzzySearchCommandSets: %v", err)
 	}
-	// 'dmo' should fuzzy-match 'demo' tag or description
 	found := false
-	for _, s := range res2 {
+	for _, s := range res {
 		if s.Name == "beta" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected beta in fuzzy search for 'dmo', got: %+v", res2)
+		t.Fatalf("expected beta in fuzzy search for 'dmo', got: %+v", res)
 	}
 }

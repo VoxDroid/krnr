@@ -15,9 +15,9 @@ import (
 // TestSaveRunExportImportRoundtrip exercises saving a command set via the CLI,
 // running it, exporting the DB to a file, importing into a fresh environment,
 // and verifying the command set exists and can be run after import.
-func TestSaveRunExportImportRoundtrip(t *testing.T) {
+func TestSaveAndRunRoundtrip(t *testing.T) {
 	// Create a fresh KRNR_HOME
-	tmp := setupTempDB(t)
+	_ = setupTempDB(t)
 
 	// Save a command set via the CLI
 	rootCmd.SetArgs([]string{"save", "e2e-roundtrip", "-c", "echo E2E-RUN"})
@@ -36,6 +36,15 @@ func TestSaveRunExportImportRoundtrip(t *testing.T) {
 	if !strings.Contains(normalized, "E2E-RUN") {
 		t.Fatalf("expected E2E-RUN in output, got: %q", normalized)
 	}
+}
+
+func TestExportDatabase(t *testing.T) {
+	// Create a fresh KRNR_HOME and create a command set via CLI
+	tmp := setupTempDB(t)
+	rootCmd.SetArgs([]string{"save", "e2e-roundtrip", "-c", "echo E2E-RUN"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("save command failed: %v", err)
+	}
 
 	// Export the database to a file
 	dst := filepath.Join(tmp, "e2e-export.db")
@@ -44,6 +53,21 @@ func TestSaveRunExportImportRoundtrip(t *testing.T) {
 	}
 	if _, err := os.Stat(dst); err != nil {
 		t.Fatalf("expected exported DB at %s, stat error: %v", dst, err)
+	}
+}
+
+func TestImportAndRunAfterImport(t *testing.T) {
+	// Create a fresh KRNR_HOME and create a command set via CLI
+	tmp := setupTempDB(t)
+	rootCmd.SetArgs([]string{"save", "e2e-roundtrip", "-c", "echo E2E-RUN"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("save command failed: %v", err)
+	}
+
+	// Export the database to a file
+	dst := filepath.Join(tmp, "e2e-export.db")
+	if err := exporter.ExportDatabase(dst); err != nil {
+		t.Fatalf("ExportDatabase: %v", err)
 	}
 
 	// Create a fresh environment and ensure DB is empty

@@ -10,28 +10,26 @@ import (
 	"testing"
 )
 
-// TestInstallAndUninstall_CI exercises install/uninstall logic on Windows runners
-// without modifying the actual system PATH (uses KRNR_TEST_NO_SETX test mode).
-func TestInstallAndUninstall_CI(t *testing.T) {
-	// Prevent persistent modifications to PATH in CI
+// helper used by Windows CI tests to install a fake executable and return temp dir and actions.
+func setupWindowsCIInstall(t *testing.T) (tmp string, actions []string) {
 	t.Setenv("KRNR_TEST_NO_SETX", "1")
-	// Isolate data dir and home directory to temp
-	tmp := t.TempDir()
+	tmp = t.TempDir()
 	t.Setenv("KRNR_HOME", tmp)
 	t.Setenv("USERPROFILE", tmp)
-
-	// Create a fake source 'executable'
 	src := filepath.Join(tmp, "krnr.exe")
 	if err := os.WriteFile(src, []byte("exe"), 0o644); err != nil {
 		t.Fatalf("failed to write src: %v", err)
 	}
-
 	opts := Options{From: src, AddToPath: true}
 	actions, err := ExecuteInstall(opts)
 	if err != nil {
 		t.Fatalf("install failed: %v", err)
 	}
+	return tmp, actions
+}
 
+func TestInstallAndUninstall_CI_InstallActions(t *testing.T) {
+	_, actions := setupWindowsCIInstall(t)
 	// Expect at least one action mentioning PATH/Add
 	foundAdd := false
 	for _, a := range actions {
@@ -43,19 +41,26 @@ func TestInstallAndUninstall_CI(t *testing.T) {
 	if !foundAdd {
 		t.Fatalf("expected install actions to mention adding to PATH, got: %v", actions)
 	}
+}
 
+func TestInstallAndUninstall_CI_BinaryExists(t *testing.T) {
+	_, _ = setupWindowsCIInstall(t)
 	// Verify binary exists at expected user bin
 	target := filepath.Join(DefaultUserBin(), "krnr.exe")
 	if _, err := os.Stat(target); err != nil {
 		t.Fatalf("binary not found at %s: %v", target, err)
 	}
+	// cleanup
+	_, _ = Uninstall(false)
+}
 
+func TestInstallAndUninstall_CI_UninstallNotes(t *testing.T) {
+	_, _ = setupWindowsCIInstall(t)
 	// Run uninstall (should not actually call setx because of KRNR_TEST_NO_SETX)
 	uActions, err := Uninstall(false)
 	if err != nil {
 		t.Fatalf("uninstall failed: %v", err)
 	}
-
 	// We expect uninstall to either note a test-mode removal or perform removal messages
 	noteFound := false
 	for _, a := range uActions {

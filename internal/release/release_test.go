@@ -16,7 +16,7 @@ import (
 // and is intentionally minimal — it invokes `scripts/release.sh` with a small set
 // of targets. The test is skipped on Windows because the CI Ubuntu runner is the
 // canonical environment for release packaging.
-func TestReleaseScript(t *testing.T) {
+func TestReleaseScript_RunCreatesDist(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("release script integration test skipped on Windows")
 	}
@@ -58,8 +58,14 @@ func TestReleaseScript(t *testing.T) {
 	if !found {
 		t.Fatalf("no release archives found in dist")
 	}
+}
 
-	// Check that SHA256 file is present and contains the version string
+func TestReleaseScript_SHAFileContainsVersion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("release script integration test skipped on Windows")
+	}
+	version := "v0.0.0-e2e"
+	dist := filepath.Join("dist")
 	shaFile := filepath.Join(dist, "krnr-"+version+"-SHA256SUMS")
 	b, err := os.ReadFile(shaFile)
 	if err != nil {
@@ -68,7 +74,6 @@ func TestReleaseScript(t *testing.T) {
 	if !strings.Contains(string(b), version) {
 		t.Fatalf("sha file does not mention version: %s", string(b))
 	}
-
 	// cleanup artifacts to keep workspace clean
 	_ = os.RemoveAll(dist)
 }
