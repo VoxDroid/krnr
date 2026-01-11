@@ -21,9 +21,9 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
   - [x] Implement fuzzy search and filter helpers in `internal/registry`
   - Acceptance: Unit tests for tag attach/detach and search; CLI examples in `docs/cli.md` — **Done** (unit tests + CLI examples added)
 - Parameters & Variable Substitution
-  - [ ] Define parameter syntax (e.g., `{{param}}`) and parser in `internal/registry`/executor
-  - [ ] Add runtime prompts/flags for supplying parameter values (`--param name=value`) and environment-binding support
-  - Acceptance: Integration test that runs a saved command with substituted parameters
+  - [x] Define parameter syntax (e.g., `{{param}}`) and parser in `internal/registry`/executor
+  - [x] Add runtime prompts/flags for supplying parameter values (`--param name=value`) and environment-binding support
+  - Acceptance: Integration test that runs a saved command with substituted parameters — **Done** (unit tests + CLI integration test added)
 - Versioning & History
   - [ ] Add version/history model for `command_sets` (DB migration and schema updates)
   - [ ] Implement `krnr history <name>` and `krnr rollback <name> --version` commands and tests

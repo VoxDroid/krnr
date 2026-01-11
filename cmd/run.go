@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -66,19 +67,60 @@ var runCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		for _, c := range cs.Commands {
-			// Security: check if command is allowed
-			if err := security.CheckAllowed(c.Command); err != nil && !force {
-				return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", c.Command, err)
+// collect parameters from flags
+	paramVals, _ := cmd.Flags().GetStringArray("param")
+	params := map[string]string{}
+	for _, p := range paramVals {
+		parts := strings.SplitN(p, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid --param value: %s (expected name=value)", p)
+		}
+		name := parts[0]
+		val := parts[1]
+		// env:NAME syntax reads from environment
+	if strings.HasPrefix(val, "env:") {
+			envKey := strings.TrimPrefix(val, "env:")
+			params[name] = os.Getenv(envKey)
+		} else {
+			params[name] = val
+		}
+	}
+
+	for _, c := range cs.Commands {
+		cmdText := c.Command
+		// Apply parameter substitution if present
+		if len(registry.FindParams(cmdText)) > 0 {
+			// gather missing params and prompt interactively if needed
+			required := registry.FindParams(cmdText)
+			for _, rname := range required {
+				if _, ok := params[rname]; !ok {
+					// interactive prompt
+					val := interactive.Prompt(fmt.Sprintf("Value for parameter %s", rname))
+					if val == "" {
+						return fmt.Errorf("missing value for parameter %s", rname)
+					}
+					params[rname] = val
+				}
 			}
-			if !suppress {
-				fmt.Printf("-> %s\n", c.Command)
+			sub, err := registry.ApplyParams(cmdText, params)
+			if err != nil {
+				return err
 			}
-			stderr := io.Discard
-			if showStderr {
-				stderr = os.Stderr
-			}
-			if err := e.Execute(ctx, c.Command, "", os.Stdout, stderr); err != nil {
+			cmdText = sub
+		}
+
+		// Security: check if command is allowed
+		if err := security.CheckAllowed(cmdText); err != nil && !force {
+			return fmt.Errorf("refusing to run potentially dangerous command '%s': %v (use --force to override)", cmdText, err)
+		}
+		if !suppress {
+			fmt.Printf("-> %s\n", cmdText)
+		}
+		stderr := io.Discard
+		if showStderr {
+			stderr = os.Stderr
+		}
+		if err := e.Execute(ctx, cmdText, "", os.Stdout, stderr); err != nil {
 				return err
 			}
 		}
@@ -95,5 +137,6 @@ func init() {
 	runCmd.Flags().Bool("suppress-command", false, "Suppress printing the written command before execution")
 	runCmd.Flags().Bool("show-stderr", false, "Show command stderr output instead of omitting it")
 	runCmd.Flags().String("shell", "", "Override shell to execute commands (e.g., pwsh, bash, cmd)")
+	runCmd.Flags().StringArray("param", []string{}, "Parameter values as name=value (repeatable). Use env:VAR to load from environment, e.g. --param user=env:USER")
 	rootCmd.AddCommand(runCmd)
 }

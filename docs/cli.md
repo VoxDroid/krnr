@@ -49,11 +49,17 @@ Shows details of a command set and its commands.
 
 ## run
 
-`krnr run <name> [--dry-run] [--confirm] [--verbose] [--shell <shell>]`
+`krnr run <name> [--dry-run] [--confirm] [--verbose] [--shell <shell>] [--param <name>=<value>]`
 
 Runs the commands in order. Defaults to stopping on the first failing command.
 Use `--dry-run` to preview commands without running them. `--confirm` will
 prompt interactively before running.
+
+The `--param` (short `-p`) flag allows passing named parameters into the
+commands. Use `--param` multiple times for multiple parameters (for example
+`-p user=alice -p token=env:API_TOKEN`). Parameter values support an
+`env:VAR` form to read values from environment variables, and if no value is
+provided the CLI will prompt interactively for the parameter value.
 
 Use `--shell` to select the shell used to execute commands (for example
 `pwsh`, `powershell`, `bash`, or `cmd`). If omitted, platform defaults are used
@@ -75,6 +81,8 @@ Behavior and notes:
 
 Examples:
 
+- `krnr run hello --param user=alice --param token=env:API_TOKEN`
+- `krnr run hello --dry-run --param release=1.2.3`
 - `krnr run hello --shell pwsh` — run with PowerShell Core
 - `krnr run hello --shell powershell` — prefer Windows PowerShell on Windows
 - `krnr run hello --shell cmd` — force Windows `cmd.exe`
