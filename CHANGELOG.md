@@ -9,9 +9,6 @@ All notable changes to this project will be documented in this file.
 - Tests: add integration tests for `krnr save` prompting on duplicate names and normal save behavior.
 - Docs: update `docs/cli.md` to document the interactive duplicate-name prompt for `krnr save`.
 - Add `krnr export` and `krnr import` commands to export/import the full DB or single named command sets. Exported sets are portable SQLite files usable with `krnr import set <file>`; imports handle name collisions by appending `-import-N` suffixes and DB imports support an `--overwrite` flag.
-
-## v1.2.0 - 2026-01-12
-
 - Import: add `--on-conflict` policy to `krnr import set` and `krnr import db` (per-set policy) with values `rename` (default), `skip`, `overwrite`, and `merge`.
   - `merge` appends incoming commands to existing command sets and records a new version snapshot; use `--dedupe` to remove exact-duplicate commands when merging.
   - `skip` ignores imported sets when a name collision exists; `overwrite` replaces the existing set with the imported one; `rename` (default) appends `-import-N` to avoid collisions.

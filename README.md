@@ -30,18 +30,19 @@ krnr is a cross-platform CLI that provides a global, persistent registry of name
 For a longer introduction and design notes, see `krnr_docs/PROJECT_OVERVIEW.md` and `docs/architecture.md`.
 
 
-## What's new — v1.0.0 (First official release) 🔖
+## What's new — v1.1.0 (2026-01-12) 🔔
 
-v1.0.0 is the project's first official stable release (2026-01-11). Key improvements include:
+v1.1.0 focuses on UX polish and import/export portability and safety. Highlights include:
 
-- Tagging & discovery: `krnr tag` and `krnr list --tag` for organizing and filtering command sets.
-- Better search: `krnr list --filter <text>` and `--fuzzy` for substring and fuzzy subsequence matches.
-- Parameters & env sourcing: `{{param}}` substitution, `--param name=value`, and `env:VAR` support.
-- Versioning & history: `krnr history <name>` and `krnr rollback <name> --version` to manage snapshots.
-- Packaging & installers: Windows MSI (WiX) and package manifests for Homebrew/Scoop/Winget; release automation produces installers and archives.
-- Security & safety: conservative destructive checks, parameter redaction, and confirmation prompts.
+- Save UX: `krnr save` now detects duplicate names and prompts interactively for a new name instead of failing with a DB constraint error.
+- Export / Import: new `krnr export` and `krnr import` commands:
+  - `krnr export db` and `krnr export set <name>` to create portable SQLite files.
+  - `krnr import db <file>` and `krnr import set <file>` to restore data; `--overwrite` and per-set `--on-conflict` policies (rename|skip|overwrite|merge) supported.
+  - `--dedupe` option removes exact-duplicate commands when merging.
+- Interactive flows: `krnr import` and `krnr export` without args start an interactive prompt to choose type and options (paths, conflict policy, dedupe) while retaining non-interactive flags.
+- Tests & Docs: integration tests for the new flows were added and `docs/cli.md` / `docs/importer.md` were updated with usage examples.
 
-See the full release notes: `docs/releases/v1.0.0.md` and the detailed changelog in `CHANGELOG.md`.
+See the full release notes: `docs/releases/v1.1.0.md` and the detailed changelog in `CHANGELOG.md`.
 
 ---
 
