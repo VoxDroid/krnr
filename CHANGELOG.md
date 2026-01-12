@@ -14,7 +14,9 @@ All notable changes to this project will be documented in this file.
     - Add accessibility and theming (high-contrast, keyboard help, screen-reader considerations).
     - Document `krnr tui` usage and add release notes and packaging adjustments.
   - Parity: The TUI aims to provide interactive equivalents for the existing CLI commands and workflows, including but not limited to: `save`, `edit`, `run` (with parameter editor and streaming logs), `list`, `describe`, `history`, `rollback`, `import/export`, `tag` management, `install`/`uninstall`, and `status`.
+  - Milestone doc: `krnr_docs/TUI_MILESTONE.md` added with a detailed checklist and status notes.
   - Acceptance: Prototype (list+detail+run modal) exists; `krnr tui` is documented in `docs/cli.md`; UI models are unit-tested; CI includes headless UI checks; users can complete the same interactive tasks via the TUI that are available in the CLI (parity for interactive workflows).
+  - Recent progress: deterministic two-column renderer, preview selection updates, Init population, run streaming, headless UI tests and PTY E2E test (skips on unsupported platforms).
 
 ## v1.1.0 - 2026-01-12
 

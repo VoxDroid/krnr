@@ -54,10 +54,16 @@ Shortcuts:
 - `?` — show help
 - `q` or `Esc` — quit
 - `Enter` — show details for the selected command set
+- `r` — run the selected command set (streams output to the right pane)
+- `Ctrl+T` — toggle high-contrast theme (accessibility)
 
 This prototype is implemented using Bubble Tea (`github.com/charmbracelet/bubbletea`) and is intended as an iterative starting point for further UX and feature work.
 
-Note: The TUI is a long-term initiative (v1.2.0). The goal is to make `krnr tui` a fully-supported, accessible interface that allows interactive browsing and runs while keeping the CLI as the canonical, scriptable automation surface. See `CHANGELOG.md` (v1.2.0 planned) and `docs/releases/v1.2.0.md` for the initiative plan.
+Headless tests:
+
+Run `go test ./cmd/tui/... -v` to execute the headless TUI unit tests that simulate key presses and streaming behavior.
+
+Note: The TUI is a long-term initiative (v1.2.0). The goal is to make `krnr tui` a fully-supported, accessible interface that allows interactive browsing and runs while keeping the CLI as the canonical, scriptable interface. See `CHANGELOG.md` (v1.2.0 planned) and `docs/releases/v1.2.0.md` for the initiative plan. For a detailed checklist and current progress see `krnr_docs/TUI_MILESTONE.md`.
 
 ## describe
 
