@@ -3,6 +3,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.0 - 2026-01-12 (planned)
+
+- UI: **TUI initiative (long-term)** — begin a sustained effort to provide a first-class, keyboard-first Terminal User Interface that complements the existing CLI. The goal is to allow users to perform common workflows (browse, describe, run with parameters, rollback, import/export, history, edit, tag management) using interactive screens while keeping the CLI as the canonical, scriptable interface.
+  - Implementation approach: the TUI will be implemented as a support layer that *reuses existing internal packages* (`registry`, `executor`, `importer`, `exporter`) rather than re-implementing business logic. Initial prototype is Bubble Tea based and available as `cmd/tui` (PoC: list + detail).
+  - Planned steps:
+    - Design `internal/tui` adapters and component architecture to avoid duplication and keep logic testable.
+    - Expand prototype components (list, detail, run modal, logs viewport, confirmations, search/filter).
+    - Add headless UI tests (pseudo-tty) and CI jobs across Windows/Linux/macOS.
+    - Add accessibility and theming (high-contrast, keyboard help, screen-reader considerations).
+    - Document `krnr tui` usage and add release notes and packaging adjustments.
+  - Parity: The TUI aims to provide interactive equivalents for the existing CLI commands and workflows, including but not limited to: `save`, `edit`, `run` (with parameter editor and streaming logs), `list`, `describe`, `history`, `rollback`, `import/export`, `tag` management, `install`/`uninstall`, and `status`.
+  - Acceptance: Prototype (list+detail+run modal) exists; `krnr tui` is documented in `docs/cli.md`; UI models are unit-tested; CI includes headless UI checks; users can complete the same interactive tasks via the TUI that are available in the CLI (parity for interactive workflows).
+
 ## v1.1.0 - 2026-01-12
 
 - UX: `krnr save` will now detect when the provided name already exists and will prompt the user to enter a different name interactively (mirrors `krnr record` behavior). This prevents a DB constraint error when saving a duplicate name and improves CLI consistency.

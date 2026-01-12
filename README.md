@@ -148,7 +148,7 @@ Use `--shell <name>` to force a specific executable for a run.
 
 - [ ] **Secret Encryption**: Encrypt sensitive parameters in the SQLite database.
 - [ ] **Remote Sync**: Optional S3/GitHub backup for your registry.
-- [ ] **UI Dashboard**: A TUI or Web view for browsing command history and analytics.
+- [x] **UI Dashboard (prototype)**: A TUI for browsing command sets is available via `krnr tui` (prototype using Bubble Tea).
 - [ ] **Hooks**: Pre-run and post-run hooks for command sets.
 
 ---

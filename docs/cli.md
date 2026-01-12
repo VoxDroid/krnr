@@ -43,6 +43,22 @@ Examples:
 - `krnr list --filter demo`
 - `krnr list --filter dmo --fuzzy`  # fuzzy-matches `demo`
 
+## tui
+
+`krnr tui`
+
+Starts the interactive terminal UI (TUI) prototype. The TUI provides a keyboard-first interface for browsing command sets.
+
+Shortcuts:
+
+- `?` — show help
+- `q` or `Esc` — quit
+- `Enter` — show details for the selected command set
+
+This prototype is implemented using Bubble Tea (`github.com/charmbracelet/bubbletea`) and is intended as an iterative starting point for further UX and feature work.
+
+Note: The TUI is a long-term initiative (v1.2.0). The goal is to make `krnr tui` a fully-supported, accessible interface that allows interactive browsing and runs while keeping the CLI as the canonical, scriptable automation surface. See `CHANGELOG.md` (v1.2.0 planned) and `docs/releases/v1.2.0.md` for the initiative plan.
+
 ## describe
 
 `krnr describe <name>`

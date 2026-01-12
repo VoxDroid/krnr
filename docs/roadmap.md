@@ -17,7 +17,9 @@ This roadmap outlines short-, medium-, and long-term priorities for `krnr`.
 
 ## Long-term (v1.x+)
 - Collaboration & sharing: remote registries, publishable command sets
-- UI integrations: TUI / VSCode extension to browse and run workflows
+- UI integrations:
+  - **TUI (v1.2.0)** — full TUI initiative to provide a first-class terminal UI that allows browsing, running, editing, importing/exporting, and history management interactively. Implementation principle: **reuse CLI internals** via `internal/tui` adapters (no duplication of business logic). Accessibility, CI headless tests, theming, and packaging updates are part of this initiative.
+  - **Editor integrations (future)**: VSCode extension or web UI to provide alternative visual access to the registry and runs
 - Telemetry & metrics (opt-in) for usage analysis
 
 ## Milestones
