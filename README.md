@@ -2,206 +2,196 @@
 
 [![CI](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/VoxDroid/krnr?label=release)](https://github.com/VoxDroid/krnr/releases) [![Downloads](https://img.shields.io/github/downloads/VoxDroid/krnr/total?label=downloads&color=blue)](https://github.com/VoxDroid/krnr/releases) [![Go Version](https://img.shields.io/github/go-mod/go-version/VoxDroid/krnr?label=go)](https://github.com/VoxDroid/krnr) [![License](https://img.shields.io/github/license/VoxDroid/krnr)](LICENSE) [![Go Report Card](https://goreportcard.com/badge/github.com/VoxDroid/krnr)](https://goreportcard.com/report/github.com/VoxDroid/krnr) [![pkg.go.dev](https://pkg.go.dev/badge/github.com/VoxDroid/krnr)](https://pkg.go.dev/github.com/VoxDroid/krnr)
 
-krnr is a cross-platform CLI that provides a global, persistent registry of named terminal workflows (command sets) backed by SQLite. It helps you save, re-run, and share commonly used shell sequences across machines.
+**krnr** is a high-performance, cross-platform CLI that provides a **global, persistent registry of named terminal workflows** backed by SQLite. It eliminates the need for managing scattered shell scripts and non-portable aliases by centralizing your command sets in a versioned, durable database accessible from any directory.
 
 ---
 
-## Table of contents
+## Why krnr?
 
-- [Quick summary](#quick-summary)
-- [Badges & Status](#badges--status)
-- [Install & Setup](#install--setup)
-- [Quick Start](#quick-start)
-- [Commands](#commands)
-- [Configuration & Database](#configuration--database)
-- [Development](#development)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License & Credits](#license--credits)
+Modern terminal users handle complex sequences across different project roots and operating systems. Standard solutions fall short:
 
----
+*   **Shell Scripts**: Require file management, PATH modification, and lack structured metadata.
+*   **Aliases**: Non-portable across machines and invisible within automated workflows.
+*   **Task Runners**: Usually scoped to a specific project directory (e.g., `Makefile`, `package.json`).
 
-## Quick summary
+**krnr** introduces a **global execution layer**:
 
-- Use `krnr save <name>` to persist a named command set (multiple commands per name).
-- Use `krnr run <name>` to execute a saved set safely and consistently.
-- Store author metadata with `krnr whoami` for recorded runs.
-
-For a longer introduction and design notes, see `krnr_docs/PROJECT_OVERVIEW.md` and `docs/architecture.md`.
-
-
-## What's new — v1.1.0 (2026-01-12) 🔔
-
-v1.1.0 focuses on UX polish and import/export portability and safety. Highlights include:
-
-- Save UX: `krnr save` now detects duplicate names and prompts interactively for a new name instead of failing with a DB constraint error.
-- Export / Import: new `krnr export` and `krnr import` commands:
-  - `krnr export db` and `krnr export set <name>` to create portable SQLite files.
-  - `krnr import db <file>` and `krnr import set <file>` to restore data; `--overwrite` and per-set `--on-conflict` policies (rename|skip|overwrite|merge) supported.
-  - `--dedupe` option removes exact-duplicate commands when merging.
-- Interactive flows: `krnr import` and `krnr export` without args start an interactive prompt to choose type and options (paths, conflict policy, dedupe) while retaining non-interactive flags.
-- Tests & Docs: integration tests for the new flows were added and `docs/cli.md` / `docs/importer.md` were updated with usage examples.
-
-See the full release notes: `docs/releases/v1.1.0.md` and the detailed changelog in `CHANGELOG.md`.
+*   **Global Access**: Call your workflows from any path without searching for script files.
+*   **Industrial Infrastructure**: Powered by SQLite for ACID compliance, versioning, and instant full-text search.
+*   **Safety First**: Built-in dry-runs, interactive confirmations, and execution safety checks.
+*   **Portable Logic**: Export and import workflows via single-file SQLite "entries" to share across your team.
 
 ---
 
-## Badges & Status
+## Key Features
 
-- CI: GitHub Actions (format, lint, test, build)
-- Releases & downloads: GitHub Releases
-- Code quality: Go Report Card, `pkg.go.dev`
-- License: MIT (see `LICENSE`)
-
----
-
-## Install & Setup
-
-### Prebuilt releases (recommended)
-
-Download for your platform from the Releases page: https://github.com/VoxDroid/krnr/releases
-
-### Homebrew (macOS / Linux)
-
-If you have Homebrew installed, the repository includes a formula under `packaging/homebrew/krnr.rb`. Example:
-
-```bash
-brew install --formula=packaging/homebrew/krnr.rb
-```
-
-### Windows package managers
-
-- Winget / Scoop manifests are included in `packaging/windows/winget` and `packaging/scoop` respectively.
-
-### Manual install (local binary)
-
-Place an executable on your PATH or use the bundled installer:
-
-Unix / macOS
-
-```bash
-./krnr install --user --from ./krnr --add-to-path
-```
-
-PowerShell / Windows
-
-```powershell
-.
-\krnr.exe install --user --from .\krnr.exe --add-to-path
-```
-
-See `docs/install.md` for full installation guidance and PATH handling details.
+- **Interactive Recording**: Capture complex terminal sessions in real-time with `krnr record`.
+- **Dynamic Parameterization**: Inject variables at runtime using `--param key=value` or interactive prompts.
+- **Auto-Versioning**: Every modification creates a version snapshot, allowing for instant rollbacks.
+- **Native Shell Integration**: Intelligently selects the best shell (Bash, PowerShell Core, CMD) for your OS while allowing manual overrides.
+- **Fuzzy Search & Tagging**: Organize hundreds of workflows with metadata-aware search and categorization.
 
 ---
 
 ## Quick Start
 
-Developer quick start
+### 1. Installation
+Install the binary and add it to your PATH automatically:
 
 ```bash
-# Build locally
-Go 1.25.5+ is recommended
-go build -v -o krnr .
-# Run interactively
-./krnr --help
+# Unix / macOS
+./krnr install --user --add-to-path
+
+# PowerShell / Windows
+.\krnr.exe install --user --add-to-path
 ```
 
-User quick start
+### 2. Save a Workflow
+Persist a multi-step sequence with a single name:
 
 ```bash
-# Save a simple command set
-krnr save hello -d "Greet" -c "echo Hello"
-# Run it
-krnr run hello
+krnr save deploy -d "Production deploy" -c "go test ./..." -c "go build -o app" -c "docker push registry/app"
 ```
 
-Interactive recording
+### 3. Execute Anywhere
+Run your saved workflow from any directory:
 
-Use `krnr record <name>` to type commands directly; finish recording by entering `:end` (aliases `:save` and `:quit`).
+```bash
+krnr run deploy --confirm
+```
 
 ---
 
-## Commands (summary table)
+## Technical Architecture
+
+krnr acts as a management layer between the user and the operating system's native shells.
+
+### System Flow
+![System Flow](assets/svg/system-flow.svg)
+
+### Execution Sequence
+![Execution Sequence](assets/svg/execution-sequence.svg)
+
+### Data Model
+![Data Model](assets/svg/data-model.svg)
+
+---
+
+## Advanced Usage
+
+### Runtime Parameters
+You can use parameters in your commands to make workflows dynamic.
+
+1. **Save a parameterized set**:
+   `krnr save config -c "echo Current target: {{target}}"`
+
+2. **Run with explicit value**:
+   `krnr run config --param target=production`
+
+3. **Run with Environment Variable**:
+   `krnr run config --param target=env:DEPLOY_TARGET`
+
+4. **Interactive Prompt**:
+   `krnr run config` (if `target` is missing, krnr will prompt you for it).
+
+---
+
+## Configuration
+
+krnr respects the following environment variables:
+
+| Variable | Description | Default |
+|---|---|---|
+| `KRNR_HOME` | Directory for the database and logs | `~/.krnr` |
+| `KRNR_DB` | Full path to the SQLite database file | `$KRNR_HOME/krnr.db` |
+| `EDITOR` | Editor used for `krnr edit` | `vi` (Unix) / `notepad` (Windows) |
+
+---
+
+## Shell Support
+
+krnr intelligently picks the execution environment based on your operating system:
+
+| Platform | Default Shell | Overrides |
+|---|---|---|
+| **Windows** | `cmd.exe` | `powershell`, `pwsh` |
+| **Linux** | `bash` | Any shell on PATH (zsh, fish, etc) |
+| **macOS** | `bash` | Any shell on PATH |
+
+Use `--shell <name>` to force a specific executable for a run.
+
+---
+
+## Command Reference
 
 | Command | Description | Example |
 |---|---|---|
-| `krnr install` | Install the `krnr` binary to your system or user PATH | `krnr install --user --from ./krnr --add-to-path` |
-| `krnr uninstall` | Uninstall krnr (remove binary and PATH modifications) | `krnr uninstall --user` |
-| `krnr status` | Show installation status (user and system) | `krnr status` |
-| `krnr save <name>` | Save a named command set | `krnr save build -d "Build project" -c "go build ./..."` |
-| `krnr record <name>` | Record commands interactively into a new command set | `krnr record demo` (then type commands, `:end` to finish) |
-| `krnr run <name>` | Run a named command set | `krnr run hello --confirm` |
-| `krnr list` | List saved command sets | `krnr list` |
-| `krnr describe <name>` | Show details for a command set | `krnr describe hello` |
-| `krnr edit <name>` | Edit a command set using your editor | `krnr edit hello` |
-| `krnr delete <name>` | Delete a command set | `krnr delete obsolete` |
-| `krnr whoami` | Manage stored author identity (`set`, `show`, `clear`) | `krnr whoami set --name "Alice" --email alice@example.com` |
-| `krnr version` | Print version information | `krnr version` |
-
-For more flags and options, run `krnr <command> --help` or see the `cmd/` directory.
-
----
-
-## Configuration & Database
-
-- Default DB location: `$HOME/.krnr/krnr.db`
-- Environment variables:
-  - `KRNR_HOME` — override the data directory
-  - `KRNR_DB` — set full DB file path (overrides KRNR_HOME)
-
-Migrations and schema are bundled and applied automatically on first run. See `docs/config.md` and `docs/database.md` for advanced configuration and backup/restore tips.
+| `krnr save <name>` | Save a named command set with multiple commands | `krnr save build -c "go build" -c "go test"` |
+| `krnr record <name>` | Record commands interactively from your terminal | `krnr record demo` (type `:end` to save) |
+| `krnr run <name>` | Execute a saved command set safely | `krnr run deploy --confirm -p env=prod` |
+| `krnr list` | List and search saved command sets | `krnr list --filter "deploy" --fuzzy` |
+| `krnr describe <name>`| View detailed command set structure and metadata | `krnr describe build` |
+| `krnr edit <name>` | Modify a command set using your favorite `$EDITOR` | `krnr edit build` |
+| `krnr delete <name>` | Remove a command set from the registry | `krnr delete legacy --yes` |
+| `krnr history <name>` | View the versioned history of a command set | `krnr history deploy` |
+| `krnr rollback <name>`| Revert a command set to a previous version | `krnr rollback deploy --version 2` |
+| `krnr tag <action>` | Manage tags (`add`, `remove`, `list`) for sets | `krnr tag add build production` |
+| `krnr export` | Export DB or specific sets to portable SQLite files | `krnr export set build --dst ./build.db` |
+| `krnr import` | Import DB or sets with flexible conflict policies | `krnr import set ./build.db --on-conflict merge` |
+| `krnr whoami` | Manage your global author identity for recorded runs | `krnr whoami set --name "Alice"` |
+| `krnr status` | Check installation and PATH health | `krnr status` |
+| `krnr version` | Show current version and build info | `krnr version` |
 
 ---
 
-## Development & Testing
+## Roadmap
 
-- Format: `./scripts/fmt.sh`
-- Lint: `./scripts/lint.sh` (use Docker fallback on Windows if needed)
-- Unit tests: `go test ./...`
-- DB tests: `go test ./internal/db -v`
+- [ ] **Secret Encryption**: Encrypt sensitive parameters in the SQLite database.
+- [ ] **Remote Sync**: Optional S3/GitHub backup for your registry.
+- [ ] **UI Dashboard**: A TUI or Web view for browsing command history and analytics.
+- [ ] **Hooks**: Pre-run and post-run hooks for command sets.
 
-Building a local release:
+---
+
+## Development & Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ```bash
-./scripts/release.sh v0.1.0
+# Recommended: Go 1.25.5+
+go build -v -o krnr .
+go test ./...
+./scripts/lint.sh
 ```
 
 ---
 
-## Troubleshooting & Notes
+## Troubleshooting
 
-- If `golangci-lint` fails on Windows with export-data errors, use the Dockerized linter (see above).
-- If install removes or doesn't add to PATH as expected, check `krnr status` and refer to `docs/install.md`.
+- **PATH issues (Windows)**: If `krnr` is not recognized after installation, ensure you ran `krnr install --add-to-path` in an elevated shell if necessary, or restart your terminal to refresh environment variables.
+- **SQLite locks**: Since krnr uses SQLite, avoid manual modification of the `.db` file while a `krnr run` is in progress to prevent database busy errors.
+- **Shell not found**: If using `--shell`, ensure the executable is available in your system path.
 
 ---
 
-## Contributing
-
-Contributions are welcome — please see `CONTRIBUTING.md` for the full guidelines (create an issue first if in doubt). Quick pointers:
-
-- Development: Go 1.25.5+ is recommended; build with `go build`.
-- Recommended tooling: `golangci-lint` v2.8.0 (use `scripts/lint.sh` to run it locally or the Docker fallback).
-- Formatting & linting: run `./scripts/fmt.sh` and `./scripts/lint.sh` before opening a PR.
-- Tests: run `go test ./...` and add tests for new behavior.
-- Use the `.github` issue templates and the PR template when opening issues or pull requests.
-
-## Community & Support
-
-- Documentation and developer guides live in `docs/` and `README.md`.
-- For help, ask a question using the **Support Question** issue template or the Discussions tab: https://github.com/VoxDroid/krnr/discussions
-
 ## Security
 
-If you discover a security vulnerability, follow `SECURITY.md`: we prefer private reports by email to [izeno.contact@gmail.com](mailto:izeno.contact@gmail.com) to avoid public disclosure until a fix is available.
+krnr executes shell commands with the privileges of the current user. 
 
-## Code of Conduct
+- Always inspect command sets before running them (use `krnr describe <name>`).
+- Use the `--confirm` flag for workflows that perform destructive operations.
+- Avoid storing plaintext secrets in command sets; use environment variables and the `env:VAR` parameter syntax instead.
 
-Please follow `CODE_OF_CONDUCT.md`. If you believe someone has violated the code, contact the maintainers at [izeno.contact@gmail.com](mailto:izeno.contact@gmail.com) or open a private issue labeled "Code of Conduct Violation."
+If you find a security vulnerability, please report it privately following our [SECURITY.md](SECURITY.md).
 
 ---
 
 ## License & Credits
 
-krnr is open-source and licensed under the MIT License — see `LICENSE`.
+krnr is open-source and licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
----
+Developed for the VoxDroid ecosystem.
+
+- **Discussions**: [GitHub Discussions](https://github.com/VoxDroid/krnr/discussions)
+- **Issues**: [Bug reports & feature requests](https://github.com/VoxDroid/krnr/issues)
+- **Support**: See [SUPPORT.md](SUPPORT.md) for tiered assistance.

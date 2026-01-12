@@ -1,0 +1,38 @@
+---
+config:
+  theme: redux-dark
+---
+erDiagram
+    COMMAND_SET ||--o{ COMMAND : contains
+    COMMAND_SET ||--o{ COMMAND_SET_VERSION : has_history
+    COMMAND_SET }|--o{ TAG : has
+    COMMAND_SET {
+        int id PK
+        string name UK
+        string description
+        string author_name
+        string author_email
+        datetime created_at
+        datetime last_run
+    }
+    COMMAND {
+        int id PK
+        int command_set_id FK
+        int position
+        string command
+    }
+    COMMAND_SET_VERSION {
+        int id PK
+        int command_set_id FK
+        int version
+        datetime created_at
+        string author_name
+        string author_email
+        string description
+        json commands
+        string operation
+    }
+    TAG {
+        int id PK
+        string name UK
+    }

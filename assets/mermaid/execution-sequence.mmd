@@ -1,0 +1,21 @@
+---
+config:
+  theme: redux-dark
+---
+sequenceDiagram
+    participant U as User
+    participant K as krnr CLI
+    participant R as SQLite Registry
+    participant S as OS Shell
+
+    U->>K: krnr save build -c "go build"
+    K->>R: Store command set & version 1
+    R-->>K: Success
+    K-->>U: Saved 'build'
+
+    U->>K: krnr run build
+    K->>R: Fetch 'build' commands
+    R-->>K: 1. "go build"
+    K->>S: spawn: go build
+    S-->>K: Exit Code: 0
+    K-->>U: Run complete

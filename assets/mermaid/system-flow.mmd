@@ -1,0 +1,15 @@
+---
+config:
+  theme: redux-dark
+---
+graph TD
+    User([User]) -- "krnr [cmd]" --> CLI[Cobra CLI Layer]
+    CLI -- "CRUD & Versioning" --> DB[(SQLite Registry)]
+    DB -- "Command Data" --> CLI
+    CLI -- "Apply Params" --> CLI
+    CLI -- "Execute" --> Engine[Execution Engine]
+    Engine -- "Spawn" --> Shell{OS Shell}
+    Shell -- "CMD" --> Windows[cmd.exe]
+    Shell -- "PWSH" --> Cross[pwsh / powershell]
+    Shell -- "Bash" --> Unix[bash / zsh]
+    CLI -- "Status Logging" --> DB
