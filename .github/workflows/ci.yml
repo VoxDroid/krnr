@@ -87,7 +87,7 @@ jobs:
       - name: Export Go cache paths to environment
         run: |
           echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
-          echo "GOCACHE=$(go env.GOCACHE)" >> $GITHUB_ENV
+          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
 
       - name: Cache Go build cache (matrix-specific)
         id: go-cache
