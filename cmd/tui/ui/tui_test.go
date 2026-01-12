@@ -19,7 +19,9 @@ func TestNewModelInitializesList(t *testing.T) {
 	m := NewModel(ui)
 	// Init should populate items via the Init cmd
 	m.Init()()
-	if len(m.list.Items()) != 2 { t.Fatalf("expected 2 items got %d", len(m.list.Items())) }
+	if len(m.list.Items()) != 2 {
+		t.Fatalf("expected 2 items got %d", len(m.list.Items()))
+	}
 }
 
 func TestInitPopulatesPreview(t *testing.T) {
@@ -28,19 +30,28 @@ func TestInitPopulatesPreview(t *testing.T) {
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
 	m.Init()()
-	if m.vp.View() == "" { t.Fatalf("expected preview content after Init") }
-	if !strings.Contains(m.vp.View(), "echo hi") { t.Fatalf("expected command in preview after Init") }
+	if m.vp.View() == "" {
+		t.Fatalf("expected preview content after Init")
+	}
+	if !strings.Contains(m.vp.View(), "echo hi") {
+		t.Fatalf("expected command in preview after Init")
+	}
 }
 
-func abs(x int) int { if x < 0 { return -x } ; return x }
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
 
 func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	// create a set with a multi-line description and two commands
 	full := adapters.CommandSetSummary{
-		Name: "with-params",
+		Name:        "with-params",
 		Description: "Param demo",
-		Commands: []string{"echo User: {{user}}", "echo Token: {{token}}"},
-		AuthorName: "VoxDroid",
+		Commands:    []string{"echo User: {{user}}", "echo Token: {{token}}"},
+		AuthorName:  "VoxDroid",
 		AuthorEmail: "izeno.contact@gmail.com",
 	}
 	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "with-params", Description: "Param demo"}}, full: full}
@@ -56,21 +67,28 @@ func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	if posDesc == -1 || posParam == -1 || posParam <= posDesc {
 		t.Fatalf("expected Param demo to appear after Description:, got:\n%s", view)
 	}
-	between := view[posDesc+len("Description:"):posParam]
-	if strings.TrimSpace(between) != "" { t.Fatalf("expected only whitespace between Description: and Param demo, got %q", between) }
+	between := view[posDesc+len("Description:") : posParam]
+	if strings.TrimSpace(between) != "" {
+		t.Fatalf("expected only whitespace between Description: and Param demo, got %q", between)
+	}
 
 	// also assert description is indented by the same base offset used for commands
 	maxPrefix := 0
 	for i := range full.Commands {
 		p := fmt.Sprintf("%d) ", i+1)
-		if l := len(p); l > maxPrefix { maxPrefix = l }
+		if l := len(p); l > maxPrefix {
+			maxPrefix = l
+		}
 	}
 	expectedDelta := 2 + maxPrefix + 1 // the formatter indents by 2 + maxPrefix + 1 spaces relative to the header
 	// find header line and the following non-empty line
 	lines := strings.Split(view, "\n")
 	headIdx := -1
 	for i, ln := range lines {
-		if strings.Contains(ln, "Description:") { headIdx = i; break }
+		if strings.Contains(ln, "Description:") {
+			headIdx = i
+			break
+		}
 	}
 	if headIdx == -1 || headIdx+1 >= len(lines) {
 		t.Fatalf("couldn't locate Description header and line in view:\n%s", view)
@@ -83,7 +101,9 @@ func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	leadingHeader := len(lines[headIdx]) - len(strings.TrimLeft(lines[headIdx], " "))
 	leadingParam := len(paramLine) - len(strings.TrimLeft(paramLine, " "))
 	delta := leadingParam - leadingHeader
-	if delta < expectedDelta { t.Fatalf("expected param to be indented at least %d spaces relative to header, got %d (view:\n%s)", expectedDelta, delta, view) }
+	if delta < expectedDelta {
+		t.Fatalf("expected param to be indented at least %d spaces relative to header, got %d (view:\n%s)", expectedDelta, delta, view)
+	}
 
 	// ensure both command lines show the prefix and a small gap before the echoed text
 	if !strings.Contains(view, "1)  echo") || !strings.Contains(view, "2)  echo") {
@@ -102,11 +122,19 @@ func TestEnterShowsFullScreenWithDryRun(t *testing.T) {
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = m2.(*TuiModel)
-	if !m.showDetail { t.Fatalf("expected showDetail true") }
-	if !strings.Contains(m.detail, "Dry-run preview") { t.Fatalf("expected dry-run preview in detail") }
+	if !m.showDetail {
+		t.Fatalf("expected showDetail true")
+	}
+	if !strings.Contains(m.detail, "Dry-run preview") {
+		t.Fatalf("expected dry-run preview in detail")
+	}
 	// dry-run should show simulated output (echo prints its argument)
-	if !strings.Contains(m.detail, "hi") { t.Fatalf("expected dry-run output 'hi' in detail, got:\n%s", m.detail) }
-	if strings.Contains(m.detail, "$ echo hi") { t.Fatalf("expected simulated output, not raw command: %s", m.detail) }
+	if !strings.Contains(m.detail, "hi") {
+		t.Fatalf("expected dry-run output 'hi' in detail, got:\n%s", m.detail)
+	}
+	if strings.Contains(m.detail, "$ echo hi") {
+		t.Fatalf("expected simulated output, not raw command: %s", m.detail)
+	}
 }
 
 func TestDetailViewShowsTitle(t *testing.T) {
@@ -121,27 +149,51 @@ func TestDetailViewShowsTitle(t *testing.T) {
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = m2.(*TuiModel)
 	view := m.View()
-	if !strings.Contains(view, "krnr — Command Details") {
-		t.Fatalf("expected title 'krnr — Command Details' in View(), got:\n%s", view)
+	if !strings.Contains(view, "krnr — sysinf Details") {
+		t.Fatalf("expected title 'krnr — sysinf Details' in View(), got:\n%s", view)
 	}
 }
 
 // minimal fakes for testing
 type fakeRegistry struct{ items []adapters.CommandSetSummary }
-func (f *fakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) { return f.items, nil }
-func (f *fakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) { return adapters.CommandSetSummary{}, nil }
-func (f *fakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error { return nil }
+
+func (f *fakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
+	return f.items, nil
+}
+func (f *fakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) {
+	return adapters.CommandSetSummary{}, nil
+}
+func (f *fakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error {
+	return nil
+}
 func (f *fakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
-func (f *fakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) { return []string{"echo hello"}, nil }
+func (f *fakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
+	return []string{"echo hello"}, nil
+}
 
 type fakeExec struct{}
-func (f *fakeExec) Run(_ context.Context, _ string, _ []string) (adapters.RunHandle, error) { return nil, nil }
+
+func (f *fakeExec) Run(_ context.Context, _ string, _ []string) (adapters.RunHandle, error) {
+	return nil, nil
+}
 
 // detailFakeRegistry returns a full CommandSet via GetCommandSet so the UI can
 // render full details and dry-run preview in tests.
-type detailFakeRegistry struct{ items []adapters.CommandSetSummary; full adapters.CommandSetSummary }
-func (f *detailFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) { return f.items, nil }
-func (f *detailFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) { return f.full, nil }
-func (f *detailFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error { return nil }
+type detailFakeRegistry struct {
+	items []adapters.CommandSetSummary
+	full  adapters.CommandSetSummary
+}
+
+func (f *detailFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
+	return f.items, nil
+}
+func (f *detailFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) {
+	return f.full, nil
+}
+func (f *detailFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error {
+	return nil
+}
 func (f *detailFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
-func (f *detailFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) { return []string{"echo hello"}, nil }
+func (f *detailFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
+	return []string{"echo hello"}, nil
+}

@@ -26,6 +26,7 @@ type TuiModel struct {
 
 	showDetail    bool
 	detail        string
+	detailName    string
 	runInProgress bool
 	logs          []string
 	cancelRun     func()
@@ -34,6 +35,8 @@ type TuiModel struct {
 	themeHighContrast bool
 	// track last selected name so we can detect changes and update preview
 	lastSelectedName string
+	// focus: false = left pane (list), true = right pane (viewport)
+	focusRight bool
 }
 
 // Messages
@@ -109,11 +112,12 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "?":
 			m.showDetail = true
-			m.detail = "Help:\n\n? show help\nq or Esc to quit\nEnter to view details\n/ to filter"
+			m.detail = "Help:\n\n? show help\nq or Esc to quit\nEnter to view details\n/ to filter\n← → or Tab to switch pane focus\n↑ ↓ to scroll focused pane"
 			return m, nil
 		case "enter":
 			if i, ok := m.list.SelectedItem().(csItem); ok {
 				m.showDetail = true
+				m.detailName = i.cs.Name
 				// fetch the full set (including commands) if possible and render
 				if cs, err := m.uiModel.GetCommandSet(context.Background(), i.cs.Name); err == nil {
 					m.detail = formatCSFullScreen(cs, m.width, m.height)
@@ -126,6 +130,18 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "b":
 			m.showDetail = false
+			m.focusRight = false // reset focus to left pane when going back
+			// Restore the viewport content to show the preview of the selected item
+			if si := m.list.SelectedItem(); si != nil {
+				if it, ok := si.(csItem); ok {
+					// Fetch full details for the preview pane
+					if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+						m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
+					} else {
+						m.vp.SetContent(formatCSDetails(it.cs, m.vp.Width))
+					}
+				}
+			}
 			return m, nil
 		case "r":
 			// run selected (fall back to first item if none selected)
@@ -145,6 +161,7 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.logs = nil
 			m.runInProgress = true
+			m.focusRight = true
 			// start run via model
 			ctx, cancel := context.WithCancel(context.Background())
 			m.cancelRun = cancel
@@ -168,6 +185,18 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "T", "t":
 			m.themeHighContrast = !m.themeHighContrast
 			return m, nil
+		case "left":
+			// Switch focus to left pane (list)
+			m.focusRight = false
+			return m, nil
+		case "right":
+			// Switch focus to right pane (viewport)
+			m.focusRight = true
+			return m, nil
+		case "tab":
+			// Toggle focus between panes
+			m.focusRight = !m.focusRight
+			return m, nil
 		}
 		// non-printable bindings
 		if msg.Type == tea.KeyCtrlT {
@@ -176,15 +205,41 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Hand message to the list so filtering input will be processed
+		// When filtering, let list handle keys
+		if m.list.FilterState() == list.Filtering {
+			m.list, cmd = m.list.Update(msg)
+			return m, cmd
+		}
+		// Handle scrolling based on which pane has focus
+		if m.focusRight {
+			// Right pane focused - scroll viewport
+			switch s {
+			case "up", "k":
+				m.vp.LineUp(1)
+				return m, nil
+			case "down", "j":
+				m.vp.LineDown(1)
+				return m, nil
+			case "pgup":
+				m.vp.HalfViewUp()
+				return m, nil
+			case "pgdown":
+				m.vp.HalfViewDown()
+				return m, nil
+			case "home":
+				m.vp.GotoTop()
+				return m, nil
+			case "end":
+				m.vp.GotoBottom()
+				return m, nil
+			}
+		}
+		// Left pane focused or other keys - pass to list
+
 		m.list, cmd = m.list.Update(msg)
 
 		if s == "/" {
 			// filter mode entry is already handled by the list; just return
-			return m, cmd
-		}
-
-		// When filtering, let list handle keys
-		if m.list.FilterState() == list.Filtering {
 			return m, cmd
 		}
 
@@ -411,6 +466,7 @@ func simulateOutput(cmd string) string {
 
 func formatCSFullScreen(cs adapters.CommandSetSummary, width int, height int) string {
 	// Colored headings to match the main UI's visual style
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Background(lipgloss.Color("#0b1226"))
 	h := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4"))
 	k := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#94a3b8"))
 	dryStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94a3b8")).Italic(true)
@@ -420,6 +476,17 @@ func formatCSFullScreen(cs adapters.CommandSetSummary, width int, height int) st
 	if contentW < 10 {
 		contentW = 10
 	}
+
+	// Title header inside the container
+	titleText := fmt.Sprintf("krnr — %s Details", cs.Name)
+	b.WriteString(titleStyle.Render(titleText) + "\n")
+	// Separator line
+	sepLen := contentW
+	if sepLen > len(titleText)+4 {
+		sepLen = len(titleText) + 4
+	}
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#0ea5a4")).Render(strings.Repeat("─", sepLen)) + "\n\n")
+
 	// compute label column width (invisible border table)
 	labels := []string{"Name:", "Description:", "Commands:", "Metadata:"}
 	labelW := 0
@@ -601,31 +668,37 @@ func (m *TuiModel) View() string {
 			bottomBg, bottomFg = "#0b1226", "#cbd5e1"
 		}
 
-		// compute body height like the main view so sizes are consistent
-		headH := 1
 		footerH := 1
-		bodyH := m.height - headH - footerH - 2
+		bottomH := 1
+		bodyH := m.height - footerH - bottomH - 2
 		if bodyH < 3 {
 			bodyH = 3
 		}
 
-		titleBox := m.renderTitleBox(" krnr — Command Details ")
-
-		// content area uses the same right border color as the main pane and
-		// is constrained to m.width-2 so the right border is visible inside the
-		// terminal width (matching the main layout behavior).
-		contentStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(rightBorder)).Padding(1).Width(m.width - 2).Height(bodyH)
+		contentStyle := lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color(rightBorder)).
+			Padding(1).
+			Width(m.width - 2).
+			Height(bodyH)
 		body := contentStyle.Render(m.detail)
 
-		status := ""
+		status := fmt.Sprintf("Viewing: %s", m.detailName)
 		if m.runInProgress {
 			status += " • RUNNING"
 		}
-		bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
+		bottom := lipgloss.NewStyle().
+			Background(lipgloss.Color(bottomBg)).
+			Foreground(lipgloss.Color(bottomFg)).
+			Padding(0, 1).
+			Width(m.width).
+			Render(" " + status + " ")
 
-		footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(b) Back | (q) Quit")
-
-		return lipgloss.JoinVertical(lipgloss.Left, titleBox, body, footer, bottom)
+		footer := lipgloss.NewStyle().
+			Italic(true).
+			Foreground(lipgloss.Color("#94a3b8")).
+			Render("(r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
+		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
 
 	headH := 1
@@ -637,19 +710,39 @@ func (m *TuiModel) View() string {
 
 	// colors adjust for high-contrast theme
 	var sideBorder, rightBorder, bottomBg, bottomFg string
+	var sideBorderStyle, rightBorderStyle lipgloss.Border
+	sideBorderStyle = lipgloss.NormalBorder()
+	rightBorderStyle = lipgloss.NormalBorder()
+
 	if m.themeHighContrast {
-		sideBorder = "#ffffff"
-		rightBorder = "#ffffff"
 		bottomBg, bottomFg = "#000000", "#ffffff"
+		if m.focusRight {
+			sideBorder = "#444444"
+			rightBorder = "#ffffff"
+			rightBorderStyle = lipgloss.ThickBorder()
+		} else {
+			sideBorder = "#ffffff"
+			sideBorderStyle = lipgloss.ThickBorder()
+			rightBorder = "#444444"
+		}
 	} else {
-		sideBorder = "#7dd3fc"
-		rightBorder = "#c084fc"
 		bottomBg, bottomFg = "#0b1226", "#cbd5e1"
+		if m.focusRight {
+			// Right focused
+			sideBorder = "#334155"  // dimmed slate
+			rightBorder = "#c084fc" // active purple
+			rightBorderStyle = lipgloss.ThickBorder()
+		} else {
+			// Left focused
+			sideBorder = "#7dd3fc" // active sky
+			sideBorderStyle = lipgloss.ThickBorder()
+			rightBorder = "#334155" // dimmed slate
+		}
 	}
 
 	titleBox := m.renderTitleBox(fmt.Sprintf(" krnr — Command sets (%d) ", len(m.list.Items())))
 
-	sidebarStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(sideBorder)).Padding(0).Width(m.list.Width()).Height(bodyH)
+	sidebarStyle := lipgloss.NewStyle().BorderStyle(sideBorderStyle).BorderForeground(lipgloss.Color(sideBorder)).Padding(0).Width(m.list.Width()).Height(bodyH)
 	sidebar := sidebarStyle.Render(m.list.View())
 
 	// compute right pane width to align with outer layout (same logic used in WindowSizeMsg)
@@ -657,7 +750,7 @@ func (m *TuiModel) View() string {
 	if rightW < 12 {
 		rightW = 12
 	}
-	rightStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(rightBorder)).Padding(1).Width(rightW).Height(bodyH)
+	rightStyle := lipgloss.NewStyle().BorderStyle(rightBorderStyle).BorderForeground(lipgloss.Color(rightBorder)).Padding(1).Width(rightW).Height(bodyH)
 	var right string
 	right = rightStyle.Render(m.vp.View())
 
@@ -669,6 +762,11 @@ func (m *TuiModel) View() string {
 	}
 
 	status := "Items: " + fmt.Sprintf("%d", len(m.list.Items()))
+	if m.focusRight {
+		status += " • FOCUS: PREVIEW/LOGS"
+	} else {
+		status += " • FOCUS: COMMAND LIST"
+	}
 	if m.list.FilterState() == list.Filtering {
 		status += " • FILTER MODE"
 	}
@@ -677,7 +775,8 @@ func (m *TuiModel) View() string {
 	}
 	bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
 
-	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("/ filter • Enter view details • r run • T toggle theme • b back • q quit • ? help")
+	footerText := "← / → / Tab switch focus • ↑ / ↓ scroll focused pane • Enter details • r run • T theme • q quit • ? help"
+	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(footerText)
 
 	return lipgloss.JoinVertical(lipgloss.Left, titleBox, body, footer, bottom)
 }
