@@ -24,17 +24,17 @@ type TuiModel struct {
 	width  int
 	height int
 
-	showDetail   bool
-	detail       string
+	showDetail    bool
+	detail        string
 	runInProgress bool
-	logs         []string
-	cancelRun    func()
-	runCh        chan adapters.RunEvent
+	logs          []string
+	cancelRun     func()
+	runCh         chan adapters.RunEvent
 	// accessibility / theme
 	themeHighContrast bool
 	// track last selected name so we can detect changes and update preview
 	lastSelectedName string
-} 
+}
 
 // Messages
 type runEventMsg adapters.RunEvent
@@ -94,7 +94,7 @@ func (m *TuiModel) Init() tea.Cmd {
 		}
 		return nil
 	}
-} 
+}
 
 func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -129,14 +129,20 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "r":
 			// run selected (fall back to first item if none selected)
-			if m.runInProgress { return m, nil }
+			if m.runInProgress {
+				return m, nil
+			}
 			var name string
 			if i, ok := m.list.SelectedItem().(csItem); ok {
 				name = i.cs.Name
 			} else if len(m.list.Items()) > 0 {
-				if it, ok := m.list.Items()[0].(csItem); ok { name = it.cs.Name }
+				if it, ok := m.list.Items()[0].(csItem); ok {
+					name = it.cs.Name
+				}
 			}
-			if name == "" { return m, nil }
+			if name == "" {
+				return m, nil
+			}
 			m.logs = nil
 			m.runInProgress = true
 			// start run via model
@@ -178,7 +184,9 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// When filtering, let list handle keys
-		if m.list.FilterState() == list.Filtering { return m, cmd }
+		if m.list.FilterState() == list.Filtering {
+			return m, cmd
+		}
 
 		// If the selection changed, update the preview pane by fetching the
 		// full CommandSet (including commands) from the model and rendering it.
@@ -194,7 +202,6 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-
 	case runEventMsg:
 		ev := adapters.RunEvent(msg)
 		if ev.Err != nil {
@@ -208,7 +215,9 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.vp.SetContent(strings.Join(m.logs, "\n"))
 		m.vp.GotoBottom()
 		// continue reading
-		if m.runCh != nil { return m, readLoop(m.runCh) }
+		if m.runCh != nil {
+			return m, readLoop(m.runCh)
+		}
 		return m, nil
 	case runDoneMsg:
 		m.runInProgress = false
@@ -220,21 +229,35 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		headH := 1
 		footerH := 1
 		bodyH := m.height - headH - footerH - 2
-		if bodyH < 3 { bodyH = 3 }
+		if bodyH < 3 {
+			bodyH = 3
+		}
 
 		sideW := int(float64(m.width) * 0.35)
-		if sideW > 36 { sideW = 36 }
-		if sideW < 20 { sideW = 20 }
+		if sideW > 36 {
+			sideW = 36
+		}
+		if sideW < 20 {
+			sideW = 20
+		}
 		innerSideW := sideW - 2
-		if innerSideW < 10 { innerSideW = 10 }
+		if innerSideW < 10 {
+			innerSideW = 10
+		}
 
 		rightW := m.width - sideW - 4
-		if rightW < 12 { rightW = 12 }
+		if rightW < 12 {
+			rightW = 12
+		}
 		innerRightW := rightW - 2
-		if innerRightW < 10 { innerRightW = 10 }
+		if innerRightW < 10 {
+			innerRightW = 10
+		}
 
 		innerBodyH := bodyH - 2
-		if innerBodyH < 1 { innerBodyH = 1 }
+		if innerBodyH < 1 {
+			innerBodyH = 1
+		}
 
 		m.list.SetSize(innerSideW, innerBodyH)
 		m.vp = viewport.New(innerRightW, innerBodyH)
@@ -267,11 +290,16 @@ func readLoop(ch <-chan adapters.RunEvent) tea.Cmd {
 
 // simple word-wrap to produce lines no longer than width (approximate by rune count)
 func wrapText(s string, width int) []string {
-	if width <= 0 { return []string{s} }
+	if width <= 0 {
+		return []string{s}
+	}
 	out := []string{}
 	for _, para := range strings.Split(s, "\n") {
 		words := strings.Fields(para)
-		if len(words) == 0 { out = append(out, ""); continue }
+		if len(words) == 0 {
+			out = append(out, "")
+			continue
+		}
 		cur := words[0]
 		for _, w := range words[1:] {
 			if utf8.RuneCountInString(cur)+1+utf8.RuneCountInString(w) > width {
@@ -289,8 +317,12 @@ func wrapText(s string, width int) []string {
 // renderTwoCol renders a prefix in a fixed-width left column and wraps the
 // text into the right column. Returns the joined lines.
 func renderTwoCol(prefix, text string, prefixW, textW int) string {
-	if prefixW < 0 { prefixW = 0 }
-	if textW < 0 { textW = 0 }
+	if prefixW < 0 {
+		prefixW = 0
+	}
+	if textW < 0 {
+		textW = 0
+	}
 	lines := wrapText(text, textW)
 	var b strings.Builder
 	for i, ln := range lines {
@@ -315,8 +347,12 @@ func renderTwoCol(prefix, text string, prefixW, textW int) string {
 // when possible. Values are wrapped to valueW and continuation lines are
 // aligned under the value column.
 func renderTableInline(label, value string, labelW, valueW int) string {
-	if labelW < 0 { labelW = 0 }
-	if valueW < 0 { valueW = 0 }
+	if labelW < 0 {
+		labelW = 0
+	}
+	if valueW < 0 {
+		valueW = 0
+	}
 	lines := wrapText(value, valueW)
 	var b strings.Builder
 	for i, ln := range lines {
@@ -344,7 +380,9 @@ func renderTableInline(label, value string, labelW, valueW int) string {
 // renderTableBlockHeader renders the label as a header line and places the
 // (already wrapped) block lines underneath it, aligned to the value column.
 func renderTableBlockHeader(label, block string, labelW int) string {
-	if labelW < 0 { labelW = 0 }
+	if labelW < 0 {
+		labelW = 0
+	}
 	lines := strings.Split(strings.TrimSuffix(block, "\n"), "\n")
 	var b strings.Builder
 	// render header
@@ -360,68 +398,117 @@ func renderTableBlockHeader(label, block string, labelW int) string {
 	return b.String()
 }
 
+// simulateOutput attempts to produce a simple dry-run output for well-known
+// commands (e.g., `echo ...`). For unknown commands we fall back to the
+// literal dry-run representation.
+func simulateOutput(cmd string) string {
+	trim := strings.TrimSpace(cmd)
+	if strings.HasPrefix(trim, "echo ") {
+		return strings.TrimSpace(strings.TrimPrefix(trim, "echo "))
+	}
+	return "$ " + cmd
+}
+
 func formatCSFullScreen(cs adapters.CommandSetSummary, width int, height int) string {
-	// invisible table layout — no inline color styles here to keep alignment predictable
+	// Colored headings to match the main UI's visual style
+	h := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4"))
+	k := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#94a3b8"))
+	dryStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94a3b8")).Italic(true)
 
 	var b strings.Builder
 	contentW := width - 6
-	if contentW < 10 { contentW = 10 }
+	if contentW < 10 {
+		contentW = 10
+	}
 	// compute label column width (invisible border table)
 	labels := []string{"Name:", "Description:", "Commands:", "Metadata:"}
 	labelW := 0
 	for _, l := range labels {
-		if utf8.RuneCountInString(l) > labelW { labelW = utf8.RuneCountInString(l) }
+		if utf8.RuneCountInString(l) > labelW {
+			labelW = utf8.RuneCountInString(l)
+		}
 	}
 	valueW := contentW - labelW - 1
-	if valueW < 10 { valueW = 10 }
+	if valueW < 10 {
+		valueW = 10
+	}
 
 	// Name inline
-	b.WriteString(renderTableInline("Name:", cs.Name, labelW, valueW))
+	b.WriteString(h.Render("Name:") + " " + cs.Name + "\n")
 
 	// Description header + wrapped lines
 	if cs.Description != "" {
 		lines := wrapText(cs.Description, valueW)
 		b.WriteString("\n")
-		b.WriteString(renderTableBlockHeader("Description:", strings.Join(lines, "\n"), labelW))
+		b.WriteString(h.Render("Description:") + "\n")
+		b.WriteString(renderTableBlockHeader("", strings.Join(lines, "\n"), labelW))
 	}
 
 	// Commands: render inner two-column block then place under Commands: header
 	if len(cs.Commands) > 0 {
 		b.WriteString("\n")
+		b.WriteString(h.Render("Commands:") + "\n")
 		maxPrefix := 0
 		for i := range cs.Commands {
 			p := fmt.Sprintf("%d) ", i+1)
-			if l := utf8.RuneCountInString(p); l > maxPrefix { maxPrefix = l }
+			if l := utf8.RuneCountInString(p); l > maxPrefix {
+				maxPrefix = l
+			}
 		}
 		// inner text width for commands inside value column
 		innerTextW := valueW - maxPrefix - 1
-		if innerTextW < 10 { innerTextW = 10 }
+		if innerTextW < 10 {
+			innerTextW = 10
+		}
 		var cb strings.Builder
 		for i, c := range cs.Commands {
 			p := fmt.Sprintf("%d) ", i+1)
 			cb.WriteString(renderTwoCol(p, c, maxPrefix, innerTextW))
 		}
-		b.WriteString(renderTableBlockHeader("Commands:", strings.TrimSuffix(cb.String(), "\n"), labelW))
+		b.WriteString(renderTableBlockHeader("", strings.TrimSuffix(cb.String(), "\n"), labelW))
 	}
 
-	// Dry-run preview
+	// Dry-run preview — show simulated output where possible
 	if len(cs.Commands) > 0 {
 		b.WriteString("\n")
-		b.WriteString(renderTableBlockHeader("Dry-run preview:", strings.TrimSuffix(strings.Join(func() []string { arr := []string{}; for _, c := range cs.Commands { arr = append(arr, "$ "+c) }; return arr }(), "\n"), "\n"), labelW))
+		b.WriteString(h.Render("Dry-run preview:") + "\n")
+		for _, c := range cs.Commands {
+			out := simulateOutput(c)
+			b.WriteString(dryStyle.Render(out) + "\n")
+		}
 	}
 
 	// Metadata
 	meta := []string{}
-	if cs.AuthorName != "" { meta = append(meta, "Author: "+cs.AuthorName) }
-	if cs.AuthorEmail != "" { meta = append(meta, "Email: "+cs.AuthorEmail) }
-	if cs.CreatedAt != "" { meta = append(meta, "Created: "+cs.CreatedAt) }
-	if cs.LastRun != "" { meta = append(meta, "Last run: "+cs.LastRun) }
-	if len(cs.Tags) > 0 { meta = append(meta, "Tags: "+strings.Join(cs.Tags, ", ")) }
+	if cs.AuthorName != "" {
+		meta = append(meta, "Author: "+cs.AuthorName)
+	}
+	if cs.AuthorEmail != "" {
+		meta = append(meta, "Email: "+cs.AuthorEmail)
+	}
+	if cs.CreatedAt != "" {
+		meta = append(meta, "Created: "+cs.CreatedAt)
+	}
+	if cs.LastRun != "" {
+		meta = append(meta, "Last run: "+cs.LastRun)
+	}
+	if len(cs.Tags) > 0 {
+		meta = append(meta, "Tags: "+strings.Join(cs.Tags, ", "))
+	}
 	if len(meta) > 0 {
 		b.WriteString("\n")
-		b.WriteString(renderTableBlockHeader("Metadata:", strings.TrimSuffix(strings.Join(meta, "\n"), "\n"), labelW))
+		b.WriteString(h.Render("Metadata:") + "\n")
+		for _, m := range meta {
+			b.WriteString(k.Render("  "+m) + "\n")
+		}
 	}
 	return b.String()
+}
+
+// add a small dry-run output test helper for the headless tests to assert
+// the detail view renders simulated outputs for echo commands.
+func dryRunOutputForTests(c adapters.CommandSetSummary, width int) string {
+	return formatCSFullScreen(c, width, 20)
 }
 
 func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
@@ -429,15 +516,21 @@ func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 
 	var b strings.Builder
 	contentW := width - 4
-	if contentW < 10 { contentW = 10 }
+	if contentW < 10 {
+		contentW = 10
+	}
 	// label column width
 	labels := []string{"Name:", "Description:", "Commands:", "Metadata:"}
 	labelW := 0
 	for _, l := range labels {
-		if utf8.RuneCountInString(l) > labelW { labelW = utf8.RuneCountInString(l) }
+		if utf8.RuneCountInString(l) > labelW {
+			labelW = utf8.RuneCountInString(l)
+		}
 	}
 	valueW := contentW - labelW - 1
-	if valueW < 10 { valueW = 10 }
+	if valueW < 10 {
+		valueW = 10
+	}
 
 	// Name inline
 	b.WriteString(renderTableInline("Name:", cs.Name, labelW, valueW))
@@ -455,10 +548,14 @@ func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 		maxPrefix := 0
 		for i := range cs.Commands {
 			p := fmt.Sprintf("%d) ", i+1)
-			if l := utf8.RuneCountInString(p); l > maxPrefix { maxPrefix = l }
+			if l := utf8.RuneCountInString(p); l > maxPrefix {
+				maxPrefix = l
+			}
 		}
 		innerTextW := valueW - maxPrefix - 1
-		if innerTextW < 10 { innerTextW = 10 }
+		if innerTextW < 10 {
+			innerTextW = 10
+		}
 		var cb strings.Builder
 		for i, c := range cs.Commands {
 			p := fmt.Sprintf("%d) ", i+1)
@@ -469,11 +566,21 @@ func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 
 	// Metadata
 	meta := []string{}
-	if cs.AuthorName != "" { meta = append(meta, "Author: "+cs.AuthorName) }
-	if cs.AuthorEmail != "" { meta = append(meta, "Email: "+cs.AuthorEmail) }
-	if cs.CreatedAt != "" { meta = append(meta, "Created: "+cs.CreatedAt) }
-	if cs.LastRun != "" { meta = append(meta, "Last run: "+cs.LastRun) }
-	if len(cs.Tags) > 0 { meta = append(meta, "Tags: "+strings.Join(cs.Tags, ", ")) }
+	if cs.AuthorName != "" {
+		meta = append(meta, "Author: "+cs.AuthorName)
+	}
+	if cs.AuthorEmail != "" {
+		meta = append(meta, "Email: "+cs.AuthorEmail)
+	}
+	if cs.CreatedAt != "" {
+		meta = append(meta, "Created: "+cs.CreatedAt)
+	}
+	if cs.LastRun != "" {
+		meta = append(meta, "Last run: "+cs.LastRun)
+	}
+	if len(cs.Tags) > 0 {
+		meta = append(meta, "Tags: "+strings.Join(cs.Tags, ", "))
+	}
 	if len(meta) > 0 {
 		b.WriteString("\n")
 		b.WriteString(renderTableBlockHeader("Metadata:", strings.TrimSuffix(strings.Join(meta, "\n"), "\n"), labelW))
@@ -483,44 +590,76 @@ func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 
 func (m *TuiModel) View() string {
 	if m.showDetail {
-		// render the detail as a full-screen view with consistent styling
-		style := lipgloss.NewStyle().Padding(1, 2).Border(lipgloss.NormalBorder()).Width(m.width).Height(m.height)
-		return style.Render(m.detail + "\n\n(b) Back | (q) Quit")
+		// Use the same top title bar and content container approach as the main
+		// page so borders and colors remain consistent across views.
+		var rightBorder, bottomBg, bottomFg string
+		if m.themeHighContrast {
+			rightBorder = "#ffffff"
+			bottomBg, bottomFg = "#000000", "#ffffff"
+		} else {
+			rightBorder = "#c084fc"
+			bottomBg, bottomFg = "#0b1226", "#cbd5e1"
+		}
+
+		// compute body height like the main view so sizes are consistent
+		headH := 1
+		footerH := 1
+		bodyH := m.height - headH - footerH - 2
+		if bodyH < 3 {
+			bodyH = 3
+		}
+
+		titleBox := m.renderTitleBox(" krnr — Command Details ")
+
+		// content area uses the same right border color as the main pane and
+		// is constrained to m.width-2 so the right border is visible inside the
+		// terminal width (matching the main layout behavior).
+		contentStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(rightBorder)).Padding(1).Width(m.width - 2).Height(bodyH)
+		body := contentStyle.Render(m.detail)
+
+		status := ""
+		if m.runInProgress {
+			status += " • RUNNING"
+		}
+		bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
+
+		footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(b) Back | (q) Quit")
+
+		return lipgloss.JoinVertical(lipgloss.Left, titleBox, body, footer, bottom)
 	}
 
 	headH := 1
 	footerH := 1
 	bodyH := m.height - headH - footerH - 2
-	if bodyH < 3 { bodyH = 3 }
+	if bodyH < 3 {
+		bodyH = 3
+	}
 
 	// colors adjust for high-contrast theme
-	var titleFg, titleBg, titleBorder, sideBorder, rightBorder, bottomBg, bottomFg string
+	var sideBorder, rightBorder, bottomBg, bottomFg string
 	if m.themeHighContrast {
-		titleFg, titleBg = "#000000", "#ffff00"
-		titleBorder = "#ffff00"
 		sideBorder = "#ffffff"
 		rightBorder = "#ffffff"
 		bottomBg, bottomFg = "#000000", "#ffffff"
 	} else {
-		titleFg, titleBg = "#ffffff", "#0f766e"
-		titleBorder = "#0ea5a4"
 		sideBorder = "#7dd3fc"
 		rightBorder = "#c084fc"
 		bottomBg, bottomFg = "#0b1226", "#cbd5e1"
 	}
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(titleFg)).Background(lipgloss.Color(titleBg)).Padding(0, 1)
-	title := titleStyle.Render(fmt.Sprintf(" krnr — Command sets (%d) ", len(m.list.Items())))
-	titleInner := lipgloss.Place(m.width-2, 1, lipgloss.Center, lipgloss.Center, title)
-	titleBox := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(titleBorder)).Width(m.width).Render(titleInner)
+	titleBox := m.renderTitleBox(fmt.Sprintf(" krnr — Command sets (%d) ", len(m.list.Items())))
 
 	sidebarStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(sideBorder)).Padding(0).Width(m.list.Width()).Height(bodyH)
 	sidebar := sidebarStyle.Render(m.list.View())
 
-	rightStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(rightBorder)).Padding(1)
+	// compute right pane width to align with outer layout (same logic used in WindowSizeMsg)
+	rightW := m.width - m.list.Width() - 4
+	if rightW < 12 {
+		rightW = 12
+	}
+	rightStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(rightBorder)).Padding(1).Width(rightW).Height(bodyH)
 	var right string
 	right = rightStyle.Render(m.vp.View())
-
 
 	var body string
 	if m.width < 80 {
@@ -530,8 +669,12 @@ func (m *TuiModel) View() string {
 	}
 
 	status := "Items: " + fmt.Sprintf("%d", len(m.list.Items()))
-	if m.list.FilterState() == list.Filtering { status += " • FILTER MODE" }
-	if m.runInProgress { status += " • RUNNING" }
+	if m.list.FilterState() == list.Filtering {
+		status += " • FILTER MODE"
+	}
+	if m.runInProgress {
+		status += " • RUNNING"
+	}
 	bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
 
 	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("/ filter • Enter view details • r run • T toggle theme • b back • q quit • ? help")
@@ -542,6 +685,23 @@ func (m *TuiModel) View() string {
 // csItem adapts adapters.CommandSetSummary for the list component
 type csItem struct{ cs adapters.CommandSetSummary }
 
-func (c csItem) Title() string { return c.cs.Name }
+func (c csItem) Title() string       { return c.cs.Name }
 func (c csItem) Description() string { return c.cs.Description }
 func (c csItem) FilterValue() string { return c.cs.Name + " " + c.cs.Description }
+
+// renderTitleBox produces a consistent title bar (with border) matching the
+// main page. Use this to keep title styling identical across views.
+func (m *TuiModel) renderTitleBox(text string) string {
+	var titleFg, titleBg, titleBorder string
+	if m.themeHighContrast {
+		titleFg, titleBg = "#000000", "#ffff00"
+		titleBorder = "#ffff00"
+	} else {
+		titleFg, titleBg = "#ffffff", "#0f766e"
+		titleBorder = "#0ea5a4"
+	}
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(titleFg)).Background(lipgloss.Color(titleBg)).Padding(0, 1)
+	title := titleStyle.Render(text)
+	titleInner := lipgloss.Place(m.width-2, 1, lipgloss.Center, lipgloss.Center, title)
+	return lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(titleBorder)).Width(m.width).Render(titleInner)
+}

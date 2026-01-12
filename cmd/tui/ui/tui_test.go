@@ -104,7 +104,26 @@ func TestEnterShowsFullScreenWithDryRun(t *testing.T) {
 	m = m2.(*TuiModel)
 	if !m.showDetail { t.Fatalf("expected showDetail true") }
 	if !strings.Contains(m.detail, "Dry-run preview") { t.Fatalf("expected dry-run preview in detail") }
-	if !strings.Contains(m.detail, "echo hi") { t.Fatalf("expected command in detail") }
+	// dry-run should show simulated output (echo prints its argument)
+	if !strings.Contains(m.detail, "hi") { t.Fatalf("expected dry-run output 'hi' in detail, got:\n%s", m.detail) }
+	if strings.Contains(m.detail, "$ echo hi") { t.Fatalf("expected simulated output, not raw command: %s", m.detail) }
+}
+
+func TestDetailViewShowsTitle(t *testing.T) {
+	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "sysinf", Description: "Info"}}, full: adapters.CommandSetSummary{Name: "sysinf", Description: "Info", Commands: []string{"systeminfo"}, CreatedAt: "2026-01-12T14:05:35Z"}}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	// give the UI a large width so title has space
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	view := m.View()
+	if !strings.Contains(view, "krnr — Command Details") {
+		t.Fatalf("expected title 'krnr — Command Details' in View(), got:\n%s", view)
+	}
 }
 
 // minimal fakes for testing
