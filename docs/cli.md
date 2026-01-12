@@ -68,6 +68,43 @@ Rollback a command set to the specified version. Rollback replaces the current c
 Examples:
 
 - `krnr rollback hello --version 2`
+
+## export
+
+`krnr export db --dst <file>`
+
+Export the entire active database to a portable SQLite file at `<file>`; this performs a WAL checkpoint to ensure a consistent copy. Use `krnr export set <name> --dst <file>` to export a single command set (an "entry") into a minimal SQLite file that contains only that set and its commands.
+
+Running `krnr export` with no arguments launches an interactive prompt where you can choose `db` or `set`, provide a destination path (or accept a sane default for DB exports), and confirm actions.
+
+Examples:
+
+- `krnr export db --dst ~/krnr-backup.db`
+- `krnr export set my-entry --dst ./my-entry.db`
+- `krnr export` (interactive mode)
+## import
+
+`krnr import db <file> [--overwrite] [--on-conflict=rename|skip|overwrite|merge] [--dedupe]`
+
+Import the provided `<file>` as the active database. Use `--overwrite` to replace the active DB file. Alternatively, specify a per-set conflict policy with `--on-conflict` to merge or handle conflicts when importing into an existing DB (for example `--on-conflict=merge --dedupe`).
+
+`krnr import set <file> [--on-conflict=rename|skip|overwrite|merge] [--dedupe]`
+
+Import a minimal exported command set file (created by `krnr export set`) into the active DB. Use `--on-conflict` to control how name collisions are handled:
+
+- `rename` (default) — append `-import-N` to avoid overwrites
+- `skip` — do not import a set when a name collision exists
+- `overwrite` — delete the existing set and insert the imported set
+- `merge` — append incoming commands into the existing set; use `--dedupe` to remove exact-duplicate commands when merging
+
+Running `krnr import` with no arguments launches an interactive prompt to choose `db` or `set` and walk through options.
+
+Examples:
+
+- `krnr import db ~/krnr-backup.db --overwrite`
+- `krnr import db ~/krnr-backup.db --on-conflict=merge --dedupe`
+- `krnr import set ./my-entry.db --on-conflict=merge --dedupe`
+- `krnr import` (interactive mode)
 ## run
 
 `krnr run <name> [--dry-run] [--confirm] [--verbose] [--shell <shell>] [--param <name>=<value>]`

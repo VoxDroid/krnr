@@ -81,7 +81,7 @@ func TestImportAndRunAfterImport(t *testing.T) {
 	_ = dbConn.Close()
 
 	// Import the exported command set into the fresh DB
-	if err := importer.ImportCommandSet(dst); err != nil {
+	if err := importer.ImportCommandSet(dst, importer.ImportOptions{}); err != nil {
 		t.Fatalf("ImportCommandSet: %v", err)
 	}
 

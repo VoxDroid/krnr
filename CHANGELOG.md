@@ -3,11 +3,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.1.0 - 2026-01-11
+## v1.1.0 - 2026-01-12
 
 - UX: `krnr save` will now detect when the provided name already exists and will prompt the user to enter a different name interactively (mirrors `krnr record` behavior). This prevents a DB constraint error when saving a duplicate name and improves CLI consistency.
 - Tests: add integration tests for `krnr save` prompting on duplicate names and normal save behavior.
 - Docs: update `docs/cli.md` to document the interactive duplicate-name prompt for `krnr save`.
+- Add `krnr export` and `krnr import` commands to export/import the full DB or single named command sets. Exported sets are portable SQLite files usable with `krnr import set <file>`; imports handle name collisions by appending `-import-N` suffixes and DB imports support an `--overwrite` flag.
+
+## v1.2.0 - 2026-01-12
+
+- Import: add `--on-conflict` policy to `krnr import set` and `krnr import db` (per-set policy) with values `rename` (default), `skip`, `overwrite`, and `merge`.
+  - `merge` appends incoming commands to existing command sets and records a new version snapshot; use `--dedupe` to remove exact-duplicate commands when merging.
+  - `skip` ignores imported sets when a name collision exists; `overwrite` replaces the existing set with the imported one; `rename` (default) appends `-import-N` to avoid collisions.
+- Interactive CLI: running `krnr import` or `krnr export` with no arguments now starts an interactive prompt to select the type (db or set) and enter options (paths, conflict policy, dedupe), while still supporting the existing one-liner flags for non-interactive use.
+- Tests: add unit and integration tests for `--on-conflict` policies and interactive import flows.
+- Docs: update `docs/importer.md` and `docs/cli.md` with the new `--on-conflict` and `--dedupe` flags and interactive examples.
 
 ## v1.0.0 - 2026-01-11 (released)
 

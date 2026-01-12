@@ -37,21 +37,21 @@ var installCmd = &cobra.Command{
 		if dry || check {
 			return nil
 		}
-	// If the plan suggests adding to PATH, print an explicit visible prompt line so
-	// tests and users will always see it even when stdin/stdout handling is odd.
-	printedPathPrompt := false
-	for _, a := range actions {
-		al := strings.ToLower(a)
-		if strings.Contains(al, "add") && strings.Contains(al, "path") {
-			if system {
-				fmt.Print("Target dir is not on PATH. System PATH modification may require admin privileges. Add it to PATH now? [y/N]: ")
-			} else {
-				fmt.Print("Target dir is not on PATH. Add it to PATH now? [y/N]: ")
+		// If the plan suggests adding to PATH, print an explicit visible prompt line so
+		// tests and users will always see it even when stdin/stdout handling is odd.
+		printedPathPrompt := false
+		for _, a := range actions {
+			al := strings.ToLower(a)
+			if strings.Contains(al, "add") && strings.Contains(al, "path") {
+				if system {
+					fmt.Print("Target dir is not on PATH. System PATH modification may require admin privileges. Add it to PATH now? [y/N]: ")
+				} else {
+					fmt.Print("Target dir is not on PATH. Add it to PATH now? [y/N]: ")
+				}
+				printedPathPrompt = true
+				break
 			}
-			printedPathPrompt = true
-			break
 		}
-	}
 		// contain the target dir (covers edge cases where plan suggests adding).
 		wantPathPrompt := false
 		for _, a := range actions {
@@ -73,7 +73,7 @@ var installCmd = &cobra.Command{
 				if !printedPathPrompt {
 					if opts.System {
 						fmt.Print("Target dir is not on PATH. System PATH modification may require admin privileges. Add it to PATH now? [y/N]: ")
-						} else {
+					} else {
 						fmt.Print("Target dir is not on PATH. Add it to PATH now? [y/N]: ")
 					}
 				}

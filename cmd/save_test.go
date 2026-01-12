@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -52,36 +53,39 @@ func TestSaveCommand_SavesCommands(t *testing.T) {
 	_ = r.DeleteCommandSet("save-test")
 }
 
-func TestSaveCommand_PromptsOnDuplicateName(t *testing.T) {
+func runSaveWithInput(t *testing.T, initialName string, stdin string, commands []string) *registry.Repository {
+	t.Helper()
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	defer func() { _ = dbConn.Close() }()
-
+	// do not close DB: caller test handles environment between tests
 	r := registry.NewRepository(dbConn)
-	_ = r.DeleteCommandSet("save-dup")
-	_ = r.DeleteCommandSet("save-dup-2")
+	_ = r.DeleteCommandSet(initialName)
+	_ = r.DeleteCommandSet(initialName+"-2")
 	// create a pre-existing set
-	if _, err := r.CreateCommandSet("save-dup", nil, nil, nil, nil); err != nil {
+	if _, err := r.CreateCommandSet(initialName, nil, nil, nil, nil); err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)
 	}
 
-	// prepare input: new name
 	local := &cobra.Command{RunE: saveCmd.RunE, Args: saveCmd.Args}
 	local.Flags().StringP("description", "d", "", "Description for the command set")
 	local.Flags().StringSliceP("command", "c", []string{}, "Command to add to the set (can be repeated)")
 	local.Flags().StringP("author", "a", "", "Author name for this command set (overrides stored whoami)")
 	local.Flags().StringP("author-email", "e", "", "Author email for this command set (optional)")
-	local.SetIn(bytes.NewBufferString("save-dup-2\n"))
-	if err := local.Flags().Set("command", "echo a,echo b"); err != nil {
+	local.SetIn(bytes.NewBufferString(stdin))
+	if err := local.Flags().Set("command", strings.Join(commands, ",")); err != nil {
 		t.Fatalf("set flag: %v", err)
 	}
 
-	if err := local.RunE(local, []string{"save-dup"}); err != nil {
+	if err := local.RunE(local, []string{initialName}); err != nil {
 		t.Fatalf("saveCmd failed: %v", err)
 	}
+	return r
+}
 
+func TestSaveCommand_PromptsOnDuplicateName(t *testing.T) {
+	r := runSaveWithInput(t, "save-dup", "save-dup-2\n", []string{"echo a", "echo b"})
 	cs, err := r.GetCommandSetByName("save-dup-2")
 	if err != nil {
 		t.Fatalf("GetCommandSetByName: %v", err)
@@ -93,21 +97,28 @@ func TestSaveCommand_PromptsOnDuplicateName(t *testing.T) {
 		t.Fatalf("expected at least 2 commands, got %d", len(cs.Commands))
 	}
 	// ensure provided commands are present
-	foundA := false
-	foundB := false
-	for _, c := range cs.Commands {
-		if c.Command == "echo a" {
-			foundA = true
-		}
-		if c.Command == "echo b" {
-			foundB = true
-		}
-	}
-	if !foundA || !foundB {
-		t.Fatalf("expected commands 'echo a' and 'echo b' to be present, got %+v", cs.Commands)
-	}
+	assertCommandsPresent(t, cs, []string{"echo a", "echo b"})
 
 	// cleanup
 	_ = r.DeleteCommandSet("save-dup")
 	_ = r.DeleteCommandSet("save-dup-2")
+}
+
+func assertCommandsPresent(t *testing.T, cs *registry.CommandSet, expected []string) {
+	t.Helper()
+	if cs == nil {
+		t.Fatalf("nil CommandSet")
+	}
+	for _, e := range expected {
+		found := false
+		for _, c := range cs.Commands {
+			if c.Command == e {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected command %s to be present in %+v", e, cs.Commands)
+		}
+	}
 }

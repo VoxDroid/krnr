@@ -87,7 +87,7 @@ jobs:
       - name: Export Go cache paths to environment
         run: |
           echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
-          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
+          echo "GOCACHE=$(go env.GOCACHE)" >> $GITHUB_ENV
 
       - name: Cache Go build cache (matrix-specific)
         id: go-cache
@@ -120,6 +120,34 @@ jobs:
 
       - name: Run tests
         run: go test ./... -v
+
+  # Export/Import end-to-end tests (merge policies)
+  export-import-e2e:
+    needs: test-matrix
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25.5'
+
+      - name: Populate Go module cache
+        run: |
+          echo "Running 'go mod download' to populate module cache in a fresh runner"
+          go mod download
+
+      - name: Run importer/exporter e2e tests
+        run: |
+          echo "Running importer unit tests (merge/dedupe)..."
+          go test ./internal/importer -run TestImportCommandSetMergeAndDedupe -v
+          echo "Running CLI import/export interactive merge test..."
+          go test ./cmd -run TestImportInteractiveSetMerge -v
+
 
   build:
     runs-on: ubuntu-latest
