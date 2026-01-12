@@ -205,5 +205,3 @@ Please follow `CODE_OF_CONDUCT.md`. If you believe someone has violated the code
 krnr is open-source and licensed under the MIT License — see `LICENSE`.
 
 ---
-
-If you'd like, I can open a draft PR with these changes and also add the commands table as an auto-generated snippet under `docs/` or keep it only in the README. Which do you prefer?
