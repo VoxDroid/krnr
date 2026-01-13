@@ -122,3 +122,27 @@ func (r *RegistryAdapterImpl) UpdateCommandSet(ctx context.Context, oldName stri
 	}
 	return r.repo.UpdateCommandSet(cur.ID, cs.Name, desc, an, ae, cs.Tags)
 }
+
+func (r *RegistryAdapterImpl) ListVersionsByName(ctx context.Context, name string) ([]Version, error) {
+	vers, err := r.repo.ListVersionsByName(name)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Version, 0, len(vers))
+	for _, v := range vers {
+		out = append(out, Version{
+			Version:     v.Version,
+			CreatedAt:   v.CreatedAt,
+			AuthorName:  v.AuthorName.String,
+			AuthorEmail: v.AuthorEmail.String,
+			Description: v.Description.String,
+			Commands:    v.Commands,
+			Operation:   v.Operation,
+		})
+	}
+	return out, nil
+}
+
+func (r *RegistryAdapterImpl) ApplyVersionByName(ctx context.Context, name string, versionNum int) error {
+	return r.repo.ApplyVersionByName(name, versionNum)
+}

@@ -75,6 +75,16 @@ func (m *UIModel) UpdateCommandSet(ctx context.Context, oldName string, cs adapt
 	return m.registry.UpdateCommandSet(ctx, oldName, cs)
 }
 
+// ListVersions fetches historical versions for a command set by name (newest first)
+func (m *UIModel) ListVersions(ctx context.Context, name string) ([]adapters.Version, error) {
+	return m.registry.ListVersionsByName(ctx, name)
+}
+
+// ApplyVersion applies a historic version to the current command set (rollback)
+func (m *UIModel) ApplyVersion(ctx context.Context, name string, versionNum int) error {
+	return m.registry.ApplyVersionByName(ctx, name, versionNum)
+}
+
 // Delete removes a named command set from the registry
 func (m *UIModel) Delete(ctx context.Context, name string) error {
 	return m.registry.DeleteCommandSet(ctx, name)

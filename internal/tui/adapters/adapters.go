@@ -20,6 +20,17 @@ type CommandSetSummary struct {
 	LastRun     string
 }
 
+// Version mirrors registry.Version and is used by the TUI to render history entries.
+type Version struct {
+	Version     int
+	CreatedAt   string
+	AuthorName  string
+	AuthorEmail string
+	Description string
+	Commands    []string
+	Operation   string
+}
+
 // RunEvent represents streaming output from a running commandset.
 type RunEvent struct {
 	Line string
@@ -46,6 +57,10 @@ type RegistryAdapter interface {
 	ReplaceCommands(ctx context.Context, name string, commands []string) error
 	// UpdateCommandSet updates metadata and tags for an existing command set.
 	UpdateCommandSet(ctx context.Context, oldName string, cs CommandSetSummary) error
+	// ListVersionsByName returns the versions for a command set (newest first)
+	ListVersionsByName(ctx context.Context, name string) ([]Version, error)
+	// ApplyVersionByName applies the specified historic version to the named command set (rollback)
+	ApplyVersionByName(ctx context.Context, name string, versionNum int) error
 }
 
 // ExecutorAdapter describes running and streaming commandset executions.

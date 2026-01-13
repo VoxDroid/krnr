@@ -380,6 +380,137 @@ func TestExportConfirmUppercaseY(t *testing.T) {
 	}
 }
 
+func TestVersionsPanelAndRollback(t *testing.T) {
+	// prepare fake registry with versions
+	full := adapters.CommandSetSummary{Name: "vset", Description: "Versions set", Commands: []string{"echo current"}}
+	vers := []adapters.Version{{Version: 2, CreatedAt: "2026-01-12T00:00:00Z", AuthorName: "alice", Description: "update", Commands: []string{"echo new2"}, Operation: "update"}, {Version: 1, CreatedAt: "2026-01-11T00:00:00Z", AuthorName: "bob", Description: "create", Commands: []string{"echo old1"}, Operation: "create"}}
+	reg := &versionsFakeRegistry{items: []adapters.CommandSetSummary{{Name: "vset", Description: "Versions set"}}, full: full, versions: vers}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// versions should be loaded and visible
+	if len(m.versions) != 2 {
+		t.Fatalf("expected 2 versions, got %d", len(m.versions))
+	}
+	view := m.View()
+	if !strings.Contains(view, "Versions") {
+		t.Fatalf("expected Versions header in view, got:\n%s", view)
+	}
+	// focus right and select second entry (older version)
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = m3.(*TuiModel)
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = m4.(*TuiModel)
+	// initiate rollback (R)
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	m = m5.(*TuiModel)
+	if !strings.Contains(m.detail, "Rollback 'vset'") {
+		t.Fatalf("expected rollback prompt in detail, got:\n%s", m.detail)
+	}
+	// confirm
+	m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m = m6.(*TuiModel)
+	if reg.lastAppliedVersion != 1 {
+		t.Fatalf("expected applied version 1, got %d", reg.lastAppliedVersion)
+	}
+	if !strings.Contains(strings.Join(m.logs, "\n"), "rolled back") {
+		t.Fatalf("expected rolled back log, got %v", m.logs)
+	}
+}
+
+func TestEnterOnVersionsDoesNotChangeDetail(t *testing.T) {
+	// prepare registry with two sets and versions only for the first
+	full := adapters.CommandSetSummary{Name: "aset", Description: "A set", Commands: []string{"echo a"}}
+	vers := []adapters.Version{{Version: 1, CreatedAt: "2026-01-11T00:00:00Z", AuthorName: "bob", Description: "create", Commands: []string{"echo old1"}, Operation: "create"}}
+	reg := &versionsFakeRegistry{items: []adapters.CommandSetSummary{{Name: "aset", Description: "A set"}, {Name: "bset", Description: "B set"}}, full: full, versions: vers}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = m1.(*TuiModel)
+	// open detail for the first (aset)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	if m.detailName != "aset" {
+		t.Fatalf("expected detailName 'aset', got %q", m.detailName)
+	}
+	// move selection on the left pane down to bset (simulate user scrolling left pane)
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = m3.(*TuiModel)
+	if si, ok := m.list.SelectedItem().(csItem); !ok || si.cs.Name != "bset" {
+		t.Fatalf("expected left selection to be 'bset', got %v", si)
+	}
+	// focus right pane and interact with versions
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = m4.(*TuiModel)
+	// ensure versions are present
+	if len(m.versions) == 0 {
+		t.Fatalf("expected versions to be loaded, got none")
+	}
+	// press Down inside versions to change selection and then press Enter
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = m5.(*TuiModel)
+	m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m6.(*TuiModel)
+	// detailName should remain the same (aset), not switch to bset
+	if m.detailName != "aset" {
+		t.Fatalf("expected detailName to remain 'aset' after Enter on versions, got %q", m.detailName)
+	}
+}
+
+// versionsFakeRegistry supports listing and applying versions for tests
+type versionsFakeRegistry struct {
+	items              []adapters.CommandSetSummary
+	full               adapters.CommandSetSummary
+	versions           []adapters.Version
+	lastAppliedVersion int
+}
+
+func (f *versionsFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
+	return f.items, nil
+}
+func (f *versionsFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) {
+	return f.full, nil
+}
+func (f *versionsFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error {
+	return nil
+}
+func (f *versionsFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
+func (f *versionsFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
+	return f.full.Commands, nil
+}
+func (f *versionsFakeRegistry) ReplaceCommands(_ context.Context, name string, cmds []string) error {
+	f.full.Commands = append([]string{}, cmds...)
+	return nil
+}
+func (f *versionsFakeRegistry) UpdateCommandSet(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	f.full.Name = cs.Name
+	f.full.Description = cs.Description
+	return nil
+}
+func (f *versionsFakeRegistry) ListVersionsByName(_ context.Context, name string) ([]adapters.Version, error) {
+	return append([]adapters.Version{}, f.versions...), nil
+}
+func (f *versionsFakeRegistry) ApplyVersionByName(_ context.Context, name string, versionNum int) error {
+	f.lastAppliedVersion = versionNum
+	// simulate applying by finding version and updating full.Commands
+	for _, v := range f.versions {
+		if v.Version == versionNum {
+			f.full.Commands = append([]string{}, v.Commands...)
+			// simulate recording a rollback version by prepending a new version entry
+			f.versions = append([]adapters.Version{{Version: v.Version + 1, CreatedAt: "now", AuthorName: "system", Commands: f.full.Commands, Operation: "rollback"}}, f.versions...)
+			return nil
+		}
+	}
+	return fmt.Errorf("version not found")
+}
+
 // minimal fakes for testing
 type fakeRegistry struct{ items []adapters.CommandSetSummary }
 
@@ -408,6 +539,10 @@ func (f *fakeRegistry) UpdateCommandSet(_ context.Context, oldName string, cs ad
 	}
 	return nil
 }
+func (f *fakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
+	return nil, nil
+}
+func (f *fakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
 
 type fakeExec struct{}
 
@@ -446,6 +581,10 @@ func (f *detailFakeRegistry) UpdateCommandSet(_ context.Context, oldName string,
 	}
 	return nil
 }
+func (f *detailFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
+	return nil, nil
+}
+func (f *detailFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
 
 // replaceFakeRegistry supports ReplaceCommands and records the last call
 // for assertions in tests.
@@ -505,5 +644,11 @@ func (f *replaceFakeRegistry) UpdateCommandSet(_ context.Context, oldName string
 	f.full.AuthorName = cs.AuthorName
 	f.full.AuthorEmail = cs.AuthorEmail
 	f.full.Tags = append([]string{}, cs.Tags...)
+	return nil
+}
+func (f *replaceFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
+	return nil, nil
+}
+func (f *replaceFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error {
 	return nil
 }

@@ -44,3 +44,7 @@ func (s *saveFakeRegistry) UpdateCommandSet(ctx context.Context, oldName string,
 	s.last = cs
 	return nil
 }
+func (s *saveFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
+	return nil, nil
+}
+func (s *saveFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }

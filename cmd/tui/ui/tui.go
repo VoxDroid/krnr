@@ -57,6 +57,15 @@ type TuiModel struct {
 		commands []string
 		cmdIndex int
 	}
+
+	// versions / rollback state
+	versions               []adapters.Version
+	versionsSelected       int
+	versionsList           list.Model
+	versionsOffset         int
+	pendingRollback        bool
+	pendingRollbackVersion int
+	pendingRollbackName    string
 }
 
 // Messages
@@ -70,8 +79,11 @@ func NewModel(ui *modelpkg.UIModel) *TuiModel {
 	l.SetFilteringEnabled(true)
 
 	vp := viewport.New(0, 0)
+	vlist := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
+	vlist.SetShowStatusBar(false)
+	vlist.SetFilteringEnabled(false)
 
-	return &TuiModel{uiModel: ui, list: l, vp: vp}
+	return &TuiModel{uiModel: ui, list: l, vp: vp, versionsList: vlist}
 }
 
 // NewProgram constructs the tea.Program for the TUI.
@@ -263,6 +275,19 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detail = "Help:\n\n? show help\nq or Esc to quit\nEnter to view details\n/ to filter\n← → or Tab to switch pane focus\n↑ ↓ to scroll focused pane"
 			return m, nil
 		case "enter":
+			// If we are showing details and the right pane (versions) is focused,
+			// forward Enter to the versions list instead of reopening a new detail
+			if m.showDetail && m.focusRight && len(m.versions) > 0 {
+				m.versionsList, cmd = m.versionsList.Update(msg)
+				m.versionsSelected = m.versionsList.Index()
+				if si := m.versionsList.SelectedItem(); si != nil {
+					if vi, ok := si.(verItem); ok {
+						m.detail = formatVersionPreview(m.detailName, vi.v, m.width-40, m.height)
+						m.vp.SetContent(m.detail)
+					}
+				}
+				return m, cmd
+			}
 			if i, ok := m.list.SelectedItem().(csItem); ok {
 				m.showDetail = true
 				m.detailName = i.cs.Name
@@ -273,6 +298,61 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.detail = formatCSDetails(i.cs, m.width/2)
 					m.vp.SetContent(m.detail)
+				}
+				// fetch versions for right-side panel
+				if vers, err := m.uiModel.ListVersions(context.Background(), i.cs.Name); err == nil {
+					m.versions = vers
+					m.versionsOffset = 0
+					// populate versions list items
+					items := make([]list.Item, 0, len(vers))
+					for _, v := range vers {
+						items = append(items, verItem{v: v})
+					}
+					m.versionsList.SetItems(items)
+					if len(vers) > 0 {
+						m.versionsSelected = 0
+						m.versionsList.Select(0)
+					}
+					// compute inner sizes and set list size so it adapts even without a recent WS
+					headH := 1
+					footerH := 1
+					bodyH := m.height - headH - footerH - 2
+					if bodyH < 3 {
+						bodyH = 3
+					}
+					sideW := int(float64(m.width) * 0.35)
+					if sideW > 36 {
+						sideW = 36
+					}
+					if sideW < 20 {
+						sideW = 20
+					}
+					rightW := m.width - sideW - 4
+					if rightW < 12 {
+						rightW = 12
+					}
+					innerRightW := rightW - 2
+					if innerRightW < 10 {
+						innerRightW = 10
+					}
+					innerBodyH := bodyH - 2
+					if innerBodyH < 1 {
+						innerBodyH = 1
+					}
+					previewH := 8
+					if previewH > innerBodyH/2 {
+						previewH = innerBodyH / 2
+					}
+					available := innerBodyH - previewH - 4
+					if available < 1 {
+						available = 1
+					}
+					m.versionsList.SetSize(innerRightW, available)
+				} else {
+					m.versions = nil
+					m.versionsSelected = 0
+					m.versionsOffset = 0
+					m.versionsList.SetItems([]list.Item{})
 				}
 			}
 			return m, nil
@@ -360,6 +440,32 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.vp.SetContent(m.detail)
 			return m, nil
 		case "y", "Y":
+			if m.pendingRollback {
+				name := m.pendingRollbackName
+				ver := m.pendingRollbackVersion
+				if err := m.uiModel.ApplyVersion(context.Background(), name, ver); err != nil {
+					m.logs = append(m.logs, "rollback error: "+err.Error())
+					m.detail = fmt.Sprintf("Rollback failed: %s", err.Error())
+					m.vp.SetContent(m.detail)
+				} else {
+					m.logs = append(m.logs, fmt.Sprintf("rolled back '%s' to v%d", name, ver))
+					m.detail = fmt.Sprintf("Rolled back '%s' to version %d", name, ver)
+					m.vp.SetContent(m.detail)
+					// refresh versions list and detail content
+					if vers, err := m.uiModel.ListVersions(context.Background(), name); err == nil {
+						m.versions = vers
+						m.versionsSelected = 0
+					}
+					if cs, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
+						m.detail = formatCSFullScreen(cs, m.width, m.height)
+						m.vp.SetContent(m.detail)
+					}
+				}
+				m.pendingRollback = false
+				m.pendingRollbackName = ""
+				m.pendingRollbackVersion = 0
+				return m, nil
+			}
 			if m.pendingDelete {
 				name := m.pendingDeleteName
 				if err := m.uiModel.Delete(context.Background(), name); err != nil {
@@ -416,6 +522,27 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logs = append(m.logs, "no pending action to confirm")
 			return m, nil
 		case "n", "N":
+			if m.pendingRollback {
+				m.pendingRollback = false
+				m.pendingRollbackName = ""
+				m.pendingRollbackVersion = 0
+				// restore detail
+				name := m.detailName
+				if name == "" {
+					if si := m.list.SelectedItem(); si != nil {
+						if it, ok := si.(csItem); ok {
+							name = it.cs.Name
+						}
+					}
+				}
+				if name != "" {
+					if cs, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
+						m.detail = formatCSFullScreen(cs, m.width, m.height)
+						m.vp.SetContent(m.detail)
+					}
+				}
+				return m, nil
+			}
 			if m.pendingDelete {
 				m.pendingDelete = false
 				// restore detail of the selected (or the cached name)
@@ -523,7 +650,36 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Handle scrolling based on which pane has focus
 		if m.focusRight {
-			// Right pane focused - scroll viewport
+			// If we're in the detail view and versions are present, use the right
+			// pane's list for navigation and selection instead of manually handling keys.
+			if m.showDetail && len(m.versions) > 0 {
+				switch s {
+				case "R":
+					// initiate rollback confirmation for selected version
+					if m.versionsSelected >= 0 && m.versionsSelected < len(m.versions) {
+						v := m.versions[m.versionsSelected]
+						m.pendingRollback = true
+						m.pendingRollbackVersion = v.Version
+						m.pendingRollbackName = m.detailName
+						m.detail = fmt.Sprintf("Rollback '%s' to version %d? [y/N]\n\nPress (y) to confirm, (n) to cancel", m.pendingRollbackName, m.pendingRollbackVersion)
+						m.vp.SetContent(m.detail)
+					}
+					return m, nil
+				default:
+					// Forward navigation keys to the versions list so it handles paging
+					var listCmd tea.Cmd
+					m.versionsList, listCmd = m.versionsList.Update(msg)
+					m.versionsSelected = m.versionsList.Index()
+					if si := m.versionsList.SelectedItem(); si != nil {
+						if vi, ok := si.(verItem); ok {
+							m.detail = formatVersionPreview(m.detailName, vi.v, m.width-40, m.height)
+							m.vp.SetContent(m.detail)
+						}
+					}
+					return m, listCmd
+				}
+			}
+			// Right pane focused - scroll viewport (fallback)
 			switch s {
 			case "up", "k":
 				m.vp.LineUp(1)
@@ -627,6 +783,19 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.list.SetSize(innerSideW, innerBodyH)
 		m.vp = viewport.New(innerRightW, innerBodyH)
+
+		// configure versionsList sizing to match the inner area when present
+		if len(m.versions) > 0 {
+			previewH := 8
+			if previewH > innerBodyH/2 {
+				previewH = innerBodyH / 2
+			}
+			available := innerBodyH - previewH - 4
+			if available < 1 {
+				available = 1
+			}
+			m.versionsList.SetSize(innerRightW, available)
+		}
 
 		// update content for selected
 		if si := m.list.SelectedItem(); si != nil {
@@ -1012,6 +1181,66 @@ func (m *TuiModel) View() string {
 		var body string
 		if m.editingMeta {
 			body = contentStyle.Render(m.renderEditor())
+		} else if len(m.versions) > 0 {
+			// split the content region into main detail (left) and versions (right)
+			rightW := 36
+			if rightW > m.width/3 {
+				rightW = m.width / 3
+			}
+			leftW := m.width - rightW - 6 // account for borders and padding
+			if leftW < 20 {
+				leftW = 20
+			}
+			leftStyle := contentStyle.Copy().Width(leftW)
+			// compute inner sizes for the right pane and pass them to the renderer
+			innerRightW := rightW - 2
+			if innerRightW < 10 {
+				innerRightW = 10
+			}
+			innerBodyH := bodyH - 2
+			if innerBodyH < 1 {
+				innerBodyH = 1
+			}
+			// Determine border color and thickness to match main page focus styling
+			var detailRightBorder string
+			var detailRightBorderStyle lipgloss.Border
+			var detailLeftBorder string
+			var detailLeftBorderStyle lipgloss.Border
+			if m.themeHighContrast {
+				if m.focusRight {
+					detailRightBorder = "#ffffff"
+					detailRightBorderStyle = lipgloss.ThickBorder()
+					detailLeftBorder = "#444444"
+					detailLeftBorderStyle = lipgloss.NormalBorder()
+				} else {
+					detailRightBorder = "#444444"
+					detailRightBorderStyle = lipgloss.NormalBorder()
+					detailLeftBorder = "#ffffff"
+					detailLeftBorderStyle = lipgloss.ThickBorder()
+				}
+			} else {
+				if m.focusRight {
+					detailRightBorder = "#c084fc"
+					detailRightBorderStyle = lipgloss.ThickBorder()
+					detailLeftBorder = "#334155"
+					detailLeftBorderStyle = lipgloss.NormalBorder()
+				} else {
+					detailRightBorder = "#334155"
+					detailRightBorderStyle = lipgloss.NormalBorder()
+					detailLeftBorder = "#7dd3fc"
+					detailLeftBorderStyle = lipgloss.ThickBorder()
+				}
+			}
+			// apply left pane border styling explicitly so focus state is clear
+			leftStyle = leftStyle.BorderStyle(detailLeftBorderStyle).BorderForeground(lipgloss.Color(detailLeftBorder))
+			left := leftStyle.Render(m.detail)
+			rightStyle := lipgloss.NewStyle().BorderStyle(detailRightBorderStyle).BorderForeground(lipgloss.Color(detailRightBorder)).Padding(1).Width(rightW).Height(bodyH)
+			right := rightStyle.Render(m.renderVersions(innerRightW, innerBodyH))
+			if m.width < 80 {
+				body = lipgloss.JoinVertical(lipgloss.Left, left, right)
+			} else {
+				body = lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+			}
 		} else {
 			body = contentStyle.Render(m.detail)
 		}
@@ -1031,7 +1260,11 @@ func (m *TuiModel) View() string {
 		if m.editingMeta {
 			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(Tab) next • (Ctrl+A) add command • (Ctrl+D) del command • (Ctrl+S) save • (Esc) cancel")
 		} else {
-			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(e) Edit • (d) Delete • (s) Export • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
+			base := "(e) Edit • (d) Delete • (s) Export • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit"
+			if len(m.versions) > 0 {
+				base = base + " • (R) Rollback"
+			}
+			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(base)
 		}
 		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
@@ -1130,6 +1363,17 @@ func (c csItem) Title() string       { return c.cs.Name }
 func (c csItem) Description() string { return c.cs.Description }
 func (c csItem) FilterValue() string { return c.cs.Name + " " + c.cs.Description }
 
+// verItem adapts adapters.Version for use with the bubbles list
+type verItem struct{ v adapters.Version }
+
+func (v verItem) Title() string {
+	return fmt.Sprintf("v%d • %s", v.v.Version, v.v.Operation)
+}
+func (v verItem) Description() string { return v.v.CreatedAt }
+func (v verItem) FilterValue() string {
+	return fmt.Sprintf("v%d %s %s", v.v.Version, v.v.Operation, v.v.CreatedAt)
+}
+
 // renderTitleBox produces a consistent title bar (with border) matching the
 // main page. Use this to keep title styling identical across views.
 func (m *TuiModel) renderTitleBox(text string) string {
@@ -1179,6 +1423,39 @@ func (m *TuiModel) renderEditor() string {
 		} else {
 			b.WriteString("  " + prefix + c + "\n")
 		}
+	}
+	return b.String()
+}
+
+// renderVersions renders the versions panel on the details view's right side.
+// It used the versionsList view so the list adapts automatically to the size
+// (same behavior as the main list).
+func (m *TuiModel) renderVersions(width, height int) string {
+	var b strings.Builder
+	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Render("Versions") + "\n\n")
+
+	// list view will already be sized in WindowSizeMsg, so just render it
+	b.WriteString(m.versionsList.View())
+
+	// preview area
+	previewH := 8
+	if previewH > height/2 {
+		previewH = height / 2
+	}
+	if m.versionsSelected >= 0 && m.versionsSelected < len(m.versions) {
+		b.WriteString("\nPreview:\n")
+		b.WriteString(formatVersionPreview(m.detailName, m.versions[m.versionsSelected], width-2, previewH))
+	}
+	return b.String()
+}
+
+// formatVersionPreview renders a short preview for a version (commands and dry-run)
+func formatVersionPreview(name string, v adapters.Version, width int, height int) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("krnr — %s v%d • %s\n", name, v.Version, v.Operation))
+	b.WriteString(strings.Repeat("-", 30) + "\n")
+	for _, c := range v.Commands {
+		b.WriteString("$ " + c + "\n")
 	}
 	return b.String()
 }

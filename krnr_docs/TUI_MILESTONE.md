@@ -66,10 +66,10 @@ Goal: Extend the Details/full-screen view so users can inspect a Command Set's m
 
 Planned sub-tasks (checklist):
 - [x] Ensure the detail view uses the same top title bar and outer borders as the main page (consistent styling). ✅
-- [x] Add `Edit` action (press `e` to open system editor to edit commands) — commands-only edit implemented; modal for full metadata implemented.
+- [x] Add `Edit` action (press `e` to open system editor to edit commands) — modal for full metadata implemented.
 - [x] Add `Delete` action with confirmation (press `d` to delete in command details view page) — implemented; headless test added.
 - [x] Add `Export set` action (press `s` in details to export to a portable DB file) — implemented; headless test added.
-- [ ] Add `Versions` panel (new right-side container of the view details page): list historical versions, show selected version preview (commands & dry-run preview), and show metadata (author, timestamp).
+- [ ] Add `Versions` panel (new right-side container of the view details page, not the main page. always visible.): list historical versions, show selected version preview (commands preview), and show metadata (author, timestamp).
 - [ ] Add `Rollback` action on a selected version (with confirmation and headless test coverage).
 - [ ] Add `Run` controls in the detail view: "Run" (start run), and a parameter editor modal (support env:VAR resolution and redaction). 
 - [ ] Add headless UI tests that exercise: opening detail, selecting versions, running rollback, edit/save flows, and running the set (streaming logs & final status).

@@ -20,6 +20,17 @@ func (f *fakeRegistry) GetCommandSet(ctx context.Context, name string) (CommandS
 }
 func (f *fakeRegistry) SaveCommandSet(ctx context.Context, cs CommandSetSummary) error { return nil }
 func (f *fakeRegistry) DeleteCommandSet(ctx context.Context, name string) error        { return nil }
+func (f *fakeRegistry) GetCommands(ctx context.Context, _ string) ([]string, error) {
+	return []string{}, nil
+}
+func (f *fakeRegistry) ReplaceCommands(ctx context.Context, _ string, _ []string) error { return nil }
+func (f *fakeRegistry) UpdateCommandSet(ctx context.Context, _ string, _ CommandSetSummary) error {
+	return nil
+}
+func (f *fakeRegistry) ListVersionsByName(ctx context.Context, _ string) ([]Version, error) {
+	return nil, nil
+}
+func (f *fakeRegistry) ApplyVersionByName(ctx context.Context, _ string, _ int) error { return nil }
 
 type fakeExecutor struct{}
 

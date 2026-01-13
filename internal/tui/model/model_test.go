@@ -52,6 +52,12 @@ func (t *testRegistry) ReplaceCommands(ctx context.Context, name string, command
 func (t *testRegistry) UpdateCommandSet(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error {
 	return nil
 }
+func (t *testRegistry) ListVersionsByName(ctx context.Context, name string) ([]adapters.Version, error) {
+	return nil, nil
+}
+func (t *testRegistry) ApplyVersionByName(ctx context.Context, name string, versionNum int) error {
+	return nil
+}
 
 type testExecutor struct{}
 
