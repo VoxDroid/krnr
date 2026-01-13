@@ -1055,8 +1055,6 @@ func formatCSFullScreen(cs adapters.CommandSetSummary, width int, _ int) string 
 	return b.String()
 }
 
-
-
 func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 	// invisible table layout — keep formatting simple and predictable for tests
 

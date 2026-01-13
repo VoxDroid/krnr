@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"bufio"
 	"context"
 	"strings"
 	"testing"
@@ -45,34 +44,61 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	// give the program some time to initialize and render
 	time.Sleep(150 * time.Millisecond)
 
-	// read what is currently on the pty
-	r := bufio.NewReader(p)
-	var b strings.Builder
-	// read available bytes (non-blocking with small timeout)
-	if err := p.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
-		// ignore deadline set errors (platform specifics)
-		t.Logf("SetReadDeadline: %v", err)
-	}
-	for {
-		line, err := r.ReadString('\n')
-		if err != nil {
-			break
+	// read what is currently on the pty using a goroutine so a slow CI
+	// environment doesn't block the test indefinitely.
+	done := make(chan string, 1)
+	go func() {
+		var b strings.Builder
+		buf := make([]byte, 1024)
+		end := time.Now().Add(900 * time.Millisecond)
+		for {
+			// overall timeout for the goroutine
+			if time.Now().After(end) {
+				break
+			}
+			// set a short read deadline so Read doesn't block forever
+			if err := p.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
+				// log and continue; deadline may be unsupported on some platforms
+				t.Logf("SetReadDeadline: %v", err)
+			}
+			n, err := p.Read(buf)
+			if n > 0 {
+				b.Write(buf[:n])
+				// stop early if we have the things we expect
+				if strings.Contains(b.String(), "with-params") && strings.Contains(b.String(), "Description:") {
+					break
+				}
+			}
+			if err != nil {
+				// if timeout, try again; otherwise stop
+				if ne, ok := err.(interface{ Timeout() bool }); ok && ne.Timeout() {
+					continue
+				}
+				break
+			}
 		}
-		b.WriteString(line)
-	}
-	out := b.String()
+		done <- b.String()
+	}()
 
-	if !strings.Contains(out, "with-params") {
-		t.Fatalf("expected command set name in output, got:\n%s", out)
-	}
-	if !strings.Contains(out, "Description:") {
-		t.Fatalf("expected Description: header in output, got:\n%s", out)
-	}
-	if !strings.Contains(out, "1)  echo") || !strings.Contains(out, "2)  echo") {
-		t.Fatalf("expected aligned command prefixes in output, got:\n%s", out)
+	select {
+	case out := <-done:
+		if !strings.Contains(out, "with-params") {
+			t.Fatalf("expected command set name in output, got:\n%s", out)
+		}
+		if !strings.Contains(out, "Description:") {
+			t.Fatalf("expected Description: header in output, got:\n%s", out)
+		}
+		if !strings.Contains(out, "1)  echo") || !strings.Contains(out, "2)  echo") {
+			t.Fatalf("expected aligned command prefixes in output, got:\n%s", out)
+		}
+	case <-time.After(1 * time.Second):
+		// try to quit the program to avoid leaving a dangling process
+		_, _ = p.Write([]byte("q"))
+		// fail the test with a helpful message
+		t.Fatalf("pty output did not appear in time; test environment may be slow or unsupported")
 	}
 
-	// quit
+	// quit (if not already done)
 	_, _ = p.Write([]byte("q"))
 	// allow program to exit cleanly
 	time.Sleep(50 * time.Millisecond)

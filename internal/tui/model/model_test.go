@@ -67,7 +67,7 @@ func (t *testExecutor) Run(_ context.Context, _ string, _ []string) (adapters.Ru
 
 type testImportExport struct{}
 
-func (t *testImportExport) Export(_ context.Context, _ string, _ string) error  { return nil }
+func (t *testImportExport) Export(_ context.Context, _ string, _ string) error { return nil }
 func (t *testImportExport) Import(_ context.Context, _ string, _ string) error { return nil }
 
 type testInstaller struct{}

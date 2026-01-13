@@ -118,6 +118,7 @@ func (m *UIModel) Import(ctx context.Context, src string, policy string) error {
 func (m *UIModel) Install(ctx context.Context, name string) error {
 	return m.installer.Install(ctx, name)
 }
+
 // Uninstall removes an installed item by name.
 func (m *UIModel) Uninstall(ctx context.Context, name string) error {
 	return m.installer.Uninstall(ctx, name)

@@ -64,8 +64,6 @@ func (e *executorAdapter) Run(ctx context.Context, _ string, commands []string) 
 	return &runHandleImpl{ch: rchan, cancel: cancel}, nil
 }
 
-
-
 type runHandleImpl struct {
 	ch     <-chan RunEvent
 	cancel context.CancelFunc

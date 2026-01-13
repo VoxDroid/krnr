@@ -41,8 +41,6 @@ func TestInitPopulatesPreview(t *testing.T) {
 	}
 }
 
-
-
 func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	// create a set with a multi-line description and two commands
 	full := adapters.CommandSetSummary{

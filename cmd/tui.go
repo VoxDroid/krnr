@@ -38,8 +38,8 @@ var tuiCmd = &cobra.Command{
 		}
 
 		p := ui.NewProgram(uiModel)
-	_, err = p.Run()
-	return err
+		_, err = p.Run()
+		return err
 	},
 }
 
