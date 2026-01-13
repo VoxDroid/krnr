@@ -43,7 +43,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 
 	// give the program some time to initialize and render
 	// Some CI runners take longer; use a slightly larger initial delay.
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// read what is currently on the pty using a goroutine so a slow CI
 	// environment doesn't block the test indefinitely.
@@ -51,7 +51,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	go func() {
 		var b strings.Builder
 		buf := make([]byte, 1024)
-		end := time.Now().Add(3 * time.Second)
+		end := time.Now().Add(5 * time.Second)
 		for {
 			// overall timeout for the goroutine
 			if time.Now().After(end) {
@@ -92,12 +92,17 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 		if !strings.Contains(out, "1)  echo") || !strings.Contains(out, "2)  echo") {
 			t.Fatalf("expected aligned command prefixes in output, got:\n%s", out)
 		}
-	case <-time.After(3 * time.Second):
+	case <-time.After(5 * time.Second):
 		// attempt to capture any partial output for diagnostics and quit
 		var diagBuf [4096]byte
+		// send quit to the program first to encourage it to flush and exit
+		_, _ = p.Write([]byte("q"))
+		// set a short read deadline so this diagnostic read cannot block indefinitely
+		if err := p.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
+			t.Logf("SetReadDeadline (diag): %v", err)
+		}
 		n, _ := p.Read(diagBuf[:])
 		outPartial := string(diagBuf[:n])
-		_, _ = p.Write([]byte("q"))
 		t.Fatalf("pty output did not appear in time; partial output:\n%s", outPartial)
 	}
 
