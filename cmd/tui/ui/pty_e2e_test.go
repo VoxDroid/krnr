@@ -42,7 +42,8 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	}()
 
 	// give the program some time to initialize and render
-	time.Sleep(150 * time.Millisecond)
+	// Some CI runners take longer; use a slightly larger initial delay.
+	time.Sleep(300 * time.Millisecond)
 
 	// read what is currently on the pty using a goroutine so a slow CI
 	// environment doesn't block the test indefinitely.
@@ -50,7 +51,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	go func() {
 		var b strings.Builder
 		buf := make([]byte, 1024)
-		end := time.Now().Add(900 * time.Millisecond)
+		end := time.Now().Add(3 * time.Second)
 		for {
 			// overall timeout for the goroutine
 			if time.Now().After(end) {
@@ -91,11 +92,13 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 		if !strings.Contains(out, "1)  echo") || !strings.Contains(out, "2)  echo") {
 			t.Fatalf("expected aligned command prefixes in output, got:\n%s", out)
 		}
-	case <-time.After(1 * time.Second):
-		// try to quit the program to avoid leaving a dangling process
+	case <-time.After(3 * time.Second):
+		// attempt to capture any partial output for diagnostics and quit
+		var diagBuf [4096]byte
+		n, _ := p.Read(diagBuf[:])
+		outPartial := string(diagBuf[:n])
 		_, _ = p.Write([]byte("q"))
-		// fail the test with a helpful message
-		t.Fatalf("pty output did not appear in time; test environment may be slow or unsupported")
+		t.Fatalf("pty output did not appear in time; partial output:\n%s", outPartial)
 	}
 
 	// quit (if not already done)
