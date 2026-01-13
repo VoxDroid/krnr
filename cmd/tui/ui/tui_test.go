@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
@@ -114,6 +115,40 @@ func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	}
 }
 
+func TestFilterModeIgnoresControlsAndEscCancels(t *testing.T) {
+	reg := &fakeRegistry{items: []adapters.CommandSetSummary{{Name: "a", Description: "A"}, {Name: "b", Description: "B"}}}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	// enter filter mode by sending '/'
+	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = m1.(*TuiModel)
+	if m.list.FilterState() != list.Filtering {
+		t.Fatalf("expected list to be in filtering state")
+	}
+	// footer should show only the esc hint while filtering
+	view := m.View()
+	if !strings.Contains(view, "(esc) quit filter") {
+		t.Fatalf("expected filter hint in footer, got:\n%s", view)
+	}
+	// ensure other shortcuts are hidden for cleanliness
+	if strings.Contains(view, "(q) quit") || strings.Contains(view, "(r) run") || strings.Contains(view, "(Enter) details") {
+		t.Fatalf("expected other shortcuts to be hidden while filtering, got footer:\n%s", view)
+	}
+	// pressing 'q' while filtering should NOT quit; the list should still be in filtering state
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = m2.(*TuiModel)
+	if m.list.FilterState() != list.Filtering {
+		t.Fatalf("expected filtering to remain active after pressing q")
+	}
+	// pressing ESC should cancel filter
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = m3.(*TuiModel)
+	if m.list.FilterState() == list.Filtering {
+		t.Fatalf("expected filtering to be cancelled after ESC")
+	}
+}
 func TestEnterShowsFullScreenWithDryRun(t *testing.T) {
 	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi", "echo there is a long line that will wrap around the width for testing"}, AuthorName: "me", AuthorEmail: "me@example.com", Tags: []string{"tag1"}}}
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
@@ -160,6 +195,9 @@ func TestDetailViewShowsTitle(t *testing.T) {
 	}
 	if !strings.Contains(view, "(d) Delete") {
 		t.Fatalf("expected detail view to include '(d) Delete' hint, got:\n%s", view)
+	}
+	if !strings.Contains(view, "(s) Export") {
+		t.Fatalf("expected detail view to include '(s) Export' hint, got:\n%s", view)
 	}
 }
 
@@ -230,7 +268,7 @@ func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
 	if !strings.Contains(m.detail, "Delete 'one' permanently?") {
 		t.Fatalf("expected delete prompt in detail, got:\n%s", m.detail)
 	}
-	// confirm deletion
+	// confirm deletion (lowercase)
 	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 	m = m4.(*TuiModel)
 	if reg.lastDeleted != "one" {
@@ -241,6 +279,102 @@ func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
 	}
 	if len(m.list.Items()) != 0 {
 		t.Fatalf("expected list to be empty after deletion, got %d", len(m.list.Items()))
+	}
+}
+
+// fake import/export adapter for tests
+type fakeImpExp struct{
+	lastName string
+	lastDest string
+}
+func (f *fakeImpExp) Export(_ context.Context, name string, dest string) error { f.lastName = name; f.lastDest = dest; return nil }
+func (f *fakeImpExp) Import(_ context.Context, _ string, _ string) error { return nil }
+
+func TestExportFromDetailPromptsAndExportsWhenConfirmed(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
+	imp := &fakeImpExp{}
+	ui := modelpkg.New(reg, &fakeExec{}, imp, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// create a file at the default destination so we simulate an existing file
+	defaultDst := filepath.Join(os.TempDir(), "one.db")
+	_ = os.WriteFile(defaultDst, []byte("x"), 0o644)
+	defer func() { _ = os.Remove(defaultDst) }()
+	// trigger export prompt
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = m3.(*TuiModel)
+	if !strings.Contains(m.detail, "Export 'one' to") {
+		t.Fatalf("expected export prompt in detail, got:\n%s", m.detail)
+	}
+	// confirm export
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m = m4.(*TuiModel)
+	if imp.lastName != "one" {
+		t.Fatalf("expected Export called for 'one', got %q", imp.lastName)
+	}
+	if imp.lastDest == "" {
+		t.Fatalf("expected destination to be set")
+	}
+	if imp.lastDest == defaultDst {
+		t.Fatalf("expected destination to be different when default exists, got the same: %s", imp.lastDest)
+	}
+	if !strings.Contains(strings.Join(m.logs, "\n"), "exported") {
+		t.Fatalf("expected exported log, got: %v", m.logs)
+	}}
+
+func TestDeleteConfirmUppercaseY(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "upcase", Description: "Up", Commands: []string{"echo hi"}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "upcase", Description: "Up"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// prompt
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m = m3.(*TuiModel)
+	if !strings.Contains(m.detail, "Delete 'upcase' permanently?") {
+		t.Fatalf("expected delete prompt in detail, got:\n%s", m.detail)
+	}
+	// confirm with uppercase 'Y'
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	m = m4.(*TuiModel)
+	if reg.lastDeleted != "upcase" {
+		t.Fatalf("expected DeleteCommandSet called for 'upcase', got %q", reg.lastDeleted)
+	}
+}
+
+func TestExportConfirmUppercaseY(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "upcaseexp", Description: "Up", Commands: []string{"echo hi"}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "upcaseexp", Description: "Up"}}, full: full}
+	imp := &fakeImpExp{}
+	ui := modelpkg.New(reg, &fakeExec{}, imp, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m = m3.(*TuiModel)
+	if !strings.Contains(m.detail, "Export 'upcaseexp' to") {
+		t.Fatalf("expected export prompt in detail, got:\n%s", m.detail)
+	}
+	// confirm with uppercase Y
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
+	m = m4.(*TuiModel)
+	if imp.lastName != "upcaseexp" {
+		t.Fatalf("expected Export called for 'upcaseexp', got %q", imp.lastName)
 	}
 } 
 // minimal fakes for testing

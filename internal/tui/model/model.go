@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
@@ -76,6 +77,9 @@ func (m *UIModel) Delete(ctx context.Context, name string) error {
 
 // Export an existing commandset to dest path
 func (m *UIModel) Export(ctx context.Context, name string, dest string) error {
+	if m.impExp == nil {
+		return fmt.Errorf("import/export adapter not configured")
+	}
 	_, err := m.registry.GetCommandSet(ctx, name)
 	if err != nil {
 		return err

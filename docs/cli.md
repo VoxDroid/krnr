@@ -56,6 +56,7 @@ Shortcuts:
 - `Enter` — show details for the selected command set
 - `e` — edit commands for the selected set (opens $EDITOR)
 - `d` — delete the selected set (from details; confirmation required)
+- `s` — export the selected set to a portable DB file (from details; confirmation required)
 - `r` — run the selected command set (streams output to the right pane)
 - `Ctrl+T` — toggle high-contrast theme (accessibility)
 

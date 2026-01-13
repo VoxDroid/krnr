@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
@@ -32,6 +33,10 @@ type TuiModel struct {
 	// delete confirmation state
 	pendingDelete bool
 	pendingDeleteName string
+	// export confirmation state
+	pendingExport bool
+	pendingExportName string
+	pendingExportDest string
 	runInProgress bool
 	logs          []string
 	cancelRun     func()
@@ -110,6 +115,12 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		s := msg.String()
+		// If the list is in filtering state, let the list consume all keys
+		// (including keys that would otherwise be global controls like q/esc).
+		if m.list.FilterState() == list.Filtering {
+			m.list, cmd = m.list.Update(msg)
+			return m, cmd
+		}
 		// global keybindings handled BEFORE passing to the list so they are
 		// not swallowed when filtering is enabled.
 		switch s {
@@ -219,7 +230,29 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detail = fmt.Sprintf("Delete '%s' permanently? [y/N]\n\nPress (y) to confirm, (n) or (b) to cancel", name)
 			m.vp.SetContent(m.detail)
 			return m, nil
-		case "y":
+		case "s":
+			// export selected set to a temp file (confirm)
+			if !m.showDetail {
+				return m, nil
+			}
+			var ename string
+			if i, ok := m.list.SelectedItem().(csItem); ok {
+				ename = i.cs.Name
+			} else if m.detailName != "" {
+				ename = m.detailName
+			}
+			if ename == "" { return m, nil }
+			// default dest in temp dir
+			dflt := filepath.Join(os.TempDir(), ename+".db")
+			// ensure we pick a path that doesn't already exist to avoid constraint errors
+			dest := uniqueDestPath(dflt)
+			m.pendingExport = true
+			m.pendingExportName = ename
+			m.pendingExportDest = dest
+			m.detail = fmt.Sprintf("Export '%s' to:\n\n%s\n\nPress (y) to confirm, (n) to cancel", ename, dest)
+			m.vp.SetContent(m.detail)
+			return m, nil
+		case "y", "Y":
 			if m.pendingDelete {
 				name := m.pendingDeleteName
 				if err := m.uiModel.Delete(context.Background(), name); err != nil {
@@ -251,9 +284,31 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.vp.SetContent("")
 				}
+				// show an explicit confirmation in the detail pane
+				m.detail = fmt.Sprintf("Deleted '%s'", name)
+				m.vp.SetContent(m.detail)
+				return m, nil
 			}
+			if m.pendingExport {
+				name := m.pendingExportName
+				dest := m.pendingExportDest
+				if err := m.uiModel.Export(context.Background(), name, dest); err != nil {
+					m.logs = append(m.logs, "export error: "+err.Error())
+					m.detail = fmt.Sprintf("Export failed: %s", err.Error())
+					m.vp.SetContent(m.detail)
+				} else {
+					m.logs = append(m.logs, fmt.Sprintf("exported '%s' to %s", name, dest))
+					m.detail = fmt.Sprintf("Exported '%s' to %s", name, dest)
+					m.vp.SetContent(m.detail)
+				}
+				m.pendingExport = false
+				m.pendingExportName = ""
+				m.pendingExportDest = ""
+				return m, nil
+			}
+			m.logs = append(m.logs, "no pending action to confirm")
 			return m, nil
-		case "n":
+		case "n", "N":
 			if m.pendingDelete {
 				m.pendingDelete = false
 				// restore detail of the selected (or the cached name)
@@ -269,6 +324,23 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.vp.SetContent(m.detail)
 					}
 				}
+				return m, nil
+			}
+			if m.pendingExport {
+				m.pendingExport = false
+				name := m.detailName
+				if name == "" {
+					if si := m.list.SelectedItem(); si != nil {
+						if it, ok := si.(csItem); ok { name = it.cs.Name }
+					}
+				}
+				if name != "" {
+					if cs, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
+						m.detail = formatCSFullScreen(cs, m.width, m.height)
+						m.vp.SetContent(m.detail)
+					}
+				}
+				return m, nil
 			}
 			return m, nil
 		case "r":
@@ -783,6 +855,23 @@ func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 	return b.String()
 }
 
+// uniqueDestPath returns a non-existing destination path by appending
+// a numeric suffix before the extension if needed (e.g., name-1.db).
+func uniqueDestPath(base string) string {
+	if _, err := os.Stat(base); err == nil {
+		// file exists — try appended counters
+		root := strings.TrimSuffix(base, filepath.Ext(base))
+		ext := filepath.Ext(base)
+		for i := 1; ; i++ {
+			cand := fmt.Sprintf("%s-%d%s", root, i, ext)
+			if _, err := os.Stat(cand); err != nil {
+				return cand
+			}
+		}
+	}
+	return base
+}
+
 func (m *TuiModel) View() string {
 	if m.showDetail {
 		// Use the same top title bar and content container approach as the main
@@ -825,7 +914,7 @@ func (m *TuiModel) View() string {
 		footer := lipgloss.NewStyle().
 			Italic(true).
 			Foreground(lipgloss.Color("#94a3b8")).
-			Render("(e) Edit • (d) Delete • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
+			Render("(e) Edit • (d) Delete • (s) Export • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
 		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
 
@@ -903,7 +992,14 @@ func (m *TuiModel) View() string {
 	}
 	bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
 
-	footerText := "← / → / Tab switch focus • ↑ / ↓ scroll focused pane • Enter details • r run • T theme • q quit • ? help"
+	var footerText string
+	if m.list.FilterState() == list.Filtering {
+		// In filter mode keep the footer minimal and only show how to quit filter
+		footerText = "(esc) quit filter"
+	} else {
+		footerText = "(←) / (→) / (Tab) switch focus • (↑) / (↓) scroll focused pane"
+		footerText += " • (Enter) details • (r) run • (T) theme • (q) quit • (?) help"
+	}
 	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(footerText)
 
 	return lipgloss.JoinVertical(lipgloss.Left, titleBox, body, footer, bottom)
