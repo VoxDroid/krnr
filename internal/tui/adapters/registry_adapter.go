@@ -63,3 +63,10 @@ func (r *RegistryAdapterImpl) SaveCommandSet(ctx context.Context, cs CommandSetS
 }
 
 func (r *RegistryAdapterImpl) DeleteCommandSet(ctx context.Context, name string) error { return r.repo.DeleteCommandSet(name) }
+
+func (r *RegistryAdapterImpl) ReplaceCommands(ctx context.Context, name string, commands []string) error {
+	cs, err := r.repo.GetCommandSetByName(name)
+	if err != nil { return err }
+	if cs == nil { return ErrNotFound }
+	return r.repo.ReplaceCommands(cs.ID, commands)
+}

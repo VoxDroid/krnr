@@ -3,6 +3,9 @@ package ui
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -152,8 +155,60 @@ func TestDetailViewShowsTitle(t *testing.T) {
 	if !strings.Contains(view, "krnr — sysinf Details") {
 		t.Fatalf("expected title 'krnr — sysinf Details' in View(), got:\n%s", view)
 	}
+	if !strings.Contains(view, "(e) Edit") {
+		t.Fatalf("expected detail view to include '(e) Edit' hint, got:\n%s", view)
+	}
 }
 
+func TestEditReplacesCommands(t *testing.T) {
+	d := t.TempDir()
+	// create a small script that overwrites the file with new commands
+	var script string
+	if runtime.GOOS == "windows" {
+		script = "@echo off\r\necho echo new1 > %1\r\necho echo new2 >> %1\r\nexit /b 0\r\n"
+		scriptPath := filepath.Join(d, "fake-editor.bat")
+		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+			t.Fatalf("write script: %v", err)
+		}
+		_ = os.Setenv("EDITOR", scriptPath)
+		defer func() { _ = os.Unsetenv("EDITOR") }()
+	} else {
+		script = "#!/bin/sh\nprintf 'echo new1\necho new2\n' > \"$1\"\nexit 0\n"
+		scriptPath := filepath.Join(d, "fake-editor.sh")
+		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+			t.Fatalf("write script: %v", err)
+		}
+		if err := os.Chmod(scriptPath, 0o755); err != nil {
+			t.Fatalf("chmod script: %v", err)
+		}
+		_ = os.Setenv("EDITOR", scriptPath)
+		defer func() { _ = os.Unsetenv("EDITOR") }()
+	}
+
+	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// trigger edit (should call EDITOR and then ReplaceCommands)
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m = m3.(*TuiModel)
+	if reg.lastName != "one" {
+		t.Fatalf("expected ReplaceCommands called with name 'one', got %q", reg.lastName)
+	}
+	if len(reg.lastCommands) != 2 || reg.lastCommands[0] != "echo new1" || reg.lastCommands[1] != "echo new2" {
+		t.Fatalf("unexpected replaced commands: %#v", reg.lastCommands)
+	}
+	// the preview in detail should reflect updated commands
+	if !strings.Contains(m.detail, "echo new1") {
+		t.Fatalf("expected updated command shown in detail, got:\n%s", m.detail)
+	}
+}
 // minimal fakes for testing
 type fakeRegistry struct{ items []adapters.CommandSetSummary }
 
@@ -170,6 +225,7 @@ func (f *fakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { ret
 func (f *fakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
 	return []string{"echo hello"}, nil
 }
+func (f *fakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error { return nil }
 
 type fakeExec struct{}
 
@@ -196,4 +252,26 @@ func (f *detailFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.Comman
 func (f *detailFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
 func (f *detailFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
 	return []string{"echo hello"}, nil
+}
+func (f *detailFakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error { return nil }
+
+// replaceFakeRegistry supports ReplaceCommands and records the last call
+// for assertions in tests.
+type replaceFakeRegistry struct{
+	items []adapters.CommandSetSummary
+	full  adapters.CommandSetSummary
+	lastName string
+	lastCommands []string
+}
+
+func (f *replaceFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) { return f.items, nil }
+func (f *replaceFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) { return f.full, nil }
+func (f *replaceFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error { return nil }
+func (f *replaceFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
+func (f *replaceFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) { return f.full.Commands, nil }
+func (f *replaceFakeRegistry) ReplaceCommands(_ context.Context, name string, cmds []string) error {
+	f.lastName = name
+	f.lastCommands = append([]string{}, cmds...)
+	f.full.Commands = append([]string{}, cmds...)
+	return nil
 }

@@ -42,6 +42,8 @@ type RegistryAdapter interface {
 	GetCommands(ctx context.Context, name string) ([]string, error)
 	SaveCommandSet(ctx context.Context, cs CommandSetSummary) error
 	DeleteCommandSet(ctx context.Context, name string) error
+	// ReplaceCommands replaces the commands for an existing command set.
+	ReplaceCommands(ctx context.Context, name string, commands []string) error
 }
 
 // ExecutorAdapter describes running and streaming commandset executions.

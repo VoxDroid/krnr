@@ -64,6 +64,11 @@ func (m *UIModel) Run(ctx context.Context, name string, args []string) (adapters
 	return m.executor.Run(ctx, name, cmds)
 }
 
+// ReplaceCommands replaces the commands for an existing command set by name.
+func (m *UIModel) ReplaceCommands(ctx context.Context, name string, commands []string) error {
+	return m.registry.ReplaceCommands(ctx, name, commands)
+}
+
 // Export an existing commandset to dest path
 func (m *UIModel) Export(ctx context.Context, name string, dest string) error {
 	_, err := m.registry.GetCommandSet(ctx, name)

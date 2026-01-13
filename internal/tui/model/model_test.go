@@ -31,6 +31,7 @@ func (t *testRegistry) GetCommands(ctx context.Context, name string) ([]string, 
 	// return a trivial command list for tests
 	return []string{"echo ok"}, nil
 }
+func (t *testRegistry) ReplaceCommands(ctx context.Context, name string, commands []string) error { return nil }
 
 type testExecutor struct{}
 func (t *testExecutor) Run(ctx context.Context, name string, commands []string) (adapters.RunHandle, error) { return FakeRunHandle([]string{"ok"}, 0), nil }

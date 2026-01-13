@@ -23,3 +23,4 @@ func (s *saveFakeRegistry) GetCommandSet(ctx context.Context, name string) (adap
 func (s *saveFakeRegistry) GetCommands(ctx context.Context, name string) ([]string, error) { return nil, adapters.ErrNotFound }
 func (s *saveFakeRegistry) SaveCommandSet(ctx context.Context, cs adapters.CommandSetSummary) error { s.last = cs; return nil }
 func (s *saveFakeRegistry) DeleteCommandSet(ctx context.Context, name string) error { return nil }
+func (s *saveFakeRegistry) ReplaceCommands(ctx context.Context, name string, commands []string) error { return nil }

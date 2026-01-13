@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"unicode/utf8"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
+	interactive "github.com/VoxDroid/krnr/internal/utils"
 )
 
 // TuiModel is the Bubble Tea model used by cmd/tui.
@@ -140,6 +142,60 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						m.vp.SetContent(formatCSDetails(it.cs, m.vp.Width))
 					}
+				}
+			}
+			return m, nil
+		case "e":
+			// Edit commands for the selected command set when in detail view
+			if !m.showDetail {
+				return m, nil
+			}
+			if i, ok := m.list.SelectedItem().(csItem); ok {
+				name := i.cs.Name
+				cs, err := m.uiModel.GetCommandSet(context.Background(), name)
+				if err != nil {
+					m.logs = append(m.logs, "edit: get: "+err.Error())
+					return m, nil
+				}
+				// create temp file with commands
+				tmpf, err := os.CreateTemp("", "krnr-edit-*.txt")
+				if err != nil {
+					m.logs = append(m.logs, "edit: tmpfile: "+err.Error())
+					return m, nil
+				}
+				defer func() { _ = os.Remove(tmpf.Name()) }()
+				for _, c := range cs.Commands {
+					_, _ = tmpf.WriteString(c + "\n")
+				}
+				_ = tmpf.Close()
+				// open editor
+				if err := interactive.OpenEditor(tmpf.Name()); err != nil {
+					m.logs = append(m.logs, "edit: open editor: "+err.Error())
+					return m, nil
+				}
+				// read back and parse
+				b, err := os.ReadFile(tmpf.Name())
+				if err != nil {
+					m.logs = append(m.logs, "edit: read: "+err.Error())
+					return m, nil
+				}
+				lines := []string{}
+				sc := strings.Split(string(b), "\n")
+				for _, ln := range sc {
+					line := strings.TrimSpace(ln)
+					if line == "" || strings.HasPrefix(line, "#") {
+						continue
+					}
+					lines = append(lines, line)
+				}
+				if err := m.uiModel.ReplaceCommands(context.Background(), name, lines); err != nil {
+					m.logs = append(m.logs, "edit: replace: "+err.Error())
+					return m, nil
+				}
+				// refresh preview
+				if updated, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
+					m.detail = formatCSFullScreen(updated, m.width, m.height)
+					m.vp.SetContent(m.detail)
 				}
 			}
 			return m, nil
@@ -697,7 +753,7 @@ func (m *TuiModel) View() string {
 		footer := lipgloss.NewStyle().
 			Italic(true).
 			Foreground(lipgloss.Color("#94a3b8")).
-			Render("(r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
+			Render("(e) Edit • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
 		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
 

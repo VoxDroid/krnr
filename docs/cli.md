@@ -54,6 +54,7 @@ Shortcuts:
 - `?` — show help
 - `q` or `Esc` — quit
 - `Enter` — show details for the selected command set
+- `e` — edit commands for the selected set (opens $EDITOR)
 - `r` — run the selected command set (streams output to the right pane)
 - `Ctrl+T` — toggle high-contrast theme (accessibility)
 

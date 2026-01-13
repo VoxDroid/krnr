@@ -60,6 +60,38 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 
 ---
 
+## Details view — this sprint (🛠️)
+
+Goal: Extend the Details/full-screen view so users can inspect a Command Set's metadata and versions, edit/delete/export/rollback the set, preview historic version contents, and trigger runs from the same screen (with a right-side contextual container for versions, logs, or previews).
+
+Planned sub-tasks (checklist):
+- [x] Ensure the detail view uses the same top title bar and outer borders as the main page (consistent styling). ✅
+- [x] Add `Edit` action (press `e` to open system editor to edit commands) — commands-only edit implemented; modal for full metadata planned.
+- [ ] Add `Delete` action with confirmation (UI + headless test). PRESS D to delete in command details view page.
+- [ ] Add `Export set` action (export single command set into portable DB file) and success feedback. PRESS S (or you decide) to export in command details view page
+- [ ] Add `Versions` panel (new right-side container of the view details page): list historical versions, show selected version preview (commands & dry-run preview), and show metadata (author, timestamp).
+- [ ] Add `Rollback` action on a selected version (with confirmation and headless test coverage).
+- [ ] Add `Run` controls in the detail view: "Run" (start run), and a parameter editor modal (support env:VAR resolution and redaction). 
+- [ ] Add headless UI tests that exercise: opening detail, selecting versions, running rollback, edit/save flows, and running the set (streaming logs & final status).
+- [ ] Add PTY E2E assertions that capture the title & borders and verify the right-side Versions container renders on real terminals (CI only for PTY-capable runners).
+- [ ] Update docs and release notes with new details view capabilities and example screenshots.
+
+Acceptance criteria:
+- Users can perform edit/delete/export/rollback from the Details view with the same safety confirmations as the CLI equivalents.
+- The right-side versions container shows a timeline of versions and renders a preview (commands & dry-run output) when a version is selected.
+- The Run controls allow starting a run (stream logs to the viewport) and performing a dry-run (simulated preview with improved simulator heuristics).
+- Headless tests and PTY E2E checks cover the critical interactions and rendering behaviors.
+
+How to test:
+- Unit & headless: `go test ./cmd/tui/... -v` (new tests under `cmd/tui/ui`)
+- PTY E2E: `go test ./cmd/tui/... -run TestTuiDetails_Pty` on PTY-capable runner to assert the title, borders, and Versions container appear as expected.
+
+Notes:
+- We'll prefer UIModel adapters for all actions so business logic remains unchanged and testable (reuse `internal/tui` adapters to call `registry`/`executor` operations).
+- For the `Run` control we will simulate outputs where safe and optionally store historic run outputs to surface real results in the future.
+
+---
+
 ## Acceptance criteria
 
 - `krnr tui` is documented and discoverable via `--help` / `docs/cli.md`.
