@@ -12,9 +12,10 @@ import (
 // executorAdapter implements ExecutorAdapter using an executor.Runner.
 type executorAdapter struct{ runner executor.Runner }
 
+// NewExecutorAdapter constructs an ExecutorAdapter backed by the provided Runner.
 func NewExecutorAdapter(r executor.Runner) ExecutorAdapter { return &executorAdapter{runner: r} }
 
-func (e *executorAdapter) Run(ctx context.Context, name string, commands []string) (RunHandle, error) {
+func (e *executorAdapter) Run(ctx context.Context, _ string, commands []string) (RunHandle, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	rchan := make(chan RunEvent)
 
@@ -63,16 +64,7 @@ func (e *executorAdapter) Run(ctx context.Context, name string, commands []strin
 	return &runHandleImpl{ch: rchan, cancel: cancel}, nil
 }
 
-func joinArgs(a []string) string {
-	out := ""
-	for i, s := range a {
-		if i > 0 {
-			out += " "
-		}
-		out += s
-	}
-	return out
-}
+
 
 type runHandleImpl struct {
 	ch     <-chan RunEvent

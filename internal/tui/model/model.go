@@ -1,3 +1,5 @@
+// Package model provides a framework-agnostic UI model built on top of
+// adapter interfaces so the TUI code can remain presentation-focused.
 package model
 
 import (
@@ -9,6 +11,7 @@ import (
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
 
+// ErrNotFound is returned when a requested command set cannot be found.
 var ErrNotFound = errors.New("not found")
 
 // UIModel is a framework-agnostic model for screens and actions.
@@ -22,6 +25,7 @@ type UIModel struct {
 	cache []adapters.CommandSetSummary
 }
 
+// New constructs a UIModel backed by the provided adapters.
 func New(reg adapters.RegistryAdapter, ex adapters.ExecutorAdapter, ie adapters.ImportExportAdapter, inst adapters.InstallerAdapter) *UIModel {
 	return &UIModel{registry: reg, executor: ex, impExp: ie, installer: inst}
 }
@@ -36,8 +40,10 @@ func (m *UIModel) RefreshList(ctx context.Context) error {
 	return nil
 }
 
+// ListCached returns the cached command set summaries.
 func (m *UIModel) ListCached() []adapters.CommandSetSummary { return m.cache }
 
+// FindByName searches the cache for a command set by name.
 func (m *UIModel) FindByName(name string) (adapters.CommandSetSummary, error) {
 	for _, cs := range m.cache {
 		if cs.Name == name {
@@ -55,7 +61,8 @@ func (m *UIModel) GetCommandSet(ctx context.Context, name string) (adapters.Comm
 }
 
 // Run starts execution and returns a handle for streaming events.
-func (m *UIModel) Run(ctx context.Context, name string, args []string) (adapters.RunHandle, error) {
+// Run starts execution and returns a handle for streaming events.
+func (m *UIModel) Run(ctx context.Context, name string, _ []string) (adapters.RunHandle, error) {
 	// fetch commands for the set
 	cmds, err := m.registry.GetCommands(ctx, name)
 	if err != nil {
@@ -111,6 +118,7 @@ func (m *UIModel) Import(ctx context.Context, src string, policy string) error {
 func (m *UIModel) Install(ctx context.Context, name string) error {
 	return m.installer.Install(ctx, name)
 }
+// Uninstall removes an installed item by name.
 func (m *UIModel) Uninstall(ctx context.Context, name string) error {
 	return m.installer.Uninstall(ctx, name)
 }
@@ -120,7 +128,7 @@ func (m *UIModel) Save(ctx context.Context, cs adapters.CommandSetSummary) error
 	return m.registry.SaveCommandSet(ctx, cs)
 }
 
-// Simple helper to simulate streaming in tests
+// FakeRunHandle simulates a streaming RunHandle for tests.
 func FakeRunHandle(lines []string, delay time.Duration) adapters.RunHandle {
 	events := make(chan adapters.RunEvent)
 	go func() {

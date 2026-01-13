@@ -1,3 +1,4 @@
+// Package ui contains tests for the TUI package.
 package ui
 
 import (
@@ -23,24 +24,24 @@ func TestSaveViaModel(t *testing.T) {
 
 type saveFakeRegistry struct{ last adapters.CommandSetSummary }
 
-func (s *saveFakeRegistry) ListCommandSets(ctx context.Context) ([]adapters.CommandSetSummary, error) {
+func (s *saveFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
 	return nil, nil
 }
-func (s *saveFakeRegistry) GetCommandSet(ctx context.Context, name string) (adapters.CommandSetSummary, error) {
+func (s *saveFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) {
 	return adapters.CommandSetSummary{}, adapters.ErrNotFound
 }
-func (s *saveFakeRegistry) GetCommands(ctx context.Context, name string) ([]string, error) {
+func (s *saveFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
 	return nil, adapters.ErrNotFound
 }
-func (s *saveFakeRegistry) SaveCommandSet(ctx context.Context, cs adapters.CommandSetSummary) error {
+func (s *saveFakeRegistry) SaveCommandSet(_ context.Context, cs adapters.CommandSetSummary) error {
 	s.last = cs
 	return nil
 }
-func (s *saveFakeRegistry) DeleteCommandSet(ctx context.Context, name string) error { return nil }
-func (s *saveFakeRegistry) ReplaceCommands(ctx context.Context, name string, commands []string) error {
+func (s *saveFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
+func (s *saveFakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error {
 	return nil
 }
-func (s *saveFakeRegistry) UpdateCommandSet(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error {
+func (s *saveFakeRegistry) UpdateCommandSet(_ context.Context, _ string, cs adapters.CommandSetSummary) error {
 	s.last = cs
 	return nil
 }

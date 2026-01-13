@@ -1,3 +1,5 @@
+// Package adapters provides adapter interfaces and lightweight types used by
+// the TUI to decouple it from the internal domain packages.
 package adapters
 
 import (
@@ -5,9 +7,10 @@ import (
 	"errors"
 )
 
+// ErrNotFound is used when a requested item cannot be found in the repository.
 var ErrNotFound = errors.New("not found")
 
-// Minimal types mirroring internal domain objects. We keep these small to avoid cycles.
+// CommandSetSummary represents a lightweight summary of a command set used by the TUI.
 type CommandSetSummary struct {
 	Name        string
 	Description string

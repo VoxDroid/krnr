@@ -72,6 +72,7 @@ type TuiModel struct {
 type runEventMsg adapters.RunEvent
 type runDoneMsg struct{}
 
+// NewModel constructs the Bubble Tea TUI model used by cmd/tui.
 func NewModel(ui *modelpkg.UIModel) *TuiModel {
 	l := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 	l.Title = "krnr — command sets"
@@ -93,6 +94,7 @@ func NewProgram(ui *modelpkg.UIModel) *tea.Program {
 	return p
 }
 
+// Init initializes the model by refreshing the list and populating the preview.
 func (m *TuiModel) Init() tea.Cmd {
 	// load initial list
 	return func() tea.Msg {
@@ -131,6 +133,7 @@ func (m *TuiModel) Init() tea.Cmd {
 	}
 }
 
+// Update handles incoming events and updates model state.
 func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -682,16 +685,16 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Right pane focused - scroll viewport (fallback)
 			switch s {
 			case "up", "k":
-				m.vp.LineUp(1)
+				m.vp.ScrollUp(1)
 				return m, nil
 			case "down", "j":
-				m.vp.LineDown(1)
+				m.vp.ScrollDown(1)
 				return m, nil
 			case "pgup":
-				m.vp.HalfViewUp()
+				m.vp.HalfPageUp()
 				return m, nil
 			case "pgdown":
-				m.vp.HalfViewDown()
+				m.vp.HalfPageDown()
 				return m, nil
 			case "home":
 				m.vp.GotoTop()
@@ -944,7 +947,7 @@ func simulateOutput(cmd string) string {
 	return "$ " + cmd
 }
 
-func formatCSFullScreen(cs adapters.CommandSetSummary, width int, height int) string {
+func formatCSFullScreen(cs adapters.CommandSetSummary, width int, _ int) string {
 	// Colored headings to match the main UI's visual style
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Background(lipgloss.Color("#0b1226"))
 	h := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4"))
@@ -1052,11 +1055,7 @@ func formatCSFullScreen(cs adapters.CommandSetSummary, width int, height int) st
 	return b.String()
 }
 
-// add a small dry-run output test helper for the headless tests to assert
-// the detail view renders simulated outputs for echo commands.
-func dryRunOutputForTests(c adapters.CommandSetSummary, width int) string {
-	return formatCSFullScreen(c, width, 20)
-}
+
 
 func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 	// invisible table layout — keep formatting simple and predictable for tests
@@ -1152,6 +1151,7 @@ func uniqueDestPath(base string) string {
 	return base
 }
 
+// View renders the current TUI view as a string.
 func (m *TuiModel) View() string {
 	if m.showDetail {
 		// Use the same top title bar and content container approach as the main
@@ -1191,7 +1191,8 @@ func (m *TuiModel) View() string {
 			if leftW < 20 {
 				leftW = 20
 			}
-			leftStyle := contentStyle.Copy().Width(leftW)
+			leftStyle := contentStyle
+			leftStyle = leftStyle.Width(leftW)
 			// compute inner sizes for the right pane and pass them to the renderer
 			innerRightW := rightW - 2
 			if innerRightW < 10 {
@@ -1319,8 +1320,7 @@ func (m *TuiModel) View() string {
 		rightW = 12
 	}
 	rightStyle := lipgloss.NewStyle().BorderStyle(rightBorderStyle).BorderForeground(lipgloss.Color(rightBorder)).Padding(1).Width(rightW).Height(bodyH)
-	var right string
-	right = rightStyle.Render(m.vp.View())
+	right := rightStyle.Render(m.vp.View())
 
 	var body string
 	if m.width < 80 {
@@ -1450,7 +1450,7 @@ func (m *TuiModel) renderVersions(width, height int) string {
 }
 
 // formatVersionPreview renders a short preview for a version (commands and dry-run)
-func formatVersionPreview(name string, v adapters.Version, width int, height int) string {
+func formatVersionPreview(name string, v adapters.Version, _ int, _ int) string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("krnr — %s v%d • %s\n", name, v.Version, v.Operation))
 	b.WriteString(strings.Repeat("-", 30) + "\n")

@@ -10,11 +10,13 @@ import (
 // RegistryAdapterImpl adapts internal/registry.Repository to the UI adapters.RegistryAdapter interface.
 type RegistryAdapterImpl struct{ repo *registry.Repository }
 
+// NewRegistryAdapter returns an adapter that wraps an internal registry.Repository.
 func NewRegistryAdapter(repo *registry.Repository) *RegistryAdapterImpl {
 	return &RegistryAdapterImpl{repo: repo}
 }
 
-func (r *RegistryAdapterImpl) ListCommandSets(ctx context.Context) ([]CommandSetSummary, error) {
+// ListCommandSets returns a list of command set summaries.
+func (r *RegistryAdapterImpl) ListCommandSets(_ context.Context) ([]CommandSetSummary, error) {
 	sets, err := r.repo.ListCommandSets()
 	if err != nil {
 		return nil, fmt.Errorf("list command sets: %w", err)
@@ -26,7 +28,8 @@ func (r *RegistryAdapterImpl) ListCommandSets(ctx context.Context) ([]CommandSet
 	return out, nil
 }
 
-func (r *RegistryAdapterImpl) GetCommandSet(ctx context.Context, name string) (CommandSetSummary, error) {
+// GetCommandSet retrieves a full CommandSetSummary by name.
+func (r *RegistryAdapterImpl) GetCommandSet(_ context.Context, name string) (CommandSetSummary, error) {
 	s, err := r.repo.GetCommandSetByName(name)
 	if err != nil {
 		return CommandSetSummary{}, fmt.Errorf("get: %w", err)
@@ -51,7 +54,8 @@ func (r *RegistryAdapterImpl) GetCommandSet(ctx context.Context, name string) (C
 	}, nil
 }
 
-func (r *RegistryAdapterImpl) GetCommands(ctx context.Context, name string) ([]string, error) {
+// GetCommands returns only the commands for a named command set.
+func (r *RegistryAdapterImpl) GetCommands(_ context.Context, name string) ([]string, error) {
 	s, err := r.repo.GetCommandSetByName(name)
 	if err != nil {
 		return nil, fmt.Errorf("get commands: %w", err)
@@ -66,7 +70,8 @@ func (r *RegistryAdapterImpl) GetCommands(ctx context.Context, name string) ([]s
 	return out, nil
 }
 
-func (r *RegistryAdapterImpl) SaveCommandSet(ctx context.Context, cs CommandSetSummary) error {
+// SaveCommandSet creates a new command set in the underlying repository.
+func (r *RegistryAdapterImpl) SaveCommandSet(_ context.Context, cs CommandSetSummary) error {
 	// Map CommandSetSummary (with Commands) into repository CreateCommandSet
 	var desc *string
 	if cs.Description != "" {
@@ -84,11 +89,13 @@ func (r *RegistryAdapterImpl) SaveCommandSet(ctx context.Context, cs CommandSetS
 	return err
 }
 
-func (r *RegistryAdapterImpl) DeleteCommandSet(ctx context.Context, name string) error {
+// DeleteCommandSet deletes a command set by name.
+func (r *RegistryAdapterImpl) DeleteCommandSet(_ context.Context, name string) error {
 	return r.repo.DeleteCommandSet(name)
 }
 
-func (r *RegistryAdapterImpl) ReplaceCommands(ctx context.Context, name string, commands []string) error {
+// ReplaceCommands replaces the commands for the named set.
+func (r *RegistryAdapterImpl) ReplaceCommands(_ context.Context, name string, commands []string) error {
 	cs, err := r.repo.GetCommandSetByName(name)
 	if err != nil {
 		return err
@@ -99,7 +106,8 @@ func (r *RegistryAdapterImpl) ReplaceCommands(ctx context.Context, name string, 
 	return r.repo.ReplaceCommands(cs.ID, commands)
 }
 
-func (r *RegistryAdapterImpl) UpdateCommandSet(ctx context.Context, oldName string, cs CommandSetSummary) error {
+// UpdateCommandSet updates metadata and tags for an existing set.
+func (r *RegistryAdapterImpl) UpdateCommandSet(_ context.Context, oldName string, cs CommandSetSummary) error {
 	cur, err := r.repo.GetCommandSetByName(oldName)
 	if err != nil {
 		return err
@@ -123,7 +131,8 @@ func (r *RegistryAdapterImpl) UpdateCommandSet(ctx context.Context, oldName stri
 	return r.repo.UpdateCommandSet(cur.ID, cs.Name, desc, an, ae, cs.Tags)
 }
 
-func (r *RegistryAdapterImpl) ListVersionsByName(ctx context.Context, name string) ([]Version, error) {
+// ListVersionsByName lists historical versions for the named command set.
+func (r *RegistryAdapterImpl) ListVersionsByName(_ context.Context, name string) ([]Version, error) {
 	vers, err := r.repo.ListVersionsByName(name)
 	if err != nil {
 		return nil, err
@@ -143,6 +152,7 @@ func (r *RegistryAdapterImpl) ListVersionsByName(ctx context.Context, name strin
 	return out, nil
 }
 
-func (r *RegistryAdapterImpl) ApplyVersionByName(ctx context.Context, name string, versionNum int) error {
+// ApplyVersionByName applies a historical version to the named set (rollback).
+func (r *RegistryAdapterImpl) ApplyVersionByName(_ context.Context, name string, versionNum int) error {
 	return r.repo.ApplyVersionByName(name, versionNum)
 }

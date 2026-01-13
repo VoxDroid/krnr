@@ -41,12 +41,7 @@ func TestInitPopulatesPreview(t *testing.T) {
 	}
 }
 
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
+
 
 func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	// create a set with a multi-line description and two commands
@@ -348,8 +343,7 @@ func TestDeleteConfirmUppercaseY(t *testing.T) {
 		t.Fatalf("expected delete prompt in detail, got:\n%s", m.detail)
 	}
 	// confirm with uppercase 'Y'
-	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
-	m = m4.(*TuiModel)
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
 	if reg.lastDeleted != "upcase" {
 		t.Fatalf("expected DeleteCommandSet called for 'upcase', got %q", reg.lastDeleted)
 	}
@@ -373,8 +367,7 @@ func TestExportConfirmUppercaseY(t *testing.T) {
 		t.Fatalf("expected export prompt in detail, got:\n%s", m.detail)
 	}
 	// confirm with uppercase Y
-	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
-	m = m4.(*TuiModel)
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
 	if imp.lastName != "upcaseexp" {
 		t.Fatalf("expected Export called for 'upcaseexp', got %q", imp.lastName)
 	}
@@ -485,19 +478,19 @@ func (f *versionsFakeRegistry) DeleteCommandSet(_ context.Context, _ string) err
 func (f *versionsFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
 	return f.full.Commands, nil
 }
-func (f *versionsFakeRegistry) ReplaceCommands(_ context.Context, name string, cmds []string) error {
+func (f *versionsFakeRegistry) ReplaceCommands(_ context.Context, _ string, cmds []string) error {
 	f.full.Commands = append([]string{}, cmds...)
 	return nil
 }
-func (f *versionsFakeRegistry) UpdateCommandSet(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+func (f *versionsFakeRegistry) UpdateCommandSet(_ context.Context, _ string, cs adapters.CommandSetSummary) error {
 	f.full.Name = cs.Name
 	f.full.Description = cs.Description
 	return nil
 }
-func (f *versionsFakeRegistry) ListVersionsByName(_ context.Context, name string) ([]adapters.Version, error) {
+func (f *versionsFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return append([]adapters.Version{}, f.versions...), nil
 }
-func (f *versionsFakeRegistry) ApplyVersionByName(_ context.Context, name string, versionNum int) error {
+func (f *versionsFakeRegistry) ApplyVersionByName(_ context.Context, _ string, versionNum int) error {
 	f.lastAppliedVersion = versionNum
 	// simulate applying by finding version and updating full.Commands
 	for _, v := range f.versions {

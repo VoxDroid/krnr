@@ -39,7 +39,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	// create and start the program configured to use the pty
 	prog := tea.NewProgram(m, tea.WithAltScreen(), tea.WithInput(tty), tea.WithOutput(tty))
 	go func() {
-		_ = prog.Start()
+		_, _ = prog.Run()
 	}()
 
 	// give the program some time to initialize and render
@@ -49,7 +49,10 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	r := bufio.NewReader(p)
 	var b strings.Builder
 	// read available bytes (non-blocking with small timeout)
-	p.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+	if err := p.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
+		// ignore deadline set errors (platform specifics)
+		t.Logf("SetReadDeadline: %v", err)
+	}
 	for {
 		line, err := r.ReadString('\n')
 		if err != nil {

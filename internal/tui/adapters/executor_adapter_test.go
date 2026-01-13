@@ -10,7 +10,7 @@ import (
 // fakeRunner writes provided lines to stdout and returns
 type fakeRunner struct{ lines []string }
 
-func (f *fakeRunner) Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
+func (f *fakeRunner) Execute(_ context.Context, _ string, _ string, stdout io.Writer, _ io.Writer) error {
 	for _, l := range f.lines {
 		_, _ = io.WriteString(stdout, l+"\n")
 		// slight delay to simulate streaming
