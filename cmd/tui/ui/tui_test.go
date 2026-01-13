@@ -158,6 +158,9 @@ func TestDetailViewShowsTitle(t *testing.T) {
 	if !strings.Contains(view, "(e) Edit") {
 		t.Fatalf("expected detail view to include '(e) Edit' hint, got:\n%s", view)
 	}
+	if !strings.Contains(view, "(d) Delete") {
+		t.Fatalf("expected detail view to include '(d) Delete' hint, got:\n%s", view)
+	}
 }
 
 func TestEditReplacesCommands(t *testing.T) {
@@ -209,6 +212,37 @@ func TestEditReplacesCommands(t *testing.T) {
 		t.Fatalf("expected updated command shown in detail, got:\n%s", m.detail)
 	}
 }
+
+func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// trigger delete prompt
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m = m3.(*TuiModel)
+	if !strings.Contains(m.detail, "Delete 'one' permanently?") {
+		t.Fatalf("expected delete prompt in detail, got:\n%s", m.detail)
+	}
+	// confirm deletion
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m = m4.(*TuiModel)
+	if reg.lastDeleted != "one" {
+		t.Fatalf("expected DeleteCommandSet called for 'one', got %q", reg.lastDeleted)
+	}
+	if m.showDetail {
+		t.Fatalf("expected showDetail false after deletion")
+	}
+	if len(m.list.Items()) != 0 {
+		t.Fatalf("expected list to be empty after deletion, got %d", len(m.list.Items()))
+	}
+} 
 // minimal fakes for testing
 type fakeRegistry struct{ items []adapters.CommandSetSummary }
 
@@ -262,12 +296,27 @@ type replaceFakeRegistry struct{
 	full  adapters.CommandSetSummary
 	lastName string
 	lastCommands []string
-}
+	lastDeleted string
+} 
 
 func (f *replaceFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) { return f.items, nil }
 func (f *replaceFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) { return f.full, nil }
 func (f *replaceFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error { return nil }
-func (f *replaceFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
+func (f *replaceFakeRegistry) DeleteCommandSet(_ context.Context, name string) error {
+	f.lastDeleted = name
+	// remove from items
+	newItems := []adapters.CommandSetSummary{}
+	for _, it := range f.items {
+		if it.Name != name {
+			newItems = append(newItems, it)
+		}
+	}
+	f.items = newItems
+	if f.full.Name == name {
+		f.full = adapters.CommandSetSummary{}
+	}
+	return nil
+} 
 func (f *replaceFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) { return f.full.Commands, nil }
 func (f *replaceFakeRegistry) ReplaceCommands(_ context.Context, name string, cmds []string) error {
 	f.lastName = name

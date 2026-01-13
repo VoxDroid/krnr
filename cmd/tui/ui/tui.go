@@ -29,6 +29,9 @@ type TuiModel struct {
 	showDetail    bool
 	detail        string
 	detailName    string
+	// delete confirmation state
+	pendingDelete bool
+	pendingDeleteName string
 	runInProgress bool
 	logs          []string
 	cancelRun     func()
@@ -39,7 +42,7 @@ type TuiModel struct {
 	lastSelectedName string
 	// focus: false = left pane (list), true = right pane (viewport)
 	focusRight bool
-}
+} 
 
 // Messages
 type runEventMsg adapters.RunEvent
@@ -196,6 +199,75 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if updated, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
 					m.detail = formatCSFullScreen(updated, m.width, m.height)
 					m.vp.SetContent(m.detail)
+				}
+			}
+			return m, nil
+		case "d":
+			// initiate delete confirmation (only valid in detail view)
+			if !m.showDetail {
+				return m, nil
+			}
+			var name string
+			if i, ok := m.list.SelectedItem().(csItem); ok {
+				name = i.cs.Name
+			} else if m.detailName != "" {
+				name = m.detailName
+			}
+			if name == "" { return m, nil }
+			m.pendingDelete = true
+			m.pendingDeleteName = name
+			m.detail = fmt.Sprintf("Delete '%s' permanently? [y/N]\n\nPress (y) to confirm, (n) or (b) to cancel", name)
+			m.vp.SetContent(m.detail)
+			return m, nil
+		case "y":
+			if m.pendingDelete {
+				name := m.pendingDeleteName
+				if err := m.uiModel.Delete(context.Background(), name); err != nil {
+					m.logs = append(m.logs, "delete error: "+err.Error())
+					m.pendingDelete = false
+					return m, nil
+				}
+				// refresh list and preview
+				_ = m.uiModel.RefreshList(context.Background())
+				items := make([]list.Item, 0, len(m.uiModel.ListCached()))
+				for _, s := range m.uiModel.ListCached() {
+					items = append(items, csItem{cs: s})
+				}
+				m.list.SetItems(items)
+				m.logs = append(m.logs, fmt.Sprintf("deleted '%s'", name))
+				m.pendingDelete = false
+				m.pendingDeleteName = ""
+				m.showDetail = false
+				// select first item and refresh preview if exists
+				if len(items) > 0 {
+					m.list.Select(0)
+					if it, ok := items[0].(csItem); ok {
+						if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+							m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
+						} else {
+							m.vp.SetContent(formatCSDetails(it.cs, m.vp.Width))
+						}
+					}
+				} else {
+					m.vp.SetContent("")
+				}
+			}
+			return m, nil
+		case "n":
+			if m.pendingDelete {
+				m.pendingDelete = false
+				// restore detail of the selected (or the cached name)
+				name := m.detailName
+				if name == "" {
+					if si := m.list.SelectedItem(); si != nil {
+						if it, ok := si.(csItem); ok { name = it.cs.Name }
+					}
+				}
+				if name != "" {
+					if cs, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
+						m.detail = formatCSFullScreen(cs, m.width, m.height)
+						m.vp.SetContent(m.detail)
+					}
 				}
 			}
 			return m, nil
@@ -753,7 +825,7 @@ func (m *TuiModel) View() string {
 		footer := lipgloss.NewStyle().
 			Italic(true).
 			Foreground(lipgloss.Color("#94a3b8")).
-			Render("(e) Edit • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
+			Render("(e) Edit • (d) Delete • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
 		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
 

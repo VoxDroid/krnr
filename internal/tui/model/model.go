@@ -69,6 +69,11 @@ func (m *UIModel) ReplaceCommands(ctx context.Context, name string, commands []s
 	return m.registry.ReplaceCommands(ctx, name, commands)
 }
 
+// Delete removes a named command set from the registry
+func (m *UIModel) Delete(ctx context.Context, name string) error {
+	return m.registry.DeleteCommandSet(ctx, name)
+}
+
 // Export an existing commandset to dest path
 func (m *UIModel) Export(ctx context.Context, name string, dest string) error {
 	_, err := m.registry.GetCommandSet(ctx, name)
@@ -76,7 +81,7 @@ func (m *UIModel) Export(ctx context.Context, name string, dest string) error {
 		return err
 	}
 	return m.impExp.Export(ctx, name, dest)
-}
+} 
 
 // Import imports a file and returns after completion (blocking)
 func (m *UIModel) Import(ctx context.Context, src string, policy string) error {
