@@ -62,7 +62,7 @@ func runSaveWithInput(t *testing.T, initialName string, stdin string, commands [
 	// do not close DB: caller test handles environment between tests
 	r := registry.NewRepository(dbConn)
 	_ = r.DeleteCommandSet(initialName)
-	_ = r.DeleteCommandSet(initialName+"-2")
+	_ = r.DeleteCommandSet(initialName + "-2")
 	// create a pre-existing set
 	if _, err := r.CreateCommandSet(initialName, nil, nil, nil, nil); err != nil {
 		t.Fatalf("CreateCommandSet: %v", err)

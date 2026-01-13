@@ -44,6 +44,8 @@ type RegistryAdapter interface {
 	DeleteCommandSet(ctx context.Context, name string) error
 	// ReplaceCommands replaces the commands for an existing command set.
 	ReplaceCommands(ctx context.Context, name string, commands []string) error
+	// UpdateCommandSet updates metadata and tags for an existing command set.
+	UpdateCommandSet(ctx context.Context, oldName string, cs CommandSetSummary) error
 }
 
 // ExecutorAdapter describes running and streaming commandset executions.
@@ -51,7 +53,6 @@ type RegistryAdapter interface {
 type ExecutorAdapter interface {
 	Run(ctx context.Context, name string, commands []string) (RunHandle, error)
 }
-
 
 // ImportExportAdapter describes import/export operations.
 type ImportExportAdapter interface {

@@ -102,6 +102,75 @@ func (r *Repository) ListCommandSets() ([]CommandSet, error) {
 	return out, nil
 }
 
+// UpdateCommandSet updates a command set's metadata (name, description, author fields and tags).
+// It records an update version snapshot of the current commands.
+func (r *Repository) UpdateCommandSet(commandSetID int64, newName string, description *string, authorName *string, authorEmail *string, tags []string) error {
+	trx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = trx.Rollback() }()
+
+	// ensure newName does not collide with another set
+	var existingID int64
+	row := trx.QueryRow("SELECT id FROM command_sets WHERE name = ?", newName)
+	if err := row.Scan(&existingID); err == nil {
+		if existingID != commandSetID {
+			return fmt.Errorf("name %q already in use", newName)
+		}
+	} else {
+		// if Scan fails with no rows it's fine; other errors propagate
+		if err != sql.ErrNoRows && err != nil {
+			return err
+		}
+	}
+
+	// perform update
+	if _, err := trx.Exec("UPDATE command_sets SET name = ?, description = ?, author_name = ?, author_email = ? WHERE id = ?", newName, description, authorName, authorEmail, commandSetID); err != nil {
+		return err
+	}
+
+	// replace tags: remove existing associations and add provided ones
+	if _, err := trx.Exec("DELETE FROM command_set_tags WHERE command_set_id = ?", commandSetID); err != nil {
+		return err
+	}
+	for _, tag := range tags {
+		if _, err := trx.Exec("INSERT OR IGNORE INTO tags (name) VALUES (?)", tag); err != nil {
+			return err
+		}
+		var tagID int64
+		rrow := trx.QueryRow("SELECT id FROM tags WHERE name = ?", tag)
+		if err := rrow.Scan(&tagID); err != nil {
+			return err
+		}
+		if _, err := trx.Exec("INSERT OR IGNORE INTO command_set_tags (command_set_id, tag_id) VALUES (?, ?)", commandSetID, tagID); err != nil {
+			return err
+		}
+	}
+
+	// snapshot current commands for version history
+	rows, err := trx.Query("SELECT command FROM commands WHERE command_set_id = ? ORDER BY position ASC", commandSetID)
+	if err != nil {
+		return err
+	}
+	var cmds []string
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		cmds = append(cmds, c)
+	}
+	_ = rows.Close()
+
+	if err := r.recordVersionTx(trx, commandSetID, authorName, authorEmail, description, cmds, "update"); err != nil {
+		return err
+	}
+
+	return trx.Commit()
+}
+
 // DeleteCommandSet removes a command set and its commands by name.
 func (r *Repository) DeleteCommandSet(name string) error {
 	trx, err := r.db.Begin()

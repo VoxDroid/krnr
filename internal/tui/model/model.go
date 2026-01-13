@@ -14,9 +14,9 @@ var ErrNotFound = errors.New("not found")
 // UIModel is a framework-agnostic model for screens and actions.
 // It depends only on adapter interfaces.
 type UIModel struct {
-	registry adapters.RegistryAdapter
-	executor adapters.ExecutorAdapter
-	impExp   adapters.ImportExportAdapter
+	registry  adapters.RegistryAdapter
+	executor  adapters.ExecutorAdapter
+	impExp    adapters.ImportExportAdapter
 	installer adapters.InstallerAdapter
 
 	cache []adapters.CommandSetSummary
@@ -70,6 +70,11 @@ func (m *UIModel) ReplaceCommands(ctx context.Context, name string, commands []s
 	return m.registry.ReplaceCommands(ctx, name, commands)
 }
 
+// UpdateCommandSet updates metadata (name, description, author, tags) for an existing set
+func (m *UIModel) UpdateCommandSet(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	return m.registry.UpdateCommandSet(ctx, oldName, cs)
+}
+
 // Delete removes a named command set from the registry
 func (m *UIModel) Delete(ctx context.Context, name string) error {
 	return m.registry.DeleteCommandSet(ctx, name)
@@ -85,7 +90,7 @@ func (m *UIModel) Export(ctx context.Context, name string, dest string) error {
 		return err
 	}
 	return m.impExp.Export(ctx, name, dest)
-} 
+}
 
 // Import imports a file and returns after completion (blocking)
 func (m *UIModel) Import(ctx context.Context, src string, policy string) error {
@@ -93,8 +98,12 @@ func (m *UIModel) Import(ctx context.Context, src string, policy string) error {
 }
 
 // Install / Uninstall
-func (m *UIModel) Install(ctx context.Context, name string) error { return m.installer.Install(ctx, name) }
-func (m *UIModel) Uninstall(ctx context.Context, name string) error { return m.installer.Uninstall(ctx, name) }
+func (m *UIModel) Install(ctx context.Context, name string) error {
+	return m.installer.Install(ctx, name)
+}
+func (m *UIModel) Uninstall(ctx context.Context, name string) error {
+	return m.installer.Uninstall(ctx, name)
+}
 
 // Save creates a new command set from provided metadata and commands
 func (m *UIModel) Save(ctx context.Context, cs adapters.CommandSetSummary) error {
@@ -119,4 +128,4 @@ func FakeRunHandle(lines []string, delay time.Duration) adapters.RunHandle {
 type fakeRunHandle struct{ ch <-chan adapters.RunEvent }
 
 func (f *fakeRunHandle) Events() <-chan adapters.RunEvent { return f.ch }
-func (f *fakeRunHandle) Cancel() {}
+func (f *fakeRunHandle) Cancel()                          {}

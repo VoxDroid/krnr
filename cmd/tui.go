@@ -35,7 +35,9 @@ var tuiCmd = &cobra.Command{
 		impExpAdapter := adapters.NewImportExportAdapter(dbConn)
 
 		uiModel := modelpkg.New(regAdapter, execAdapter, impExpAdapter, nil)
-		if err := uiModel.RefreshList(ctx); err != nil { return err }
+		if err := uiModel.RefreshList(ctx); err != nil {
+			return err
+		}
 
 		p := ui.NewProgram(uiModel)
 		return p.Start()
@@ -46,16 +48,15 @@ func init() {
 	rootCmd.AddCommand(tuiCmd)
 }
 
-
 // csItem adapts adapters.CommandSetSummary to list.Item
 type csItem struct{ cs adapters.CommandSetSummary }
 
-func (c csItem) Title() string { return c.cs.Name }
+func (c csItem) Title() string       { return c.cs.Name }
 func (c csItem) Description() string { return c.cs.Description }
 func (c csItem) FilterValue() string { return c.cs.Name + " " + c.cs.Description }
 
 // model implements tea.Model
-type model struct{
+type model struct {
 	list       list.Model
 	vp         viewport.Model
 	width      int

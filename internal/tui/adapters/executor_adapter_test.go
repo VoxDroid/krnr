@@ -24,13 +24,21 @@ func TestExecutorAdapter_RunStreamsOutput(t *testing.T) {
 	a := NewExecutorAdapter(r)
 	// run a single command (fake runner will stream the 3 lines)
 	h, err := a.Run(context.Background(), "set", []string{"run"})
-	if err != nil { t.Fatalf("run failed: %v", err) }
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
 	var got []string
 	for ev := range h.Events() {
-		if ev.Err != nil { t.Fatalf("event error: %v", ev.Err) }
+		if ev.Err != nil {
+			t.Fatalf("event error: %v", ev.Err)
+		}
 		// skip the announce line that indicates the command
-		if len(ev.Line) > 3 && ev.Line[:3] == "-> " { continue }
+		if len(ev.Line) > 3 && ev.Line[:3] == "-> " {
+			continue
+		}
 		got = append(got, ev.Line)
 	}
-	if len(got) != 3 { t.Fatalf("expected 3 lines got %d", len(got)) }
+	if len(got) != 3 {
+		t.Fatalf("expected 3 lines got %d", len(got))
+	}
 }

@@ -18,10 +18,10 @@ import (
 // catch real terminal rendering/regressions.
 func TestTuiInitialRender_Pty(t *testing.T) {
 	full := adapters.CommandSetSummary{
-		Name: "with-params",
+		Name:        "with-params",
 		Description: "Param demo",
-		Commands: []string{"echo User: {{user}}", "echo Token: {{token}}"},
-		AuthorName: "VoxDroid",
+		Commands:    []string{"echo User: {{user}}", "echo Token: {{token}}"},
+		AuthorName:  "VoxDroid",
 		AuthorEmail: "izeno.contact@gmail.com",
 	}
 	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "with-params", Description: "Param demo"}}, full: full}

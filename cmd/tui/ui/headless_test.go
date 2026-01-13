@@ -20,16 +20,22 @@ func TestRunStreamsLinesHeadless(t *testing.T) {
 	// init
 	m.Init()()
 	// ensure selected item exists
-	if len(m.list.Items()) == 0 { t.Fatalf("no items") }
+	if len(m.list.Items()) == 0 {
+		t.Fatalf("no items")
+	}
 
 	// Start a run directly (avoid keybinding being swallowed by the list in tests).
 	h, err := m.uiModel.Run(context.Background(), m.list.Items()[0].(csItem).cs.Name, nil)
-	if err != nil { t.Fatalf("run start failed: %v", err) }
+	if err != nil {
+		t.Fatalf("run start failed: %v", err)
+	}
 	ch := make(chan adapters.RunEvent)
 	// ensure model runCh is set so Update continues reading
 	m.runCh = ch
 	go func() {
-		for ev := range h.Events() { ch <- ev }
+		for ev := range h.Events() {
+			ch <- ev
+		}
 		close(ch)
 	}()
 
@@ -41,11 +47,17 @@ func TestRunStreamsLinesHeadless(t *testing.T) {
 		m1, cmd = m.Update(msg)
 		m = m1.(*TuiModel)
 		// stop when run finished
-		if !m.runInProgress && m.runCh == nil { break }
+		if !m.runInProgress && m.runCh == nil {
+			break
+		}
 	}
 
-	if len(m.logs) != 3 { t.Fatalf("expected 3 log lines got %d", len(m.logs)) }
-	if m.logs[0] != "line1" || m.logs[2] != "line3" { t.Fatalf("unexpected logs: %v", m.logs) }
+	if len(m.logs) != 3 {
+		t.Fatalf("expected 3 log lines got %d", len(m.logs))
+	}
+	if m.logs[0] != "line1" || m.logs[2] != "line3" {
+		t.Fatalf("unexpected logs: %v", m.logs)
+	}
 }
 
 // fake executor adapter that returns a FakeRunHandle from the model package

@@ -17,8 +17,12 @@ func TestThemeToggle(t *testing.T) {
 	m := NewModel(ui)
 	m.Init()()
 	// default is off
-	if m.themeHighContrast { t.Fatalf("expected theme default off") }
+	if m.themeHighContrast {
+		t.Fatalf("expected theme default off")
+	}
 	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
 	m = m1.(*TuiModel)
-	if !m.themeHighContrast { t.Fatalf("expected theme toggled on") }
+	if !m.themeHighContrast {
+		t.Fatalf("expected theme toggled on")
+	}
 }

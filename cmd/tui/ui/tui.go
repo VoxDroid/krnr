@@ -15,7 +15,6 @@ import (
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
-	interactive "github.com/VoxDroid/krnr/internal/utils"
 )
 
 // TuiModel is the Bubble Tea model used by cmd/tui.
@@ -27,27 +26,38 @@ type TuiModel struct {
 	width  int
 	height int
 
-	showDetail    bool
-	detail        string
-	detailName    string
+	showDetail bool
+	detail     string
+	detailName string
 	// delete confirmation state
-	pendingDelete bool
+	pendingDelete     bool
 	pendingDeleteName string
 	// export confirmation state
-	pendingExport bool
+	pendingExport     bool
 	pendingExportName string
 	pendingExportDest string
-	runInProgress bool
-	logs          []string
-	cancelRun     func()
-	runCh         chan adapters.RunEvent
+	runInProgress     bool
+	logs              []string
+	cancelRun         func()
+	runCh             chan adapters.RunEvent
 	// accessibility / theme
 	themeHighContrast bool
 	// track last selected name so we can detect changes and update preview
 	lastSelectedName string
 	// focus: false = left pane (list), true = right pane (viewport)
 	focusRight bool
-} 
+
+	// editing metadata modal state
+	editingMeta bool
+	editor      struct {
+		field    int // 0=name,1=desc,2=tags,3=commands
+		name     string
+		desc     string
+		tags     string
+		commands []string
+		cmdIndex int
+	}
+}
 
 // Messages
 type runEventMsg adapters.RunEvent
@@ -115,6 +125,128 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		s := msg.String()
+		// If we're editing metadata, consume keys for the editor first
+		if m.editingMeta {
+			// tab cycles fields
+			switch s {
+			case "tab":
+				m.editor.field = (m.editor.field + 1) % 4
+				return m, nil
+			case "esc":
+				// cancel editing and restore detail view
+				m.editingMeta = false
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
+					m.detail = formatCSFullScreen(cs, m.width, m.height)
+					m.vp.SetContent(m.detail)
+				}
+				return m, nil
+			case "up", "k":
+				if m.editor.field == 3 && m.editor.cmdIndex > 0 {
+					m.editor.cmdIndex--
+				}
+				return m, nil
+			case "down", "j":
+				if m.editor.field == 3 && m.editor.cmdIndex < len(m.editor.commands)-1 {
+					m.editor.cmdIndex++
+				}
+				return m, nil
+			case "enter":
+				// Treat enter as newline for description field only
+				if m.editor.field == 1 {
+					m.editor.desc += "\n"
+				}
+				return m, nil
+			}
+
+			// Ctrl+A: add command (use Ctrl to avoid colliding with typed runes)
+			if msg.Type == tea.KeyCtrlA && m.editor.field == 3 {
+				m.editor.commands = append(m.editor.commands, "")
+				m.editor.cmdIndex = len(m.editor.commands) - 1
+				return m, nil
+			}
+			// Ctrl+D: delete current command
+			if msg.Type == tea.KeyCtrlD && m.editor.field == 3 && len(m.editor.commands) > 0 {
+				idx := m.editor.cmdIndex
+				m.editor.commands = append(m.editor.commands[:idx], m.editor.commands[idx+1:]...)
+				if m.editor.cmdIndex >= len(m.editor.commands) && m.editor.cmdIndex > 0 {
+					m.editor.cmdIndex--
+				}
+				if len(m.editor.commands) == 0 {
+					m.editor.commands = []string{""}
+				}
+				return m, nil
+			}
+
+			// Save on Ctrl+S
+			if msg.Type == tea.KeyCtrlS {
+				// build new summary and persist changes
+				newCS := adapters.CommandSetSummary{
+					Name:        m.editor.name,
+					Description: m.editor.desc,
+					Tags:        []string{},
+				}
+				if strings.TrimSpace(m.editor.tags) != "" {
+					for _, t := range strings.Split(m.editor.tags, ",") {
+						newCS.Tags = append(newCS.Tags, strings.TrimSpace(t))
+					}
+				}
+				// call update for metadata
+				if err := m.uiModel.UpdateCommandSet(context.Background(), m.detailName, newCS); err != nil {
+					m.logs = append(m.logs, "update: "+err.Error())
+					return m, nil
+				}
+				// replace commands
+				if err := m.uiModel.ReplaceCommands(context.Background(), newCS.Name, filterEmptyLines(m.editor.commands)); err != nil {
+					m.logs = append(m.logs, "replace commands: "+err.Error())
+					return m, nil
+				}
+				// refresh detail
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), newCS.Name); err == nil {
+					m.detailName = cs.Name
+					m.detail = formatCSFullScreen(cs, m.width, m.height)
+					m.vp.SetContent(m.detail)
+				}
+				m.editingMeta = false
+				return m, nil
+			}
+
+			// Handle rune input and backspace depending on field
+			if msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete {
+				switch m.editor.field {
+				case 0:
+					m.editor.name = trimLastRune(m.editor.name)
+				case 1:
+					m.editor.desc = trimLastRune(m.editor.desc)
+				case 2:
+					m.editor.tags = trimLastRune(m.editor.tags)
+				case 3:
+					idx := m.editor.cmdIndex
+					if idx >= 0 && idx < len(m.editor.commands) {
+						m.editor.commands[idx] = trimLastRune(m.editor.commands[idx])
+					}
+				}
+				return m, nil
+			}
+			if msg.Type == tea.KeyRunes {
+				r := msg.Runes
+				for _, ru := range r {
+					switch m.editor.field {
+					case 0:
+						m.editor.name += string(ru)
+					case 1:
+						m.editor.desc += string(ru)
+					case 2:
+						m.editor.tags += string(ru)
+					case 3:
+						idx := m.editor.cmdIndex
+						if idx >= 0 && idx < len(m.editor.commands) {
+							m.editor.commands[idx] += string(ru)
+						}
+					}
+				}
+				return m, nil
+			}
+		}
 		// If the list is in filtering state, let the list consume all keys
 		// (including keys that would otherwise be global controls like q/esc).
 		if m.list.FilterState() == list.Filtering {
@@ -160,7 +292,7 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "e":
-			// Edit commands for the selected command set when in detail view
+			// Open in-TUI metadata editor for the selected command set when in detail view
 			if !m.showDetail {
 				return m, nil
 			}
@@ -171,46 +303,17 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.logs = append(m.logs, "edit: get: "+err.Error())
 					return m, nil
 				}
-				// create temp file with commands
-				tmpf, err := os.CreateTemp("", "krnr-edit-*.txt")
-				if err != nil {
-					m.logs = append(m.logs, "edit: tmpfile: "+err.Error())
-					return m, nil
+				// populate modal editor state
+				m.editingMeta = true
+				m.editor.field = 0
+				m.editor.name = cs.Name
+				m.editor.desc = cs.Description
+				m.editor.tags = strings.Join(cs.Tags, ",")
+				m.editor.commands = append([]string{}, cs.Commands...)
+				if len(m.editor.commands) == 0 {
+					m.editor.commands = []string{""}
 				}
-				defer func() { _ = os.Remove(tmpf.Name()) }()
-				for _, c := range cs.Commands {
-					_, _ = tmpf.WriteString(c + "\n")
-				}
-				_ = tmpf.Close()
-				// open editor
-				if err := interactive.OpenEditor(tmpf.Name()); err != nil {
-					m.logs = append(m.logs, "edit: open editor: "+err.Error())
-					return m, nil
-				}
-				// read back and parse
-				b, err := os.ReadFile(tmpf.Name())
-				if err != nil {
-					m.logs = append(m.logs, "edit: read: "+err.Error())
-					return m, nil
-				}
-				lines := []string{}
-				sc := strings.Split(string(b), "\n")
-				for _, ln := range sc {
-					line := strings.TrimSpace(ln)
-					if line == "" || strings.HasPrefix(line, "#") {
-						continue
-					}
-					lines = append(lines, line)
-				}
-				if err := m.uiModel.ReplaceCommands(context.Background(), name, lines); err != nil {
-					m.logs = append(m.logs, "edit: replace: "+err.Error())
-					return m, nil
-				}
-				// refresh preview
-				if updated, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
-					m.detail = formatCSFullScreen(updated, m.width, m.height)
-					m.vp.SetContent(m.detail)
-				}
+				m.editor.cmdIndex = 0
 			}
 			return m, nil
 		case "d":
@@ -224,7 +327,9 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.detailName != "" {
 				name = m.detailName
 			}
-			if name == "" { return m, nil }
+			if name == "" {
+				return m, nil
+			}
 			m.pendingDelete = true
 			m.pendingDeleteName = name
 			m.detail = fmt.Sprintf("Delete '%s' permanently? [y/N]\n\nPress (y) to confirm, (n) or (b) to cancel", name)
@@ -241,7 +346,9 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.detailName != "" {
 				ename = m.detailName
 			}
-			if ename == "" { return m, nil }
+			if ename == "" {
+				return m, nil
+			}
 			// default dest in temp dir
 			dflt := filepath.Join(os.TempDir(), ename+".db")
 			// ensure we pick a path that doesn't already exist to avoid constraint errors
@@ -315,7 +422,9 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				name := m.detailName
 				if name == "" {
 					if si := m.list.SelectedItem(); si != nil {
-						if it, ok := si.(csItem); ok { name = it.cs.Name }
+						if it, ok := si.(csItem); ok {
+							name = it.cs.Name
+						}
 					}
 				}
 				if name != "" {
@@ -331,7 +440,9 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				name := m.detailName
 				if name == "" {
 					if si := m.list.SelectedItem(); si != nil {
-						if it, ok := si.(csItem); ok { name = it.cs.Name }
+						if it, ok := si.(csItem); ok {
+							name = it.cs.Name
+						}
 					}
 				}
 				if name != "" {
@@ -898,7 +1009,12 @@ func (m *TuiModel) View() string {
 			Padding(1).
 			Width(m.width - 2).
 			Height(bodyH)
-		body := contentStyle.Render(m.detail)
+		var body string
+		if m.editingMeta {
+			body = contentStyle.Render(m.renderEditor())
+		} else {
+			body = contentStyle.Render(m.detail)
+		}
 
 		status := fmt.Sprintf("Viewing: %s", m.detailName)
 		if m.runInProgress {
@@ -911,10 +1027,12 @@ func (m *TuiModel) View() string {
 			Width(m.width).
 			Render(" " + status + " ")
 
-		footer := lipgloss.NewStyle().
-			Italic(true).
-			Foreground(lipgloss.Color("#94a3b8")).
-			Render("(e) Edit • (d) Delete • (s) Export • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
+		var footer string
+		if m.editingMeta {
+			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(Tab) next • (Ctrl+A) add command • (Ctrl+D) del command • (Ctrl+S) save • (Esc) cancel")
+		} else {
+			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(e) Edit • (d) Delete • (s) Export • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit")
+		}
 		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
 
@@ -1027,4 +1145,63 @@ func (m *TuiModel) renderTitleBox(text string) string {
 	title := titleStyle.Render(text)
 	titleInner := lipgloss.Place(m.width-2, 1, lipgloss.Center, lipgloss.Center, title)
 	return lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(titleBorder)).Width(m.width).Render(titleInner)
+}
+
+// renderEditor produces the editor modal content when editing metadata in-place.
+func (m *TuiModel) renderEditor() string {
+	var b strings.Builder
+	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Render(fmt.Sprintf("Edit: %s", m.detailName)))
+	b.WriteString("\n\n")
+	// Name
+	if m.editor.field == 0 {
+		b.WriteString("Name: > " + m.editor.name + "\n")
+	} else {
+		b.WriteString("Name:   " + m.editor.name + "\n")
+	}
+	// Description
+	if m.editor.field == 1 {
+		b.WriteString("Description: > " + m.editor.desc + "\n")
+	} else {
+		b.WriteString("Description:   " + m.editor.desc + "\n")
+	}
+	// Tags
+	if m.editor.field == 2 {
+		b.WriteString("Tags: > " + m.editor.tags + "\n")
+	} else {
+		b.WriteString("Tags:   " + m.editor.tags + "\n")
+	}
+	// Commands
+	b.WriteString("\nCommands:\n")
+	for i, c := range m.editor.commands {
+		prefix := fmt.Sprintf("%d) ", i+1)
+		if m.editor.field == 3 && i == m.editor.cmdIndex {
+			b.WriteString("* " + prefix + c + "\n")
+		} else {
+			b.WriteString("  " + prefix + c + "\n")
+		}
+	}
+	return b.String()
+}
+
+// trimLastRune removes the last rune from a string if present
+func trimLastRune(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	if len(r) == 0 {
+		return ""
+	}
+	return string(r[:len(r)-1])
+}
+
+// filterEmptyLines returns a copy with empty or whitespace-only lines removed
+func filterEmptyLines(in []string) []string {
+	out := []string{}
+	for _, l := range in {
+		if strings.TrimSpace(l) != "" {
+			out = append(out, strings.TrimSpace(l))
+		}
+	}
+	return out
 }

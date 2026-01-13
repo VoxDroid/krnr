@@ -12,7 +12,9 @@ import (
 // ImportExportAdapterImpl adapts exporter/importer package functions to the UI adapter.
 type ImportExportAdapterImpl struct{ db *sql.DB }
 
-func NewImportExportAdapter(db *sql.DB) *ImportExportAdapterImpl { return &ImportExportAdapterImpl{db: db} }
+func NewImportExportAdapter(db *sql.DB) *ImportExportAdapterImpl {
+	return &ImportExportAdapterImpl{db: db}
+}
 
 func (i *ImportExportAdapterImpl) Export(_ context.Context, name string, dest string) error {
 	if name == "" {

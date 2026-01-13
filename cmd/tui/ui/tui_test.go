@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -202,30 +201,6 @@ func TestDetailViewShowsTitle(t *testing.T) {
 }
 
 func TestEditReplacesCommands(t *testing.T) {
-	d := t.TempDir()
-	// create a small script that overwrites the file with new commands
-	var script string
-	if runtime.GOOS == "windows" {
-		script = "@echo off\r\necho echo new1 > %1\r\necho echo new2 >> %1\r\nexit /b 0\r\n"
-		scriptPath := filepath.Join(d, "fake-editor.bat")
-		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-			t.Fatalf("write script: %v", err)
-		}
-		_ = os.Setenv("EDITOR", scriptPath)
-		defer func() { _ = os.Unsetenv("EDITOR") }()
-	} else {
-		script = "#!/bin/sh\nprintf 'echo new1\necho new2\n' > \"$1\"\nexit 0\n"
-		scriptPath := filepath.Join(d, "fake-editor.sh")
-		if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
-			t.Fatalf("write script: %v", err)
-		}
-		if err := os.Chmod(scriptPath, 0o755); err != nil {
-			t.Fatalf("chmod script: %v", err)
-		}
-		_ = os.Setenv("EDITOR", scriptPath)
-		defer func() { _ = os.Unsetenv("EDITOR") }()
-	}
-
 	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
 	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
@@ -236,14 +211,35 @@ func TestEditReplacesCommands(t *testing.T) {
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = m2.(*TuiModel)
-	// trigger edit (should call EDITOR and then ReplaceCommands)
+	// open in-TUI editor
 	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
 	m = m3.(*TuiModel)
-	if reg.lastName != "one" {
-		t.Fatalf("expected ReplaceCommands called with name 'one', got %q", reg.lastName)
+	if !m.editingMeta {
+		t.Fatalf("expected editor to be open")
 	}
-	if len(reg.lastCommands) != 2 || reg.lastCommands[0] != "echo new1" || reg.lastCommands[1] != "echo new2" {
-		t.Fatalf("unexpected replaced commands: %#v", reg.lastCommands)
+	// cycle to commands field (tab 3 times)
+	for i := 0; i < 3; i++ {
+		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		m = m4.(*TuiModel)
+	}
+	// add a new command (Ctrl+A) and type 'echo new1'
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlA})
+	m = m5.(*TuiModel)
+	for _, r := range []rune{'e', 'c', 'h', 'o', ' ', 'n', 'e', 'w', '1'} {
+		m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = m6.(*TuiModel)
+	}
+	// save with Ctrl+S
+	m7, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = m7.(*TuiModel)
+	if reg.lastName != "one" {
+		t.Fatalf("expected UpdateCommandSet called with name 'one', got %q", reg.lastName)
+	}
+	if len(reg.lastCommands) != 2 {
+		t.Fatalf("expected two commands after edit, got %#v", reg.lastCommands)
+	}
+	if reg.lastCommands[1] != "echo new1" {
+		t.Fatalf("expected second command to be 'echo new1', got %q", reg.lastCommands[1])
 	}
 	// the preview in detail should reflect updated commands
 	if !strings.Contains(m.detail, "echo new1") {
@@ -283,11 +279,16 @@ func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
 }
 
 // fake import/export adapter for tests
-type fakeImpExp struct{
+type fakeImpExp struct {
 	lastName string
 	lastDest string
 }
-func (f *fakeImpExp) Export(_ context.Context, name string, dest string) error { f.lastName = name; f.lastDest = dest; return nil }
+
+func (f *fakeImpExp) Export(_ context.Context, name string, dest string) error {
+	f.lastName = name
+	f.lastDest = dest
+	return nil
+}
 func (f *fakeImpExp) Import(_ context.Context, _ string, _ string) error { return nil }
 
 func TestExportFromDetailPromptsAndExportsWhenConfirmed(t *testing.T) {
@@ -326,7 +327,8 @@ func TestExportFromDetailPromptsAndExportsWhenConfirmed(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(m.logs, "\n"), "exported") {
 		t.Fatalf("expected exported log, got: %v", m.logs)
-	}}
+	}
+}
 
 func TestDeleteConfirmUppercaseY(t *testing.T) {
 	full := adapters.CommandSetSummary{Name: "upcase", Description: "Up", Commands: []string{"echo hi"}}
@@ -376,7 +378,8 @@ func TestExportConfirmUppercaseY(t *testing.T) {
 	if imp.lastName != "upcaseexp" {
 		t.Fatalf("expected Export called for 'upcaseexp', got %q", imp.lastName)
 	}
-} 
+}
+
 // minimal fakes for testing
 type fakeRegistry struct{ items []adapters.CommandSetSummary }
 
@@ -394,6 +397,17 @@ func (f *fakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error
 	return []string{"echo hello"}, nil
 }
 func (f *fakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error { return nil }
+func (f *fakeRegistry) UpdateCommandSet(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	// update first matching item
+	for i := range f.items {
+		if f.items[i].Name == oldName {
+			f.items[i].Name = cs.Name
+			f.items[i].Description = cs.Description
+			return nil
+		}
+	}
+	return nil
+}
 
 type fakeExec struct{}
 
@@ -421,21 +435,37 @@ func (f *detailFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error
 func (f *detailFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
 	return []string{"echo hello"}, nil
 }
-func (f *detailFakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error { return nil }
+func (f *detailFakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error {
+	return nil
+}
+func (f *detailFakeRegistry) UpdateCommandSet(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	if f.full.Name == oldName {
+		f.full.Name = cs.Name
+		f.full.Description = cs.Description
+		f.full.Tags = append([]string{}, cs.Tags...)
+	}
+	return nil
+}
 
 // replaceFakeRegistry supports ReplaceCommands and records the last call
 // for assertions in tests.
-type replaceFakeRegistry struct{
-	items []adapters.CommandSetSummary
-	full  adapters.CommandSetSummary
-	lastName string
+type replaceFakeRegistry struct {
+	items        []adapters.CommandSetSummary
+	full         adapters.CommandSetSummary
+	lastName     string
 	lastCommands []string
-	lastDeleted string
-} 
+	lastDeleted  string
+}
 
-func (f *replaceFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) { return f.items, nil }
-func (f *replaceFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) { return f.full, nil }
-func (f *replaceFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error { return nil }
+func (f *replaceFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
+	return f.items, nil
+}
+func (f *replaceFakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) {
+	return f.full, nil
+}
+func (f *replaceFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error {
+	return nil
+}
 func (f *replaceFakeRegistry) DeleteCommandSet(_ context.Context, name string) error {
 	f.lastDeleted = name
 	// remove from items
@@ -450,11 +480,30 @@ func (f *replaceFakeRegistry) DeleteCommandSet(_ context.Context, name string) e
 		f.full = adapters.CommandSetSummary{}
 	}
 	return nil
-} 
-func (f *replaceFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) { return f.full.Commands, nil }
+}
+func (f *replaceFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
+	return f.full.Commands, nil
+}
 func (f *replaceFakeRegistry) ReplaceCommands(_ context.Context, name string, cmds []string) error {
 	f.lastName = name
 	f.lastCommands = append([]string{}, cmds...)
 	f.full.Commands = append([]string{}, cmds...)
+	return nil
+}
+
+func (f *replaceFakeRegistry) UpdateCommandSet(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	f.lastName = cs.Name
+	// update items list if name changed
+	for i := range f.items {
+		if f.items[i].Name == oldName {
+			f.items[i].Name = cs.Name
+			f.items[i].Description = cs.Description
+		}
+	}
+	f.full.Name = cs.Name
+	f.full.Description = cs.Description
+	f.full.AuthorName = cs.AuthorName
+	f.full.AuthorEmail = cs.AuthorEmail
+	f.full.Tags = append([]string{}, cs.Tags...)
 	return nil
 }

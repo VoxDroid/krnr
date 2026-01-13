@@ -66,16 +66,18 @@ func (e *executorAdapter) Run(ctx context.Context, name string, commands []strin
 func joinArgs(a []string) string {
 	out := ""
 	for i, s := range a {
-		if i > 0 { out += " " }
+		if i > 0 {
+			out += " "
+		}
 		out += s
 	}
 	return out
 }
 
-type runHandleImpl struct{
-	ch <-chan RunEvent
+type runHandleImpl struct {
+	ch     <-chan RunEvent
 	cancel context.CancelFunc
 }
 
 func (r *runHandleImpl) Events() <-chan RunEvent { return r.ch }
-func (r *runHandleImpl) Cancel() { r.cancel() }
+func (r *runHandleImpl) Cancel()                 { r.cancel() }
