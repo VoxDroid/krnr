@@ -67,6 +67,7 @@ type TuiModel struct {
 	// versions / rollback state
 	versions               []adapters.Version
 	versionsSelected       int
+	versionsPreviewContent string
 	versionsList           list.Model
 	versionsOffset         int
 	pendingRollback        bool
@@ -143,6 +144,20 @@ func (m *TuiModel) Init() tea.Cmd {
 // Update handles incoming events and updates model state.
 func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
+	// Reconcile versions preview at end of Update to catch external selection
+	// changes (mouse events, direct list.Select calls, or commands that alter
+	// the list selection outside the normal key handlers). This uses the
+	// deterministic setVersionsPreviewIndex helper which is idempotent.
+	defer func() {
+		if m.showDetail && m.focusRight && len(m.versions) > 0 {
+			idx := m.versionsList.Index()
+			if idx < 0 {
+				idx = 0
+			}
+			_ = m.setVersionsPreviewIndex(idx)
+		}
+	}()
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -385,7 +400,12 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.showDetail && m.focusRight && len(m.versions) > 0 {
 				m.versionsList, cmd = m.versionsList.Update(msg)
 				m.versionsSelected = m.versionsList.Index()
-				// selection changed; no preview shown when selecting a version
+				// when a version is highlighted, preview its metadata/commands on the
+				// left-side pane so users can inspect historic versions without
+				// permanently changing the detail view.
+				if m.versionsSelected >= 0 && m.versionsSelected < len(m.versions) {
+					m.setVersionsPreviewIndex(m.versionsSelected)
+				}
 				return m, cmd
 			}
 			if i, ok := m.list.SelectedItem().(csItem); ok {
@@ -745,14 +765,52 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "left":
 			// Switch focus to left pane (list)
 			m.focusRight = false
+			// if we were showing a historic version in the preview, restore the
+			// current/latest command set details for the selected item
+			if m.showDetail && m.detailName != "" {
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
+					m.detail = formatCSFullScreen(cs, m.width, m.height)
+					m.vp.SetContent(m.detail)
+				} else if si := m.list.SelectedItem(); si != nil {
+					if it, ok := si.(csItem); ok {
+						m.vp.SetContent(formatCSDetails(it.cs, m.vp.Width))
+					}
+				}
+			}
 			return m, nil
 		case "right":
-			// Switch focus to right pane (viewport)
+			// Switch focus to right pane (versions)
 			m.focusRight = true
+			// If we have versions loaded, preview the currently-selected version
+			if m.showDetail && len(m.versions) > 0 {
+				idx := m.versionsList.Index()
+				if idx < 0 {
+					idx = 0
+				}
+				m.setVersionsPreviewIndex(idx)
+			}
 			return m, nil
 		case "tab":
-			// Toggle focus between panes
+			// Toggle focus between panes; when toggling back to the left pane we
+			// should restore the current/latest version preview if in detail view
 			m.focusRight = !m.focusRight
+			if !m.focusRight && m.showDetail && m.detailName != "" {
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
+					m.detail = formatCSFullScreen(cs, m.width, m.height)
+					m.vp.SetContent(m.detail)
+				} else if si := m.list.SelectedItem(); si != nil {
+					if it, ok := si.(csItem); ok {
+						m.vp.SetContent(formatCSDetails(it.cs, m.vp.Width))
+					}
+				}
+			} else if m.focusRight && m.showDetail && len(m.versions) > 0 {
+				// toggled into versions pane — preview currently-selected version
+				idx := m.versionsList.Index()
+				if idx < 0 {
+					idx = 0
+				}
+				m.setVersionsPreviewIndex(idx)
+			}
 			return m, nil
 		}
 		// non-printable bindings
@@ -788,7 +846,11 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Forward navigation keys to the versions list so it handles paging
 					var listCmd tea.Cmd
 					m.versionsList, listCmd = m.versionsList.Update(msg)
-					m.versionsSelected = m.versionsList.Index()
+					idx := m.versionsList.Index()
+					if idx < 0 {
+						idx = 0
+					}
+					m.setVersionsPreviewIndex(idx)
 					return m, listCmd
 				}
 			}
@@ -994,11 +1056,25 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// update content for selected
 		if m.showDetail {
 			// when in details mode, reformat the full-screen detail to match the
-			// current terminal width/height so it remains responsive
-			if m.detailName != "" {
-				if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
-					m.detail = formatCSFullScreen(cs, m.width, m.height)
-					m.vp.SetContent(m.detail)
+			// current terminal width/height so it remains responsive. Only update
+			// the main detail when the left pane has focus; otherwise keep the
+			// versions preview visible while focus is on the right pane.
+			if !m.focusRight {
+				if m.detailName != "" {
+					if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
+						m.detail = formatCSFullScreen(cs, m.width, m.height)
+						m.vp.SetContent(m.detail)
+					}
+				}
+			} else {
+				// when focus is on the versions pane, ensure the preview matches
+				// the currently-selected versions list index (if any)
+				if len(m.versions) > 0 {
+					idx := m.versionsList.Index()
+					if idx < 0 {
+						idx = 0
+					}
+					m.setVersionsPreviewIndex(idx)
 				}
 			}
 		} else {
@@ -1385,7 +1461,7 @@ func (m *TuiModel) View() string {
 			body = contentStyle.Render(m.renderEditor())
 		} else if len(m.versions) > 0 {
 			// split the content region into main detail (left) and versions (right)
-			rightW := 36
+			rightW := 30
 			if rightW > m.width/3 {
 				rightW = m.width / 3
 			}
@@ -1452,7 +1528,12 @@ func (m *TuiModel) View() string {
 				m.vp = viewport.New(vpw, vph)
 				m.vp.YOffset = oldOff
 			}
-			m.vp.SetContent(m.detail)
+			// Only set the main detail content when left pane is focused. If the
+			// right pane (versions) is focused, we should display the preview
+			// content which is set by setVersionsPreviewIndex.
+			if !m.focusRight {
+				m.vp.SetContent(m.detail)
+			}
 			left := leftStyle.Render(m.vp.View())
 			rightStyle := lipgloss.NewStyle().BorderStyle(detailRightBorderStyle).BorderForeground(lipgloss.Color(detailRightBorder)).Padding(1).Width(rightW).Height(bodyH)
 			right := rightStyle.Render(m.renderVersions(innerRightW, innerBodyH))
@@ -1690,6 +1771,123 @@ func formatVersionPreview(name string, v adapters.Version, _ int, _ int) string 
 	return b.String()
 }
 
+// setVersionsPreviewIndex sets the versions preview to the given index and
+// updates internal state; returns a tea.Cmd if needed (nil for now).
+func (m *TuiModel) setVersionsPreviewIndex(idx int) tea.Cmd {
+	if idx < 0 || idx >= len(m.versions) {
+		return nil
+	}
+	// If no change to the selection and we already have a preview set, no work needed
+	if idx == m.versionsSelected && m.versionsPreviewContent != "" {
+		return nil
+	}
+	oldIdx := m.versionsSelected
+	oldContent := m.versionsPreviewContent
+	content := formatVersionDetails(m.detailName, m.versions[idx], m.vp.Width)
+	changed := content != oldContent || idx != oldIdx
+
+	// Update state
+	m.versionsSelected = idx
+	m.versionsPreviewContent = content
+	// reset scroll and set new content if it actually changed
+	if changed {
+		m.vp.YOffset = 0
+		m.vp.SetContent(content)
+	}
+	return nil
+}
+
+// formatVersionDetails renders a full metadata view for a historic version.
+// It is similar to the full-screen command set rendering but for a specific
+// version so users can inspect author, description, created date and commands.
+func formatVersionDetails(name string, v adapters.Version, width int) string {
+	// reuse visual styles from full-screen formatting
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Background(lipgloss.Color("#0b1226"))
+	h := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4"))
+	k := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#94a3b8"))
+	var b strings.Builder
+	contentW := width - 6
+	if contentW < 10 {
+		contentW = 10
+	}
+	// Title header
+	titleText := fmt.Sprintf("v%d %s — %s", v.Version, v.Operation, name)
+	b.WriteString(titleStyle.Render(titleText) + "\n")
+	sepLen := contentW
+	if sepLen > len(titleText)+4 {
+		sepLen = len(titleText) + 4
+	}
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#0ea5a4")).Render(strings.Repeat("─", sepLen)) + "\n\n")
+
+	// compute label widths
+	labels := []string{"Version:", "Created:", "Author:", "Description:", "Commands:"}
+	labelW := 0
+	for _, l := range labels {
+		if utf8.RuneCountInString(l) > labelW {
+			labelW = utf8.RuneCountInString(l)
+		}
+	}
+	valueW := contentW - labelW - 1
+	if valueW < 10 {
+		valueW = 10
+	}
+
+	b.WriteString(h.Render("Version:") + " " + fmt.Sprintf("%d", v.Version) + "\n")
+	if v.CreatedAt != "" {
+		b.WriteString(h.Render("Created:") + " " + v.CreatedAt + "\n")
+	}
+	if v.AuthorName != "" {
+		b.WriteString(h.Render("Author:") + " " + v.AuthorName + "\n")
+	}
+
+	if v.Description != "" {
+		lines := wrapText(v.Description, valueW)
+		b.WriteString("\n")
+		b.WriteString(h.Render("Description:") + "\n")
+		b.WriteString(renderTableBlockHeader("", strings.Join(lines, "\n"), labelW))
+	}
+
+	if len(v.Commands) > 0 {
+		b.WriteString("\n")
+		b.WriteString(h.Render("Commands:") + "\n")
+		maxPrefix := 0
+		for i := range v.Commands {
+			p := fmt.Sprintf("%d) ", i+1)
+			if l := utf8.RuneCountInString(p); l > maxPrefix {
+				maxPrefix = l
+			}
+		}
+		innerTextW := valueW - maxPrefix - 1
+		if innerTextW < 10 {
+			innerTextW = 10
+		}
+		var cb strings.Builder
+		for i, c := range v.Commands {
+			p := fmt.Sprintf("%d) ", i+1)
+			cb.WriteString(renderTwoCol(p, c, maxPrefix, innerTextW))
+		}
+		b.WriteString(renderTableBlockHeader("", strings.TrimSuffix(cb.String(), "\n"), labelW))
+	}
+
+	// metadata fields
+	meta := []string{}
+	if v.AuthorName != "" {
+		meta = append(meta, "Author: "+v.AuthorName)
+	}
+	if v.AuthorEmail != "" {
+		meta = append(meta, "Email: "+v.AuthorEmail)
+	}
+	if len(meta) > 0 {
+		b.WriteString("\n")
+		b.WriteString(h.Render("Metadata:") + "\n")
+		for _, m := range meta {
+			b.WriteString(k.Render("  "+m) + "\n")
+		}
+	}
+
+	return b.String()
+}
+
 // detailScrollIndicator builds a small "current/total" indicator for the
 // detail pane based on the viewport's height and vertical offset. It helps
 // users discover where they are inside long details.
@@ -1715,6 +1913,7 @@ func (m *TuiModel) detailScrollIndicator() string {
 	}
 	return fmt.Sprintf("%d/%d", off+1, total)
 }
+
 
 // trimLastRune removes the last rune from a string if present
 func trimLastRune(s string) string {
