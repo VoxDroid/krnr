@@ -13,9 +13,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/VoxDroid/krnr/internal/executor"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
-	"github.com/VoxDroid/krnr/internal/executor"
 )
 
 // TuiModel is the Bubble Tea model used by cmd/tui.
@@ -178,12 +178,16 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.vp.SetContent(m.detail)
 				}
 				return m, nil
-			case "up", "k":
+			case "up":
+				// arrow/up should move the command selection when in commands field;
+				// typed letters like 'k' must be accepted as rune input, so avoid
+				// interpreting the 'k' rune as navigation here.
 				if m.editor.field == 3 && m.editor.cmdIndex > 0 {
 					m.editor.cmdIndex--
 				}
 				return m, nil
-			case "down", "j":
+			case "down":
+				// same rationale as above for 'j' vs down arrow
 				if m.editor.field == 3 && m.editor.cmdIndex < len(m.editor.commands)-1 {
 					m.editor.cmdIndex++
 				}

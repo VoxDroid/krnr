@@ -439,6 +439,7 @@ func TestEditReplacesCommands(t *testing.T) {
 		m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 		m = m6.(*TuiModel)
 	}
+
 	// save with Ctrl+S
 	m7, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
 	m = m7.(*TuiModel)
@@ -554,6 +555,46 @@ func TestEditorSaveRejectsControlCharacters(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected error log about invalid command, got logs: %#v", m.logs)
+	}
+}
+
+func TestEditorTypingKAndSpaceInCommands(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{""}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// open in-TUI editor
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m = m3.(*TuiModel)
+	if !m.editingMeta {
+		t.Fatalf("expected editor to be open")
+	}
+	// cycle to commands field (tab 3 times)
+	for i := 0; i < 3; i++ {
+		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		m = m4.(*TuiModel)
+	}
+	// ensure we're editing the first command
+	if m.editor.cmdIndex != 0 {
+		t.Fatalf("expected cmdIndex 0, got %d", m.editor.cmdIndex)
+	}
+	// type 'k', then space, then 'x'
+	for _, r := range []rune{'k', ' ', 'x'} {
+		m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = m5.(*TuiModel)
+	}
+	if m.editor.commands[m.editor.cmdIndex] != "k x" {
+		t.Fatalf("expected command to contain typed runes 'k x', got %q", m.editor.commands[m.editor.cmdIndex])
+	}
+	// ensure cmdIndex didn't move due to 'k'
+	if m.editor.cmdIndex != 0 {
+		t.Fatalf("expected cmdIndex to remain 0 after typing 'k', got %d", m.editor.cmdIndex)
 	}
 }
 
