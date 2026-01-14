@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
@@ -153,8 +152,8 @@ func TestFilterModeIgnoresControlsAndEscCancels(t *testing.T) {
 	// enter filter mode by sending '/'
 	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	m = m1.(*TuiModel)
-	if m.list.FilterState() != list.Filtering {
-		t.Fatalf("expected list to be in filtering state")
+	if !m.filterMode {
+		t.Fatalf("expected filter mode to be active")
 	}
 	// footer should show only the esc hint while filtering
 	view := m.View()
@@ -165,16 +164,16 @@ func TestFilterModeIgnoresControlsAndEscCancels(t *testing.T) {
 	if strings.Contains(view, "(q) quit") || strings.Contains(view, "(r) run") || strings.Contains(view, "(Enter) details") {
 		t.Fatalf("expected other shortcuts to be hidden while filtering, got footer:\n%s", view)
 	}
-	// pressing 'q' while filtering should NOT quit; the list should still be in filtering state
+	// pressing 'q' while filtering should NOT quit; the filter mode should still be active
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	m = m2.(*TuiModel)
-	if m.list.FilterState() != list.Filtering {
+	if !m.filterMode {
 		t.Fatalf("expected filtering to remain active after pressing q")
 	}
 	// pressing ESC should cancel filter
 	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = m3.(*TuiModel)
-	if m.list.FilterState() == list.Filtering {
+	if m.filterMode {
 		t.Fatalf("expected filtering to be cancelled after ESC")
 	}
 }

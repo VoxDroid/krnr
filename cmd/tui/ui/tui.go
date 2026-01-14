@@ -46,6 +46,12 @@ type TuiModel struct {
 	lastSelectedName string
 	// focus: false = left pane (list), true = right pane (viewport)
 	focusRight bool
+	// live filter text while the list is in filtering state
+	listFilter string
+	// when true we are in our custom filter mode and typed characters should
+	// immediately filter the left-hand list (we manage the prompt display
+	// ourselves so the built-in list filtering UI can remain disabled)
+	filterMode bool
 
 	// editing metadata modal state
 	editingMeta bool
@@ -77,7 +83,8 @@ func NewModel(ui *modelpkg.UIModel) *TuiModel {
 	l := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 	l.Title = "krnr — command sets"
 	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(true)
+	// We'll implement live filtering ourselves so disable the built-in filter UI
+	l.SetFilteringEnabled(false)
 
 	vp := viewport.New(0, 0)
 	vlist := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
@@ -262,10 +269,105 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+		// If we're in our custom filter mode, handle character input here so we can
+		// perform live filtering and show a prompt. We do this instead of using the
+		// built-in list filtering UI because we want immediate item updates.
+		if m.filterMode {
+			allowGlobalEnter := false
+			switch msg.Type {
+			case tea.KeyRunes:
+				for _, ru := range msg.Runes {
+					m.listFilter += string(ru)
+				}
+			case tea.KeyBackspace, tea.KeyDelete:
+				if len(m.listFilter) > 0 {
+					r := []rune(m.listFilter)
+					m.listFilter = string(r[:len(r)-1])
+				}
+			case tea.KeyEsc:
+				// cancel filter mode and restore items/title
+				m.filterMode = false
+				m.listFilter = ""
+				items := make([]list.Item, 0, len(m.uiModel.ListCached()))
+				for _, s := range m.uiModel.ListCached() {
+					items = append(items, csItem{cs: s})
+				}
+				m.list.SetItems(items)
+				m.list.Title = "krnr — command sets"
+				return m, nil
+			case tea.KeyEnter:
+				// Exit filter mode and let the global Enter handler take over
+				allowGlobalEnter = true
+				m.filterMode = false
+				m.listFilter = ""
+				m.list.Title = "krnr — command sets"
+			default:
+				// let navigation keys be handled by the list so up/down still work
+				m.list, cmd = m.list.Update(msg)
+				return m, cmd
+			}
+			if !allowGlobalEnter {
+				// apply live filtering against cached items
+				q := strings.ToLower(strings.TrimSpace(m.listFilter))
+				items := make([]list.Item, 0)
+				if q == "" {
+					for _, s := range m.uiModel.ListCached() {
+						items = append(items, csItem{cs: s})
+					}
+				} else {
+					for _, s := range m.uiModel.ListCached() {
+						if strings.Contains(strings.ToLower(s.Name+" "+s.Description), q) {
+							items = append(items, csItem{cs: s})
+						}
+					}
+				}
+				m.list.SetItems(items)
+				// show the filter prompt in the title so list.View() contains it
+				m.list.Title = "Filter: " + m.listFilter
+				if len(items) > 0 {
+					m.list.Select(0)
+				}
+				return m, nil
+			}
+			// else: allow handler to fall through to global key handling (e.g., Enter)
+		}
 		// If the list is in filtering state, let the list consume all keys
 		// (including keys that would otherwise be global controls like q/esc).
 		if m.list.FilterState() == list.Filtering {
 			m.list, cmd = m.list.Update(msg)
+			// Maintain our own live filter text so we can update the list items
+			switch msg.Type {
+			case tea.KeyRunes:
+				for _, ru := range msg.Runes {
+					m.listFilter += string(ru)
+				}
+			case tea.KeyBackspace, tea.KeyDelete:
+				if len(m.listFilter) > 0 {
+					r := []rune(m.listFilter)
+					m.listFilter = string(r[:len(r)-1])
+				}
+			case tea.KeyEsc:
+				// ESC cancels filter — clear our filter cache
+				m.listFilter = ""
+			}
+			// apply live filtering against the cached list
+			q := strings.ToLower(strings.TrimSpace(m.listFilter))
+			if q == "" {
+				// restore full items
+				items := make([]list.Item, 0, len(m.uiModel.ListCached()))
+				for _, s := range m.uiModel.ListCached() {
+					items = append(items, csItem{cs: s})
+				}
+				m.list.SetItems(items)
+			} else {
+				items := make([]list.Item, 0)
+				for _, s := range m.uiModel.ListCached() {
+					if strings.Contains(strings.ToLower(s.Name+" "+s.Description), q) {
+						items = append(items, csItem{cs: s})
+					}
+				}
+				m.list.SetItems(items)
+			}
 			return m, cmd
 		}
 		// global keybindings handled BEFORE passing to the list so they are
@@ -359,8 +461,8 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						previewH = innerBodyH / 2
 					}
 					// reserve one line for the versions pane shortcuts at the bottom
-				indicatorH := 1
-				available := innerBodyH - indicatorH - 2
+					indicatorH := 1
+					available := innerBodyH - indicatorH - 2
 					if available < 1 {
 						available = 1
 					}
@@ -745,7 +847,15 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list, cmd = m.list.Update(msg)
 
 		if s == "/" {
-			// filter mode entry is already handled by the list; just return
+			// enter our custom filter mode which shows a prompt and filters items
+			m.filterMode = true
+			m.listFilter = ""
+			m.list.Title = "Filter: "
+			items := make([]list.Item, 0, len(m.uiModel.ListCached()))
+			for _, s := range m.uiModel.ListCached() {
+				items = append(items, csItem{cs: s})
+			}
+			m.list.SetItems(items)
 			return m, cmd
 		}
 
@@ -1468,7 +1578,7 @@ func (m *TuiModel) View() string {
 	} else {
 		status += " • FOCUS: COMMAND LIST"
 	}
-	if m.list.FilterState() == list.Filtering {
+	if m.filterMode || m.list.FilterState() == list.Filtering {
 		status += " • FILTER MODE"
 	}
 	if m.runInProgress {
@@ -1477,7 +1587,7 @@ func (m *TuiModel) View() string {
 	bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
 
 	var footerText string
-	if m.list.FilterState() == list.Filtering {
+	if m.filterMode || m.list.FilterState() == list.Filtering {
 		// In filter mode keep the footer minimal and only show how to quit filter
 		footerText = "(esc) quit filter"
 	} else {
