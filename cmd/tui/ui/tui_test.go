@@ -41,6 +41,43 @@ func TestInitPopulatesPreview(t *testing.T) {
 	}
 }
 
+// Deterministic headless test for initial render. This validates the same
+// expectations as the PTY integration test but doesn't require a real PTY or
+// platform-specific features, making it safe to run in CI.
+func TestTuiInitialRender_Headless(t *testing.T) {
+	full := adapters.CommandSetSummary{
+		Name:        "with-params",
+		Description: "Param demo",
+		Commands:    []string{"echo User: {{user}}", "echo Token: {{token}}"},
+		AuthorName:  "VoxDroid",
+		AuthorEmail: "izeno.contact@gmail.com",
+	}
+	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "with-params", Description: "Param demo"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	// run Init to populate list/preview
+	m.Init()()
+	// simulate a terminal resize so view/layout code runs deterministically
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = m1.(*TuiModel)
+	// enter detail view (as a user would) so full-screen rendering includes commands
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	view := m.View()
+	if !strings.Contains(view, "with-params") {
+		t.Fatalf("expected command set name in view, got:\n%s", view)
+	}
+	// detail viewport should include Description header and command prefixes
+	vp := m.vp.View()
+	if !strings.Contains(vp, "Description:") {
+		t.Fatalf("expected Description: header in detail, got:\n%s", vp)
+	}
+	if !strings.Contains(vp, "1) ") || !strings.Contains(vp, "2) ") {
+		t.Fatalf("expected aligned command prefixes in detail, got:\n%s", vp)
+	}
+}
+
 func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	// create a set with a multi-line description and two commands
 	full := adapters.CommandSetSummary{

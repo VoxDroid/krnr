@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package ui
 
 import (
@@ -44,26 +47,6 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	// give the program some time to initialize and render
 	// Some CI runners take longer; use a slightly larger initial delay.
 	time.Sleep(500 * time.Millisecond)
-	// send a resize to the program to force a render (helps flaky CI terminals)
-	prog.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
-	// small extra wait and retry for very slow runners
-	time.Sleep(50 * time.Millisecond)
-	prog.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
-	// actively stimulate the program with repeated resize events for a short
-	// window (helps very flaky CI terminals that take longer to initialize)
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		timeout := time.After(1 * time.Second)
-		for {
-			select {
-			case <-ticker.C:
-				prog.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
-			case <-timeout:
-				return
-			}
-		}
-	}()
 
 	// read what is currently on the pty using a goroutine so a slow CI
 	// environment doesn't block the test indefinitely.
@@ -71,7 +54,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	go func() {
 		var b strings.Builder
 		buf := make([]byte, 1024)
-		end := time.Now().Add(8 * time.Second)
+		end := time.Now().Add(5 * time.Second)
 		for {
 			// overall timeout for the goroutine
 			if time.Now().After(end) {
@@ -93,8 +76,6 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 			if err != nil {
 				// if timeout, try again; otherwise stop
 				if ne, ok := err.(interface{ Timeout() bool }); ok && ne.Timeout() {
-					// retry stimulation: send a resize to prompt a render and flush
-					prog.Send(tea.WindowSizeMsg{Width: 120, Height: 40})
 					continue
 				}
 				break
@@ -114,7 +95,8 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 		if !strings.Contains(out, "1)  echo") || !strings.Contains(out, "2)  echo") {
 			t.Fatalf("expected aligned command prefixes in output, got:\n%s", out)
 		}
-	case <-time.After(8 * time.Second):
+	case <-time.After(5 * time.Second):
+		// attempt to capture any partial output for diagnostics and quit
 		var diagBuf [4096]byte
 		// send quit to the program first to encourage it to flush and exit
 		_, _ = p.Write([]byte("q"))
