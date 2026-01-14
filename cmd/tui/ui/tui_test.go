@@ -246,6 +246,145 @@ func TestEnterShowsFullScreenWithDryRun(t *testing.T) {
 	}
 }
 
+func TestDetailResponsiveToWindowSize(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "long", Description: "Wrap test", Commands: []string{"echo there is a long line that will wrap around the width for testing and should produce more lines when narrower"}}
+	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "long", Description: "Wrap test"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	// large width
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	vpLarge := m.vp.View()
+	// compute max line length for large and small views as a better proxy for wrapping
+	maxLen := func(s string) int {
+		max := 0
+		for _, ln := range strings.Split(s, "\n") {
+			if l := len(ln); l > max {
+				max = l
+			}
+		}
+		return max
+	}
+	maxLarge := maxLen(vpLarge)
+	// smaller width should result in shorter max line length due to wrapping
+	m3, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 40})
+	m = m3.(*TuiModel)
+	vpSmall := m.vp.View()
+	maxSmall := maxLen(vpSmall)
+	if maxSmall >= maxLarge {
+		t.Fatalf("expected smaller max line length at narrow width (large=%d small=%d)\n--- large ---\n%s\n--- small ---\n%s", maxLarge, maxSmall, vpLarge, vpSmall)
+	}
+}
+
+func TestDetailScrollable(t *testing.T) {
+	// many commands so the rendered detail exceeds a small viewport
+	cmds := []string{}
+	for i := 1; i <= 50; i++ {
+		cmds = append(cmds, fmt.Sprintf("echo line %d", i))
+	}
+	full := adapters.CommandSetSummary{Name: "many", Description: "Large", Commands: cmds}
+	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "many", Description: "Large"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	// small viewport to force scrolling
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	if !m.showDetail {
+		t.Fatalf("expected showDetail true")
+	}
+	view := m.vp.View()
+	if strings.Contains(view, "line 50") {
+		t.Fatalf("unexpectedly saw far content before scrolling")
+	}
+	// scroll down until we see the far content or until we hit an iteration cap
+	found := false
+	for i := 0; i < 500; i++ {
+		m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = m1.(*TuiModel)
+		view2 := m.vp.View()
+		if strings.Contains(view2, "line 50") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected to see later content after scrolling; last viewport:\n%s", m.vp.View())
+	}
+}
+
+func TestDetailScrollIndicatorUpdates(t *testing.T) {
+	// many commands so the rendered detail exceeds a small viewport
+	cmds := []string{}
+	for i := 1; i <= 50; i++ {
+		cmds = append(cmds, fmt.Sprintf("echo line %d", i))
+	}
+	full := adapters.CommandSetSummary{Name: "many", Description: "Large", Commands: cmds}
+	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "many", Description: "Large"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	// small viewport to force scrolling
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	if !m.showDetail {
+		t.Fatalf("expected showDetail true")
+	}
+	view := m.View()
+	if !strings.Contains(view, "(↑/↓ scroll detail)") {
+		t.Fatalf("expected scroll hint in footer, got:\n%s", view)
+	}
+	// find indicator after the scroll hint
+	hintIdx := strings.Index(view, "(↑/↓ scroll detail)")
+	if hintIdx == -1 {
+		t.Fatalf("couldn't find scroll hint in view:\n%s", view)
+	}
+	sub := view[hintIdx:]
+	dotIdx := strings.Index(sub, "•")
+	if dotIdx == -1 {
+		t.Fatalf("expected indicator dot in footer, got:\n%s", view)
+	}
+	// parse "n/total"
+	frag := strings.TrimSpace(sub[dotIdx+len("•"):])
+	parts := strings.SplitN(frag, " ", 2)
+	if len(parts) == 0 {
+		t.Fatalf("unexpected footer fragment: %q", frag)
+	}
+	indicator := parts[0]
+	if !strings.Contains(indicator, "/") {
+		t.Fatalf("expected indicator like 'n/total', got %q", indicator)
+	}
+	first := strings.SplitN(indicator, "/", 2)[0]
+	if first != "1" {
+		t.Fatalf("expected initial indicator to start at 1, got %q (footer: %s)", first, view)
+	}
+	// scroll down once and ensure the indicator advances
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = m3.(*TuiModel)
+	view2 := m.View()
+	sub2 := view2[hintIdx:]
+	dotIdx2 := strings.Index(sub2, "•")
+	if dotIdx2 == -1 {
+		t.Fatalf("expected indicator dot in footer after scroll, got:\n%s", view2)
+	}
+	frag2 := strings.TrimSpace(sub2[dotIdx2+len("•"):])
+	parts2 := strings.SplitN(frag2, " ", 2)
+	indicator2 := parts2[0]
+	if indicator2 == indicator {
+		t.Fatalf("expected indicator to change after scrolling down; was %q, still %q", indicator, indicator2)
+	}
+}
+
 func TestDetailViewShowsTitle(t *testing.T) {
 	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "sysinf", Description: "Info"}}, full: adapters.CommandSetSummary{Name: "sysinf", Description: "Info", Commands: []string{"systeminfo"}, CreatedAt: "2026-01-12T14:05:35Z"}}
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)

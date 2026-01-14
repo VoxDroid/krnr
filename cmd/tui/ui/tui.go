@@ -283,12 +283,7 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.showDetail && m.focusRight && len(m.versions) > 0 {
 				m.versionsList, cmd = m.versionsList.Update(msg)
 				m.versionsSelected = m.versionsList.Index()
-				if si := m.versionsList.SelectedItem(); si != nil {
-					if vi, ok := si.(verItem); ok {
-						m.detail = formatVersionPreview(m.detailName, vi.v, m.width-40, m.height)
-						m.vp.SetContent(m.detail)
-					}
-				}
+				// selection changed; no preview shown when selecting a version
 				return m, cmd
 			}
 			if i, ok := m.list.SelectedItem().(csItem); ok {
@@ -302,6 +297,23 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.detail = formatCSDetails(i.cs, m.width/2)
 					m.vp.SetContent(m.detail)
 				}
+				// Ensure viewport has a reasonable size even if we haven't received a WindowSizeMsg
+				headH := 1
+				footerH := 1
+				bodyH := m.height - headH - footerH - 2
+				if bodyH < 3 {
+					bodyH = 3
+				}
+				vpw := m.width - 8
+				vph := bodyH - 4
+				if vpw < 10 {
+					vpw = 10
+				}
+				if vph < 3 {
+					vph = 3
+				}
+				m.vp = viewport.New(vpw, vph)
+				m.vp.SetContent(m.detail)
 				// fetch versions for right-side panel
 				if vers, err := m.uiModel.ListVersions(context.Background(), i.cs.Name); err == nil {
 					m.versions = vers
@@ -346,7 +358,9 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if previewH > innerBodyH/2 {
 						previewH = innerBodyH / 2
 					}
-					available := innerBodyH - previewH - 4
+					// reserve one line for the versions pane shortcuts at the bottom
+				indicatorH := 1
+				available := innerBodyH - indicatorH - 2
 					if available < 1 {
 						available = 1
 					}
@@ -673,12 +687,6 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					var listCmd tea.Cmd
 					m.versionsList, listCmd = m.versionsList.Update(msg)
 					m.versionsSelected = m.versionsList.Index()
-					if si := m.versionsList.SelectedItem(); si != nil {
-						if vi, ok := si.(verItem); ok {
-							m.detail = formatVersionPreview(m.detailName, vi.v, m.width-40, m.height)
-							m.vp.SetContent(m.detail)
-						}
-					}
 					return m, listCmd
 				}
 			}
@@ -704,13 +712,32 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		// Left pane focused or other keys - but when details are shown and focus
-		// is on the left pane, ignore navigation keys and Enter so the user must
-		// explicitly go back before changing the selection.
+		// Left pane focused or other keys - when details are shown and focus is
+		// on the left pane, make the detail content scrollable instead of
+		// changing list selection. Arrow keys and paging should scroll the
+		// details viewport. Enter is ignored (user must press 'b' to go back).
 		if m.showDetail && !m.focusRight {
 			switch s {
-			case "up", "down", "k", "j", "pgup", "pgdown", "home", "end", "enter":
-				// consume the key and do nothing
+			case "up", "k":
+				m.vp.ScrollUp(1)
+				return m, nil
+			case "down", "j":
+				m.vp.ScrollDown(1)
+				return m, nil
+			case "pgup":
+				m.vp.HalfPageUp()
+				return m, nil
+			case "pgdown":
+				m.vp.HalfPageDown()
+				return m, nil
+			case "home":
+				m.vp.GotoTop()
+				return m, nil
+			case "end":
+				m.vp.GotoBottom()
+				return m, nil
+			case "enter":
+				// do nothing — Enter shouldn't change detail while detail is open
 				return m, nil
 			}
 		}
@@ -767,16 +794,25 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			bodyH = 3
 		}
 
+		// compute side/right widths with safe bounds to avoid overflow on narrow terminals
 		sideW := int(float64(m.width) * 0.35)
 		if sideW > 36 {
 			sideW = 36
 		}
-		if sideW < 20 {
-			sideW = 20
+		if sideW < 10 {
+			sideW = 10
+		}
+		// ensure sideW leaves room for the right pane; adjust if necessary
+		minRightW := 12
+		if m.width-sideW-4 < minRightW {
+			sideW = m.width - minRightW - 4
+			if sideW < 6 {
+				sideW = 6
+			}
 		}
 		innerSideW := sideW - 2
-		if innerSideW < 10 {
-			innerSideW = 10
+		if innerSideW < 4 {
+			innerSideW = 4
 		}
 
 		rightW := m.width - sideW - 4
@@ -794,15 +830,51 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.list.SetSize(innerSideW, innerBodyH)
-		m.vp = viewport.New(innerRightW, innerBodyH)
+		// Configure the detail/preview viewport size based on whether we are
+		// showing details (and whether the versions panel is present). This
+		// ensures the viewport is anchored within the content box (top/bottom)
+		// and avoids recreating it in View(), which previously caused truncation
+		// and overlap when layout calculations drifted between renders.
+		if m.showDetail && len(m.versions) > 0 {
+			// when versions panel exists, left pane width is the remaining width
+			rightW := 36
+			if rightW > m.width/3 {
+				rightW = m.width / 3
+			}
+			leftW := m.width - rightW - 6
+			if leftW < 20 {
+				leftW = 20
+			}
+			vpw := leftW - 4
+			vph := innerBodyH - 2
+			if vpw < 10 {
+				vpw = 10
+			}
+			if vph < 3 {
+				vph = 3
+			}
+			m.vp = viewport.New(vpw, vph)
+		} else if m.showDetail {
+			// full-screen detail (no versions)
+			vpw := m.width - 8
+			vph := bodyH - 4
+			if vpw < 10 {
+				vpw = 10
+			}
+			if vph < 3 {
+				vph = 3
+			}
+			m.vp = viewport.New(vpw, vph)
+		} else {
+			// list preview area (default)
+			m.vp = viewport.New(innerRightW, innerBodyH)
+		}
 
 		// configure versionsList sizing to match the inner area when present
 		if len(m.versions) > 0 {
-			previewH := 8
-			if previewH > innerBodyH/2 {
-				previewH = innerBodyH / 2
-			}
-			available := innerBodyH - previewH - 4
+			// reserve one line for the versions pane shortcuts at the bottom
+			indicatorH := 1
+			available := innerBodyH - indicatorH - 2
 			if available < 1 {
 				available = 1
 			}
@@ -810,11 +882,22 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// update content for selected
-		if si := m.list.SelectedItem(); si != nil {
-			if cs, ok := si.(csItem); ok {
-				// construct a full metadata view
-				full := formatCSDetails(cs.cs, m.vp.Width)
-				m.vp.SetContent(full)
+		if m.showDetail {
+			// when in details mode, reformat the full-screen detail to match the
+			// current terminal width/height so it remains responsive
+			if m.detailName != "" {
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
+					m.detail = formatCSFullScreen(cs, m.width, m.height)
+					m.vp.SetContent(m.detail)
+				}
+			}
+		} else {
+			if si := m.list.SelectedItem(); si != nil {
+				if cs, ok := si.(csItem); ok {
+					// construct a full metadata view
+					full := formatCSDetails(cs.cs, m.vp.Width)
+					m.vp.SetContent(full)
+				}
 			}
 		}
 	}
@@ -1172,9 +1255,11 @@ func (m *TuiModel) View() string {
 			bottomBg, bottomFg = "#0b1226", "#cbd5e1"
 		}
 
+		headH := 0 // removed top title box; inner detail contains its own title
 		footerH := 1
 		bottomH := 1
-		bodyH := m.height - footerH - bottomH - 2
+		// Account for footer and bottom bar when computing the available body height
+		bodyH := m.height - headH - footerH - bottomH - 2
 		if bodyH < 3 {
 			bodyH = 3
 		}
@@ -1241,7 +1326,24 @@ func (m *TuiModel) View() string {
 			}
 			// apply left pane border styling explicitly so focus state is clear
 			leftStyle = leftStyle.BorderStyle(detailLeftBorderStyle).BorderForeground(lipgloss.Color(detailLeftBorder))
-			left := leftStyle.Render(m.detail)
+			// ensure viewport matches left content area so the detail becomes scrollable
+			vpw := leftW - 4
+			vph := innerBodyH - 2
+			if vpw < 10 {
+				vpw = 10
+			}
+			if vph < 3 {
+				vph = 3
+			}
+			m.detail = strings.TrimRight(m.detail, "\n")
+			// ensure viewport sized for current layout so detail becomes scrollable
+			if m.vp.Width != vpw || m.vp.Height != vph {
+				oldOff := m.vp.YOffset
+				m.vp = viewport.New(vpw, vph)
+				m.vp.YOffset = oldOff
+			}
+			m.vp.SetContent(m.detail)
+			left := leftStyle.Render(m.vp.View())
 			rightStyle := lipgloss.NewStyle().BorderStyle(detailRightBorderStyle).BorderForeground(lipgloss.Color(detailRightBorder)).Padding(1).Width(rightW).Height(bodyH)
 			right := rightStyle.Render(m.renderVersions(innerRightW, innerBodyH))
 			if m.width < 80 {
@@ -1250,7 +1352,25 @@ func (m *TuiModel) View() string {
 				body = lipgloss.JoinHorizontal(lipgloss.Top, left, right)
 			}
 		} else {
-			body = contentStyle.Render(m.detail)
+			// no versions pane; render detail inside a viewport so it can scroll
+			// to match the behavior/responsiveness of the main page.
+			m.detail = strings.TrimRight(m.detail, "\n")
+			// ensure viewport sized for full-screen detail
+			vpw := m.width - 8
+			vph := bodyH - 4
+			if vpw < 10 {
+				vpw = 10
+			}
+			if vph < 3 {
+				vph = 3
+			}
+			if m.vp.Width != vpw || m.vp.Height != vph {
+				oldOff := m.vp.YOffset
+				m.vp = viewport.New(vpw, vph)
+				m.vp.YOffset = oldOff
+			}
+			m.vp.SetContent(m.detail)
+			body = contentStyle.Render(m.vp.View())
 		}
 
 		status := fmt.Sprintf("Viewing: %s", m.detailName)
@@ -1266,18 +1386,26 @@ func (m *TuiModel) View() string {
 
 		var footer string
 		if m.editingMeta {
-			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(Tab) next • (Ctrl+A) add command • (Ctrl+D) del command • (Ctrl+S) save • (Esc) cancel")
+			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(Tab) next - (Ctrl+A) add command - (Ctrl+D) del command - (Ctrl+S) save - (Esc) cancel")
 		} else {
-			base := "(e) Edit • (d) Delete • (s) Export • (r) Run • (T) Toggle Theme • (b) Back • (q) Quit"
+			base := "(e) Edit - (d) Delete - (s) Export - (r) Run - (T) Toggle Theme - (b) Back - (q) Quit"
 			if len(m.versions) > 0 {
-				base = base + " • (R) Rollback"
+				base = base + " - (R) Rollback"
+			}
+			// When showing details, add a scroll hint and indicator so users can
+			// discover navigation and their current position inside the detail.
+			if m.showDetail {
+				base = base + " - (↑/↓ scroll detail)"
+				if ind := m.detailScrollIndicator(); ind != "" {
+					base = base + " • " + ind
+				}
 			}
 			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(base)
 		}
 		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
 
-	headH := 1
+	headH := 1 // reserve a 1-line top spacer so borders don't touch the terminal edge
 	footerH := 1
 	bodyH := m.height - headH - footerH - 2
 	if bodyH < 3 {
@@ -1316,8 +1444,6 @@ func (m *TuiModel) View() string {
 		}
 	}
 
-	titleBox := m.renderTitleBox(fmt.Sprintf(" krnr — Command sets (%d) ", len(m.list.Items())))
-
 	sidebarStyle := lipgloss.NewStyle().BorderStyle(sideBorderStyle).BorderForeground(lipgloss.Color(sideBorder)).Padding(0).Width(m.list.Width()).Height(bodyH)
 	sidebar := sidebarStyle.Render(m.list.View())
 
@@ -1346,7 +1472,7 @@ func (m *TuiModel) View() string {
 		status += " • FILTER MODE"
 	}
 	if m.runInProgress {
-		status += " • RUNNING"
+		status += " - RUNNING"
 	}
 	bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
 
@@ -1355,47 +1481,43 @@ func (m *TuiModel) View() string {
 		// In filter mode keep the footer minimal and only show how to quit filter
 		footerText = "(esc) quit filter"
 	} else {
-		footerText = "(←) / (→) / (Tab) switch focus • (↑) / (↓) scroll focused pane"
-		footerText += " • (Enter) details • (r) run • (T) theme • (q) quit • (?) help"
+		// Use simple ASCII-friendly footer to ensure compatibility across
+		// environments and avoid encoding issues with exotic characters.
+		footerText = "(<-) / (->) / (Tab) switch focus - (Up)/(Down) scroll focused pane"
+		footerText += " - (Enter) details - (r) run - (T) theme - (q) quit - (?) help"
 	}
 	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(footerText)
 
-	return lipgloss.JoinVertical(lipgloss.Left, titleBox, body, footer, bottom)
+	// top spacer to ensure the main page has a minimum top height and borders don't touch the terminal edge
+	topSpacer := lipgloss.NewStyle().Height(headH).Width(m.width).Render("")
+
+	return lipgloss.JoinVertical(lipgloss.Left, topSpacer, body, footer, bottom)
 }
 
 // csItem adapts adapters.CommandSetSummary for the list component
 type csItem struct{ cs adapters.CommandSetSummary }
 
-func (c csItem) Title() string       { return c.cs.Name }
-func (c csItem) Description() string { return c.cs.Description }
-func (c csItem) FilterValue() string { return c.cs.Name + " " + c.cs.Description }
+func (c csItem) Title() string {
+	return c.cs.Name
+}
+
+func (c csItem) Description() string {
+	return c.cs.Description
+}
+
+func (c csItem) FilterValue() string {
+	return c.cs.Name + " " + c.cs.Description
+}
 
 // verItem adapts adapters.Version for use with the bubbles list
 type verItem struct{ v adapters.Version }
 
 func (v verItem) Title() string {
-	return fmt.Sprintf("v%d • %s", v.v.Version, v.v.Operation)
+	return fmt.Sprintf("v%d - %s", v.v.Version, v.v.Operation)
 }
 func (v verItem) Description() string { return v.v.CreatedAt }
 func (v verItem) FilterValue() string {
 	return fmt.Sprintf("v%d %s %s", v.v.Version, v.v.Operation, v.v.CreatedAt)
-}
-
-// renderTitleBox produces a consistent title bar (with border) matching the
-// main page. Use this to keep title styling identical across views.
-func (m *TuiModel) renderTitleBox(text string) string {
-	var titleFg, titleBg, titleBorder string
-	if m.themeHighContrast {
-		titleFg, titleBg = "#000000", "#ffff00"
-		titleBorder = "#ffff00"
-	} else {
-		titleFg, titleBg = "#ffffff", "#0f766e"
-		titleBorder = "#0ea5a4"
-	}
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(titleFg)).Background(lipgloss.Color(titleBg)).Padding(0, 1)
-	title := titleStyle.Render(text)
-	titleInner := lipgloss.Place(m.width-2, 1, lipgloss.Center, lipgloss.Center, title)
-	return lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(titleBorder)).Width(m.width).Render(titleInner)
 }
 
 // renderEditor produces the editor modal content when editing metadata in-place.
@@ -1444,27 +1566,44 @@ func (m *TuiModel) renderVersions(width, height int) string {
 	// list view will already be sized in WindowSizeMsg, so just render it
 	b.WriteString(m.versionsList.View())
 
-	// preview area
-	previewH := 8
-	if previewH > height/2 {
-		previewH = height / 2
-	}
-	if m.versionsSelected >= 0 && m.versionsSelected < len(m.versions) {
-		b.WriteString("\nPreview:\n")
-		b.WriteString(formatVersionPreview(m.detailName, m.versions[m.versionsSelected], width-2, previewH))
-	}
 	return b.String()
 }
 
 // formatVersionPreview renders a short preview for a version (commands and dry-run)
 func formatVersionPreview(name string, v adapters.Version, _ int, _ int) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("krnr — %s v%d • %s\n", name, v.Version, v.Operation))
+	b.WriteString(fmt.Sprintf("krnr — %s v%d - %s\n", name, v.Version, v.Operation))
 	b.WriteString(strings.Repeat("-", 30) + "\n")
 	for _, c := range v.Commands {
 		b.WriteString("$ " + c + "\n")
 	}
 	return b.String()
+}
+
+// detailScrollIndicator builds a small "current/total" indicator for the
+// detail pane based on the viewport's height and vertical offset. It helps
+// users discover where they are inside long details.
+func (m *TuiModel) detailScrollIndicator() string {
+	if m.detail == "" || m.vp.Height <= 0 {
+		return ""
+	}
+	lines := strings.Split(m.detail, "\n")
+	total := len(lines)
+	visible := m.vp.Height
+	// attempt to read viewport offset; the viewport exposes YOffset so use it
+	off := 0
+	// guard against zero/nil viewport
+	off = m.vp.YOffset
+	if off < 0 {
+		off = 0
+	}
+	if visible >= total {
+		return fmt.Sprintf("%d/%d", 1, total)
+	}
+	if off > total-visible {
+		off = total - visible
+	}
+	return fmt.Sprintf("%d/%d", off+1, total)
 }
 
 // trimLastRune removes the last rune from a string if present
