@@ -178,6 +178,48 @@ func TestFilterModeIgnoresControlsAndEscCancels(t *testing.T) {
 		t.Fatalf("expected filtering to be cancelled after ESC")
 	}
 }
+
+func TestLeftPaneNavNoopsWhileDetailOpen(t *testing.T) {
+	reg := &fakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}, {Name: "two", Description: "Second"}, {Name: "three", Description: "Third"}}}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	// ensure first item selected
+	if m.list.Index() != 0 {
+		t.Fatalf("expected initial selection 0, got %d", m.list.Index())
+	}
+	// open detail view
+	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m1.(*TuiModel)
+	if !m.showDetail {
+		t.Fatalf("expected showDetail true after Enter")
+	}
+	// focus is left by default; attempt to move down should be ignored
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = m2.(*TuiModel)
+	if m.list.Index() != 0 {
+		t.Fatalf("selection changed while in details; expected 0, got %d", m.list.Index())
+	}
+	// Enter should not change the detail to another selection
+	prev := m.detailName
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m3.(*TuiModel)
+	if m.detailName != prev {
+		t.Fatalf("detail changed on Enter while in details: %q -> %q", prev, m.detailName)
+	}
+	// back to list and navigation should work
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	m = m4.(*TuiModel)
+	if m.showDetail {
+		t.Fatalf("expected showDetail false after 'b'")
+	}
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = m5.(*TuiModel)
+	if m.list.Index() == 0 {
+		t.Fatalf("expected selection to move after leaving details")
+	}
+}
 func TestEnterShowsFullScreenWithDryRun(t *testing.T) {
 	reg := &detailFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi", "echo there is a long line that will wrap around the width for testing"}, AuthorName: "me", AuthorEmail: "me@example.com", Tags: []string{"tag1"}}}
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
@@ -468,11 +510,11 @@ func TestEnterOnVersionsDoesNotChangeDetail(t *testing.T) {
 	if m.detailName != "aset" {
 		t.Fatalf("expected detailName 'aset', got %q", m.detailName)
 	}
-	// move selection on the left pane down to bset (simulate user scrolling left pane)
+	// attempt to move selection on the left pane down while detail is open; it should be ignored
 	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = m3.(*TuiModel)
-	if si, ok := m.list.SelectedItem().(csItem); !ok || si.cs.Name != "bset" {
-		t.Fatalf("expected left selection to be 'bset', got %v", si)
+	if si, ok := m.list.SelectedItem().(csItem); !ok || si.cs.Name != "aset" {
+		t.Fatalf("expected left selection to remain 'aset' while detail is open, got %v", si)
 	}
 	// focus right pane and interact with versions
 	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})

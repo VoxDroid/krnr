@@ -704,7 +704,16 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		// Left pane focused or other keys - pass to list
+		// Left pane focused or other keys - but when details are shown and focus
+		// is on the left pane, ignore navigation keys and Enter so the user must
+		// explicitly go back before changing the selection.
+		if m.showDetail && !m.focusRight {
+			switch s {
+			case "up", "down", "k", "j", "pgup", "pgdown", "home", "end", "enter":
+				// consume the key and do nothing
+				return m, nil
+			}
+		}
 
 		m.list, cmd = m.list.Update(msg)
 
