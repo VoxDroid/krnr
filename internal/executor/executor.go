@@ -65,7 +65,48 @@ func New(dry, verbose bool) Runner {
 
 // Execute runs the given command string. stdout and stderr are written to the
 // provided writers. If cwd is non-empty, the command runs in that directory.
+// sanitizeCommand normalizes common unicode characters that often get
+// inserted by editors (e.g., smart quotes, NBSP, zero-width spaces) and
+// converts them to their ASCII equivalents where sensible.
+func sanitizeCommand(s string) string {
+	r := strings.NewReplacer(
+		"\u2018", "'", // left single quote
+		"\u2019", "'", // right single quote
+		"\u201C", "\"", // left double quote
+		"\u201D", "\"", // right double quote
+		"\u00A0", " ",  // NO-BREAK SPACE
+		"\u200B", "",   // zero width space
+		"\u200E", "",   // left-to-right mark
+		"\u200F", "",   // right-to-left mark
+	)
+	rp := r.Replace(s)
+	// Remove embedded NUL (\x00) and other invisible control runes that are
+	// commonly inserted by text editors in some environments. Keep tabs and
+	// normal printable characters; drop NULs to be forgiving for TUI edits.
+	return strings.Map(func(r rune) rune {
+		if r == 0 {
+			return -1
+		}
+		return r
+	}, rp)
+}
+
 func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
+	// First sanitize common unicode punctuation and invisible characters
+	// (e.g., smart quotes, NBSP, zero-width spaces, and NUL bytes) before
+	// validation so the TUI editor becomes forgiving for accidental insertions.
+	command = sanitizeCommand(command)
+
+	// After sanitization, reject multiline commands (newlines are not allowed)
+	if strings.Contains(command, "\n") {
+		return fmt.Errorf("invalid command: contains newline characters; each command must be a single line")
+	}
+
+	// If any control characters remain (other than tab), fail with a helpful message
+	if strings.IndexFunc(command, func(r rune) bool { return r == 0 || (r < 32 && r != '\t') || r == 0x7f }) != -1 {
+		return fmt.Errorf("invalid command: contains control characters; remove non-printable characters")
+	}
+
 	if e.DryRun {
 		if e.Verbose {
 			_, _ = fmt.Fprintf(stdout, "dry-run: %s\n", command)
@@ -74,11 +115,22 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 	}
 
 	shell, args := shellInvocation(command, e.Shell)
+	// Validate shell + args for obvious issues to avoid opaque CreateProcess errors
+	if p, err := exec.LookPath(shell); err == nil {
+		shell = p
+	}
+	// ensure args don't contain NUL or control chars that are likely to break CreateProcess
+	for i, a := range args {
+		if strings.IndexFunc(a, func(r rune) bool { return r == 0 || (r < 32 && r != '\t') || r == 0x7f }) != -1 {
+			return fmt.Errorf("invalid shell arg[%d]: contains control characters", i)
+		}
+	}
+
 	cmd := exec.CommandContext(ctx, shell, args...)
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
-	// On Windows, some shells may emit backslash-escaped quotes (\"), so
+	// On Windows, some shells may emit backslash-escaped quotes (\") so
 	// wrap the writers with a filter that unescapes them for friendlier output.
 	if runtime.GOOS == "windows" {
 		cmd.Stdout = &unescapeWriter{w: stdout}
@@ -89,7 +141,8 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 	}
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("command failed: %w", err)
+		// Wrap the error with shell information to make the cause clearer to users
+		return fmt.Errorf("command failed: %w (shell=%s args=%q)", err, shell, args)
 	}
 	return nil
 }
@@ -131,4 +184,24 @@ func shellInvocation(command string, overrideShell string) (string, []string) {
 	}
 	// Unix-like
 	return "bash", []string{"-c", command}
+}
+
+// Sanitize normalizes common unicode characters and removes embedded
+// null and other invisible runes. Exported for use by callers (e.g., the
+// TUI) that want to sanitize user-edited commands at save time.
+func Sanitize(s string) string {
+	return sanitizeCommand(s)
+}
+
+// ValidateCommand checks for remaining problematic characters that will
+// cause command execution to fail (e.g., newlines and control characters)
+// and returns an error describing the problem if one is found.
+func ValidateCommand(s string) error {
+	if strings.Contains(s, "\n") {
+		return fmt.Errorf("invalid command: contains newline characters; each command must be a single line")
+	}
+	if strings.IndexFunc(s, func(r rune) bool { return r == 0 || (r < 32 && r != '\t') || r == 0x7f }) != -1 {
+		return fmt.Errorf("invalid command: contains control characters; remove non-printable characters")
+	}
+	return nil
 }

@@ -457,6 +457,106 @@ func TestEditReplacesCommands(t *testing.T) {
 	}
 }
 
+func TestEditorSaveSanitizesCommands(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// open in-TUI editor
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m = m3.(*TuiModel)
+	if !m.editingMeta {
+		t.Fatalf("expected editor to be open")
+	}
+	// cycle to commands field (tab 3 times)
+	for i := 0; i < 3; i++ {
+		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		m = m4.(*TuiModel)
+	}
+	// add a new command (Ctrl+A) and type 'echo “quoted”' using smart quotes
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlA})
+	m = m5.(*TuiModel)
+	for _, r := range []rune{'e', 'c', 'h', 'o', ' ', '\u201C', 'q', 'u', 'o', 't', 'e', 'd', '\u201D'} {
+		m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = m6.(*TuiModel)
+	}
+	// save with Ctrl+S
+	m7, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = m7.(*TuiModel)
+	if reg.lastName != "one" {
+		t.Fatalf("expected UpdateCommandSet called with name 'one', got %q", reg.lastName)
+	}
+	if len(reg.lastCommands) != 2 {
+		t.Fatalf("expected two commands after edit, got %#v", reg.lastCommands)
+	}
+	// sanitized quotes should be regular ASCII quotes
+	if reg.lastCommands[1] != "echo \"quoted\"" {
+		t.Fatalf("expected sanitized command to be 'echo \"quoted\"', got %q", reg.lastCommands[1])
+	}
+	// ensure we logged the sanitization and the editor content was updated
+	found := false
+	for _, l := range m.logs {
+		if strings.Contains(l, "sanitized command") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected log to mention sanitization, got logs: %#v", m.logs)
+	}
+}
+
+func TestEditorSaveRejectsControlCharacters(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// open in-TUI editor
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m = m3.(*TuiModel)
+	if !m.editingMeta {
+		t.Fatalf("expected editor to be open")
+	}
+	// cycle to commands field (tab 3 times)
+	for i := 0; i < 3; i++ {
+		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		m = m4.(*TuiModel)
+	}
+	// replace the current command with a command containing a newline
+	idx := m.editor.cmdIndex
+	m.editor.commands[idx] = "echo broken\nnext"
+	// save with Ctrl+S
+	m7, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = m7.(*TuiModel)
+	// ReplaceCommands should not have been called due to invalid input
+	if len(reg.lastCommands) != 0 {
+		t.Fatalf("expected ReplaceCommands not to be called, got %#v", reg.lastCommands)
+	}
+	// expect an error log
+	found := false
+	for _, l := range m.logs {
+		if strings.Contains(l, "replace commands: invalid command") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected error log about invalid command, got logs: %#v", m.logs)
+	}
+}
+
 func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
 	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
 	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}

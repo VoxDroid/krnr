@@ -15,6 +15,7 @@ import (
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
+	"github.com/VoxDroid/krnr/internal/executor"
 )
 
 // TuiModel is the Bubble Tea model used by cmd/tui.
@@ -233,11 +234,31 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				// replace commands
-				if err := m.uiModel.ReplaceCommands(context.Background(), newCS.Name, filterEmptyLines(m.editor.commands)); err != nil {
+				raw := filterEmptyLines(m.editor.commands)
+			clean := make([]string, 0, len(raw))
+			for i, c := range raw {
+				cSan := executor.Sanitize(c)
+				if cSan != c {
+					m.logs = append(m.logs, "sanitized command: \""+c+"\" -> \""+cSan+"\"")
+					for j := range m.editor.commands {
+						if strings.TrimSpace(m.editor.commands[j]) == strings.TrimSpace(c) {
+							m.editor.commands[j] = cSan
+							break
+						}
+					}
+				}
+				if err := executor.ValidateCommand(cSan); err != nil {
 					m.logs = append(m.logs, "replace commands: "+err.Error())
 					return m, nil
 				}
-				// refresh detail
+				clean = append(clean, cSan)
+				_ = i
+			}
+			if err := m.uiModel.ReplaceCommands(context.Background(), newCS.Name, clean); err != nil {
+				m.logs = append(m.logs, "replace commands: "+err.Error())
+				return m, nil
+			}
+			// refresh detail
 				if cs, err := m.uiModel.GetCommandSet(context.Background(), newCS.Name); err == nil {
 					m.detailName = cs.Name
 					m.detail = formatCSFullScreen(cs, m.width, m.height)
