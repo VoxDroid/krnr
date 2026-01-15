@@ -127,6 +127,9 @@ func (m *TuiModel) handleEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.editor.commands[idx] = trimLastRune(m.editor.commands[idx])
 			}
 		}
+		// mark last edit time so scheduled save can wait for stability
+		m.editor.lastEditAt = time.Now()
+		m.editor.saveRetries = 0
 		return m, nil
 	}
 	if msg.Type == tea.KeyRunes {
@@ -154,6 +157,9 @@ func (m *TuiModel) handleEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+		// mark last edit time so scheduled save can wait for stability
+		m.editor.lastEditAt = time.Now()
+		m.editor.saveRetries = 0
 		return m, nil
 	}
 

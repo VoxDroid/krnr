@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"sync"
 
@@ -70,6 +71,8 @@ type TuiModel struct {
 		saving           bool   // true while a save is in progress to prevent re-entry
 		lastFailedName   string // last name that failed validation/save to short-circuit repeated spam
 		lastFailedReason string // the notification/reason for why last save failed for that name
+		lastEditAt       time.Time
+		saveRetries      int
 	}
 
 	// versions / rollback state
@@ -92,8 +95,9 @@ type runDoneMsg struct{}
 // flows deterministic when typing then immediately saving.
 type saveNowMsg struct{}
 
-// NewModel, NewProgram and Init were moved to `core.go` as part of
-// Phase 5 modularization (core orchestration and interfaces).
+// editorSaveRetryMsg is used to retry a scheduled save when recent edits
+// are still arriving; it contains the current retry count so we can limit retries.
+type editorSaveRetryMsg struct{ retry int }
 
 // thread-safe helpers for detail view state used by integration tests
 func (m *TuiModel) setShowDetail(v bool) {
@@ -149,9 +153,17 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case saveNowMsg:
-		// scheduled save: perform editor save now and clear saving flag. If the
-		// save fails due to the name already existing, suppress the notification
-		// because the create likely succeeded in a prior immediate save.
+		// scheduled save: if edits are still arriving, retry a few times before
+		// performing the save. This avoids races where the delayed save fires
+		// while the PTY is still delivering multi-byte rune sequences.
+		const stabilityWindow = 50 * time.Millisecond
+		const maxRetries = 5
+		if time.Since(m.editor.lastEditAt) < stabilityWindow && m.editor.saveRetries < maxRetries {
+			m.editor.saveRetries++
+			return m, tea.Tick(stabilityWindow, func(_ time.Time) tea.Msg { return saveNowMsg{} })
+		}
+		// reset retry counter and perform final save
+		m.editor.saveRetries = 0
 		if err := m.editorSave(); err != nil {
 			if !strings.Contains(err.Error(), "already in use") {
 				m.logs = append(m.logs, "replace commands: "+err.Error())
