@@ -60,15 +60,21 @@ Phase 2 — Split versions & viewport (COMPLETED)
 - [x] Run `go test ./cmd/tui/ui -run TestVersions* -v` and fix regressions.
 - [ ] Follow-up: add more viewport unit tests and a PTY-based integration test for versions preview if desired.
 
-Phase 3 — Extract editor logic
-- [ ] Create `editor.go`. Move editor state struct (if currently embedded) and all editor key handlers (add/delete/save) and sanitization-on-save logic to use `executor.Sanitize/ValidateCommand` via adapters.
-- [ ] Add targeted editor tests: typing behavior (including `k`, `j`, space), sanitization log/display, save rejection on invalid commands.
-- [ ] Run `go test ./cmd/tui/ui -run TestEditor* -v`.
+Phase 3 — Extract editor logic (COMPLETED)
+- [x] Create `editor.go`. Editor state and keystroke handlers (add/delete/save) were moved into `cmd/tui/ui/editor.go` and delegate to `executor.Sanitize/ValidateCommand` via adapters as needed.
+- [x] Add targeted editor tests: typing behavior (including `k`, `j`, space), sanitization log/display, save rejection on invalid commands (tests added in `editor_test.go`).
+- [x] Run `go test ./cmd/tui/ui -run TestEditor* -v` and fixed regressions (package now passes tests).
+- [ ] Follow-up: add more editor-focused unit tests (field navigation, logging visibility, edge cases for command sanitization).
 
-Phase 4 — Input & dispatch
-- [ ] Create `input.go`. Centralize key handling, with small exported functions that interpret `KeyMsg` -> action and delegate to editor/versions/list/viewport behavior.
-- [ ] Add unit tests that feed KeyMsg values to these interpreter helpers and assert outcome state changes (cmdIndex changes, scrolls, toggles).
-- [ ] Confirm overall `Update()` can be simplified to orchestrate module calls and keep a small deferred reconcile (versions preview) and focus management.
+Phase 4 — Input & dispatch (COMPLETED)
+- [x] Create `input.go` scaffold and initial test file (`input_test.go`) with basic test placeholders.
+- [x] Move filter-mode handling into `input.go` (done).
+- [x] Move most key handling helpers from `tui.go` into `input.go` (dispatchKey, handleGlobalKeys, handleFocusedNavigation, confirm flows).
+- [x] Add unit tests for global interpreter functions and run behavior (e.g., quit/help/tab/run and headless run streaming) in `input_test.go`.
+- [x] Move built-in list filtering handling into `input.go` (added `handleListFiltering`/`applyListFilterKey`) and added tests.
+- [x] Finalize `Update()` delegation so it acts as a thin orchestrator and defers input handling to helpers.
+- [ ] Add additional unit tests for edge cases (focus toggles, Enter-on-versions behavior, confirm flow restores, deep-scroll/version preview interactions).
+- [ ] Add PTY-based integration tests to validate end-to-end edit→save→run flow (sanitization and no CreateProcess errors).
 
 Phase 5 — Core & interfaces
 - [ ] Create `core.go` that keeps the minimal `TuiModel` and orchestration logic. Ensure `core.go` imports the module files locally (same package) and calls their helpers.
