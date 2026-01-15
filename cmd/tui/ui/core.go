@@ -15,9 +15,9 @@ import (
 )
 
 // NewModel constructs the Bubble Tea TUI model used by cmd/tui. It accepts
-// any implementation of UIModel (usually the framework-agnostic internal
+// any implementation of Model (usually the framework-agnostic internal
 // model) so tests can provide fakes.
-func NewModel(ui UIModel) *TuiModel {
+func NewModel(ui Model) *TuiModel {
 	l := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 	l.Title = "krnr — command sets"
 	l.SetShowStatusBar(false)
@@ -33,7 +33,7 @@ func NewModel(ui UIModel) *TuiModel {
 }
 
 // NewProgram constructs the tea.Program for the TUI.
-func NewProgram(ui UIModel) *tea.Program {
+func NewProgram(ui Model) *tea.Program {
 	m := NewModel(ui)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	return p

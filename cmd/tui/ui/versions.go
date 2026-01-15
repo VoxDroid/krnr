@@ -12,24 +12,13 @@ import (
 // renderVersions renders the versions panel on the details view's right side.
 // It uses the versionsList view so the list adapts automatically to the size
 // (same behavior as the main list).
-func (m *TuiModel) renderVersions(width, height int) string {
+func (m *TuiModel) renderVersions(_ int, _ int) string {
 	var b strings.Builder
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Render("Versions") + "\n\n")
 
 	// list view will already be sized in WindowSizeMsg, so just render it
 	b.WriteString(m.versionsList.View())
 
-	return b.String()
-}
-
-// formatVersionPreview renders a short preview for a version (commands and dry-run)
-func formatVersionPreview(name string, v adapters.Version, _ int, _ int) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("krnr — %s v%d - %s\n", name, v.Version, v.Operation))
-	b.WriteString(strings.Repeat("-", 30) + "\n")
-	for _, c := range v.Commands {
-		b.WriteString("$ " + c + "\n")
-	}
 	return b.String()
 }
 
@@ -62,7 +51,7 @@ func (m *TuiModel) setVersionsPreviewIndex(idx int) tea.Cmd {
 // formatVersionDetails renders a full metadata view for a historic version.
 // It is similar to the full-screen command set rendering but for a specific
 // version so users can inspect author, description, created date and commands.
-func formatVersionDetails(name string, v adapters.Version, width int) string {
+func formatVersionDetails(name string, v adapters.Version, _ int) string {
 	var b strings.Builder
 	title := fmt.Sprintf("krnr — %s v%d Details", name, v.Version)
 	b.WriteString(title + "\n")

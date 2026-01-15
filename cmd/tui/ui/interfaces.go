@@ -6,10 +6,13 @@ import (
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
 
-// UIModel defines the small subset of methods from the framework-agnostic
+// Model defines the small subset of methods from the framework-agnostic
 // internal UI model that the TUI depends on. This decouples presentation
 // code from the concrete implementation and makes unit testing easier.
-type UIModel interface {
+//
+// Named `Model` (instead of `UIModel`) to avoid redundant package/type
+// stuttering when referenced as `ui.Model`.
+type Model interface {
 	RefreshList(ctx context.Context) error
 	ListCached() []adapters.CommandSetSummary
 	GetCommandSet(ctx context.Context, name string) (adapters.CommandSetSummary, error)

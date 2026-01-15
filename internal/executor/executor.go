@@ -91,6 +91,10 @@ func sanitizeCommand(s string) string {
 	}, rp)
 }
 
+// Execute runs the provided command string using an OS-appropriate shell
+// invocation (e.g., `bash -c` on Unix, `cmd /C` on Windows). It sanitizes
+// the command, validates it for illegal characters or newlines, and then
+// executes it writing stdout/stderr to the provided writers.
 func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
 	// First sanitize common unicode punctuation and invisible characters
 	// (e.g., smart quotes, NBSP, zero-width spaces, and NUL bytes) before

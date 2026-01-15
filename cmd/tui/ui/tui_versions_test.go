@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestVersionsPreviewRemoved(t *testing.T) {
+func TestVersionsPreviewRemoved(_ *testing.T) {
 	// Preview removed by design — this test prevents regressions.
 }
 

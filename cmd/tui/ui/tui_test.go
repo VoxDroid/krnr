@@ -260,13 +260,13 @@ func TestDetailResponsiveToWindowSize(t *testing.T) {
 	vpLarge := m.vp.View()
 	// compute max line length for large and small views as a better proxy for wrapping
 	maxLen := func(s string) int {
-		max := 0
+		maxv := 0
 		for _, ln := range strings.Split(s, "\n") {
-			if l := len(ln); l > max {
-				max = l
+			if l := len(ln); l > maxv {
+				maxv = l
 			}
 		}
-		return max
+		return maxv
 	}
 	maxLarge := maxLen(vpLarge)
 	// smaller width should result in shorter max line length due to wrapping

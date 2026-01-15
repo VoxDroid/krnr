@@ -9,6 +9,7 @@ import (
 	"context"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -49,6 +50,12 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	}
 	defer func() { _ = p.Close(); _ = tty.Close() }()
 
+	// try to set the master fd to non-blocking so Read won't block when
+	// SetReadDeadline is not supported on some platforms (CI macOS runners).
+	if err := setNonblock(p.Fd()); err != nil {
+		t.Logf("SetNonblock (master) failed: %v", err)
+	}
+
 	// create and start the program configured to use the pty
 	prog := tea.NewProgram(m, tea.WithAltScreen(), tea.WithInput(tty), tea.WithOutput(tty))
 	go func() {
@@ -71,11 +78,6 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 			if time.Now().After(end) {
 				break
 			}
-			// set a short read deadline so Read doesn't block forever
-			if err := p.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
-				// log and continue; deadline may be unsupported on some platforms
-				t.Logf("SetReadDeadline: %v", err)
-			}
 			n, err := p.Read(buf)
 			if n > 0 {
 				b.Write(buf[:n])
@@ -85,10 +87,12 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 				}
 			}
 			if err != nil {
-				// if timeout, try again; otherwise stop
-				if ne, ok := err.(interface{ Timeout() bool }); ok && ne.Timeout() {
+				// on non-blocking reads EAGAIN/EWOULDBLOCK means no data is ready
+				if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+					time.Sleep(50 * time.Millisecond)
 					continue
 				}
+				// if EOF or other errors, stop
 				break
 			}
 		}
@@ -111,11 +115,11 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 		var diagBuf [4096]byte
 		// send quit to the program first to encourage it to flush and exit
 		_, _ = p.Write([]byte("q"))
-		// set a short read deadline so this diagnostic read cannot block indefinitely
-		if err := p.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
-			t.Logf("SetReadDeadline (diag): %v", err)
+		n, err := p.Read(diagBuf[:])
+		if err != nil && (err == syscall.EAGAIN || err == syscall.EWOULDBLOCK) {
+			// no data available
+			n = 0
 		}
-		n, _ := p.Read(diagBuf[:])
 		outPartial := string(diagBuf[:n])
 		t.Fatalf("pty output did not appear in time; partial output:\n%s", outPartial)
 	}
@@ -148,6 +152,10 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 		t.Skipf("pty not supported: %v", err)
 	}
 	defer func() { _ = master.Close(); _ = tty.Close() }()
+	// set non-blocking on master so Read won't block when SetReadDeadline is unsupported
+	if err := setNonblock(master.Fd()); err != nil {
+		t.Logf("SetNonblock (master) failed: %v", err)
+	}
 
 	prog := tea.NewProgram(m, tea.WithAltScreen(), tea.WithInput(tty), tea.WithOutput(tty))
 	go func() { _, _ = prog.Run() }()
@@ -158,14 +166,22 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 		var b bytes.Buffer
 		r := bufio.NewReader(master)
 		for time.Now().Before(end) {
-			master.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
 			buf := make([]byte, 1024)
-			n, _ := r.Read(buf)
+			n, err := r.Read(buf)
 			if n > 0 {
 				b.Write(buf[:n])
 				if strings.Contains(b.String(), needle) {
 					return b.String(), nil
 				}
+			}
+			if err != nil {
+				if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+					// no data yet, try again
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+				// otherwise, break and return what we have
+				break
 			}
 		}
 		return b.String(), context.DeadlineExceeded
@@ -177,36 +193,55 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	}
 
 	// Enter detail
-	if _, err := master.Write([]byte{'\r'}); err != nil { t.Fatalf("enter: %v", err) }
-	if _, err := readUntil("(e) Edit", 2*time.Second); err != nil { t.Fatalf("detail not shown: %v", err) }
+	if _, err := master.Write([]byte{'\r'}); err != nil {
+		t.Fatalf("enter: %v", err)
+	}
+	if _, err := readUntil("(e) Edit", 2*time.Second); err != nil {
+		t.Fatalf("detail not shown: %v", err)
+	}
 
 	// Edit
-	if _, err := master.Write([]byte{'e'}); err != nil { t.Fatalf("edit: %v", err) }
+	if _, err := master.Write([]byte{'e'}); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
 	// tab 3x to commands field
-	for i := 0; i < 3; i++ { _, _ = master.Write([]byte{'\t'}); time.Sleep(40 * time.Millisecond) }
+	for i := 0; i < 3; i++ {
+		_, _ = master.Write([]byte{'\t'})
+		time.Sleep(40 * time.Millisecond)
+	}
 	// add command (Ctrl+A)
 	_, _ = master.Write([]byte{0x01})
 	// type smart-quoted command: echo “quoted”
 	cmd := "echo \u201Cquoted\u201D"
-	if _, err := master.Write([]byte(cmd)); err != nil { t.Fatalf("type cmd: %v", err) }
+	if _, err := master.Write([]byte(cmd)); err != nil {
+		t.Fatalf("type cmd: %v", err)
+	}
 	// save Ctrl+S
 	_, _ = master.Write([]byte{0x13})
 
 	// wait for ReplaceCommands to be called
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if len(reg.lastCommands) > 0 { break }
+		if len(reg.lastCommands) > 0 {
+			break
+		}
 		_, _ = readUntil("", 200*time.Millisecond)
 	}
-	if len(reg.lastCommands) == 0 { t.Fatalf("expected ReplaceCommands to be called") }
+	if len(reg.lastCommands) == 0 {
+		t.Fatalf("expected ReplaceCommands to be called")
+	}
 	// expect sanitized ASCII quotes (accept variants where an accidental missing space
 	// may have resulted in `echo"quoted"` on some PTY environments)
 	t.Logf("ReplaceCommands recorded: %#v", reg.lastCommands)
 	found := false
 	for _, c := range reg.lastCommands {
-		if c == "echo \"quoted\"" || strings.Contains(c, "\"quoted\"") { found = true }
+		if c == "echo \"quoted\"" || strings.Contains(c, "\"quoted\"") {
+			found = true
+		}
 	}
-	if !found { t.Fatalf("sanitized command not found in ReplaceCommands: %#v", reg.lastCommands) }
+	if !found {
+		t.Fatalf("sanitized command not found in ReplaceCommands: %#v", reg.lastCommands)
+	}
 	// wait for UI to emit a sanitization log message as an additional marker
 	if _, err := readUntil("sanitized command", 3*time.Second); err != nil {
 		// non-fatal: continue but log for diagnostics
@@ -218,17 +253,25 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	// wait for executor Run call
 	dead2 := time.Now().Add(2 * time.Second)
 	for time.Now().Before(dead2) {
-		if len(fe.lastRunCommands) > 0 { break }
+		if len(fe.lastRunCommands) > 0 {
+			break
+		}
 		_, _ = readUntil("", 200*time.Millisecond)
 	}
-	if len(fe.lastRunCommands) == 0 { t.Fatalf("expected Run called") }
+	if len(fe.lastRunCommands) == 0 {
+		t.Fatalf("expected Run called")
+	}
 	t.Logf("Run recorded: %#v", fe.lastRunCommands)
 	// assert sanitized command executed (accept variants where space may be missing)
 	runFound := false
 	for _, c := range fe.lastRunCommands {
-		if c == "echo \"quoted\"" || strings.Contains(c, "\"quoted\"") { runFound = true }
+		if c == "echo \"quoted\"" || strings.Contains(c, "\"quoted\"") {
+			runFound = true
+		}
 	}
-	if !runFound { t.Fatalf("expected sanitized command in Run, got: %#v", fe.lastRunCommands) }
+	if !runFound {
+		t.Fatalf("expected sanitized command in Run, got: %#v", fe.lastRunCommands)
+	}
 
 	// Quit
 	_, _ = master.Write([]byte{'q'})

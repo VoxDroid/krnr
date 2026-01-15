@@ -15,7 +15,7 @@ import (
 
 // TuiModel is the Bubble Tea model used by cmd/tui.
 type TuiModel struct {
-	uiModel UIModel
+	uiModel Model
 	list    list.Model
 	vp      viewport.Model
 
