@@ -152,14 +152,12 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// scheduled save: perform editor save now and clear saving flag. If the
 		// save fails due to the name already existing, suppress the notification
 		// because the create likely succeeded in a prior immediate save.
-		if m.editingMeta {
-			if err := m.editorSave(); err != nil {
-				if !strings.Contains(err.Error(), "already in use") {
-					m.logs = append(m.logs, "replace commands: "+err.Error())
-				}
+		if err := m.editorSave(); err != nil {
+			if !strings.Contains(err.Error(), "already in use") {
+				m.logs = append(m.logs, "replace commands: "+err.Error())
 			}
-			m.editor.saving = false
 		}
+		m.editor.saving = false
 		return m, nil
 	case tea.KeyMsg:
 		s := msg.String()
