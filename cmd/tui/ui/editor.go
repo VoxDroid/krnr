@@ -82,14 +82,22 @@ func (m *TuiModel) handleEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Save on Ctrl+S: schedule a short delayed save so that recently-typed
 	// runes arriving just before Ctrl+S have a small window to be processed.
 	if msg.Type == tea.KeyCtrlS {
-		// Prevent re-entry: set saving and schedule a delayed save cmd.
+		// Prevent re-entry: set saving; perform an immediate save for fast
+		// non-PTY flows but also schedule a delayed save to catch any runes that
+		// arrive just after Ctrl+S in PTY environments.
 		if m.editor.saving {
 			m.setNotification("save in progress")
 			m.logs = append(m.logs, "notification: save in progress")
 			return m, nil
 		}
 		m.editor.saving = true
-		// delay briefly to allow pending key bytes to be processed
+		// immediate attempt
+		if err := m.editorSave(); err != nil {
+			m.logs = append(m.logs, "replace commands: "+err.Error())
+		}
+		// clear immediate saving guard so subsequent Ctrl+S presses behave normally
+		m.editor.saving = false
+		// schedule a delayed save as a second attempt to capture late keystrokes
 		return m, tea.Tick(40*time.Millisecond, func(_ time.Time) tea.Msg { return saveNowMsg{} })
 	}
 
