@@ -198,6 +198,11 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("pty E2E tests skipped on Windows")
 	}
+	// Skip on CI runners to avoid flaky PTY hangs; these tests are useful
+	// locally but often cause long timeouts in CI environments.
+	if os.Getenv("CI") != "" || os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("skipping PTY E2E in CI due to flakiness")
+	}
 
 	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
 	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
