@@ -43,6 +43,8 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	_ = ui.RefreshList(context.Background())
 
 	m := NewModel(ui)
+	// Run model Init synchronously so the initial list/preview are populated
+	m.Init()()
 	p, tty, err := pty.Open()
 	if err != nil {
 		// PTY may be unsupported on this platform (e.g., Windows), skip the test
@@ -146,6 +148,8 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	ui := modelpkg.New(reg, fe, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
+	// Ensure initial list/preview are populated before starting the TUI program
+	m.Init()()
 
 	master, tty, err := pty.Open()
 	if err != nil {
