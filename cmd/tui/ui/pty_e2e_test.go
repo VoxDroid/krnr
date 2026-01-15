@@ -52,6 +52,11 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	}
 	defer func() { _ = p.Close(); _ = tty.Close() }()
 
+	// ensure the tty has a reasonable initial size so the UI renders items
+	if err := pty.Setsize(tty, &pty.Winsize{Cols: 120, Rows: 30}); err != nil {
+		t.Logf("pty size set failed: %v", err)
+	}
+
 	// try to set the master fd to non-blocking so Read won't block when
 	// SetReadDeadline is not supported on some platforms (CI macOS runners).
 	if err := setNonblock(p.Fd()); err != nil {
@@ -156,6 +161,10 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 		t.Skipf("pty not supported: %v", err)
 	}
 	defer func() { _ = master.Close(); _ = tty.Close() }()
+	// ensure the tty has a reasonable initial size so the UI renders items
+	if err := pty.Setsize(tty, &pty.Winsize{Cols: 120, Rows: 30}); err != nil {
+		t.Logf("pty size set failed: %v", err)
+	}
 	// set non-blocking on master so Read won't block when SetReadDeadline is unsupported
 	if err := setNonblock(master.Fd()); err != nil {
 		t.Logf("SetNonblock (master) failed: %v", err)
