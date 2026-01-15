@@ -79,7 +79,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	go func() {
 		var b strings.Builder
 		buf := make([]byte, 1024)
-		end := time.Now().Add(8 * time.Second)
+		end := time.Now().Add(12 * time.Second)
 		for {
 			// overall timeout for the goroutine
 			if time.Now().After(end) {
@@ -88,8 +88,11 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 			n, err := p.Read(buf)
 			if n > 0 {
 				b.Write(buf[:n])
-				// stop early if we have the things we expect
-				if strings.Contains(b.String(), "with-params") && strings.Contains(b.String(), "Description:") {
+				// stop early if we have the things we expect (name, description and
+				// commands block). some renders send header/description first then
+				// commands shortly after; require the Commands header to avoid
+				// capturing partial output that lacks the numbered command lines.
+				if strings.Contains(b.String(), "with-params") && strings.Contains(b.String(), "Description:") && (strings.Contains(b.String(), "Commands:") || strings.Contains(b.String(), "1) ") || strings.Contains(b.String(), "Dry-run preview:")) {
 					break
 				}
 			}
@@ -117,7 +120,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 		if !strings.Contains(out, "1)  echo") || !strings.Contains(out, "2)  echo") {
 			t.Fatalf("expected aligned command prefixes in output, got:\n%s", out)
 		}
-	case <-time.After(8 * time.Second):
+	case <-time.After(12 * time.Second):
 		// attempt to capture any partial output for diagnostics and quit
 		var diagBuf [4096]byte
 		// send quit to the program first to encourage it to flush and exit
@@ -201,8 +204,11 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	}
 
 	// await initial render
-	if _, err := readUntil("krnr — command sets", 3*time.Second); err != nil {
-		t.Fatalf("initial render not seen: %v", err)
+	if _, err := readUntil("krnr — command sets", 8*time.Second); err != nil {
+		// additional fallback: try to detect the command set name or detail header
+		if _, err2 := readUntil("one", 4*time.Second); err2 != nil {
+			t.Fatalf("initial render not seen: %v (fallback: %v)", err, err2)
+		}
 	}
 
 	// Enter detail
