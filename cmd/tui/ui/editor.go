@@ -3,6 +3,8 @@ package ui
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -97,8 +99,10 @@ func (m *TuiModel) handleEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// clear immediate saving guard so subsequent Ctrl+S presses behave normally
 		m.editor.saving = false
-		// schedule a delayed save as a second attempt to capture late keystrokes
-		return m, tea.Tick(40*time.Millisecond, func(_ time.Time) tea.Msg { return saveNowMsg{} })
+		// schedule a delayed save as a second attempt to capture late keystrokes.
+		// Delay is configurable via KRNR_SAVE_DELAY_MS (milliseconds) to adjust for
+		// slower CI/PTY environments; default is 120ms.
+		return m, tea.Tick(getSaveDelay(), func(_ time.Time) tea.Msg { return saveNowMsg{} })
 	}
 
 	// Handle rune input and backspace depending on field
@@ -391,4 +395,14 @@ func (m *TuiModel) renderEditor() string {
 		}
 	}
 	return b.String()
+}
+
+// getSaveDelay returns the configured save delay duration.
+func getSaveDelay() time.Duration {
+	if v := os.Getenv("KRNR_SAVE_DELAY_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * time.Millisecond
+		}
+	}
+	return 120 * time.Millisecond
 }
