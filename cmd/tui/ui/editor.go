@@ -63,9 +63,16 @@ func (m *TuiModel) handleEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Ctrl+A: add command (use Ctrl to avoid colliding with typed runes)
-	if msg.Type == tea.KeyCtrlA && m.editor.field == 5 {
+	// Make this robust: if the user presses Ctrl+A from any field, switch focus
+	// to the commands field and add a new command entry. This avoids relying on
+	// exact tab count in PTY tests or on flaky focus state.
+	if msg.Type == tea.KeyCtrlA {
+		m.editor.field = 5
 		m.editor.commands = append(m.editor.commands, "")
 		m.editor.cmdIndex = len(m.editor.commands) - 1
+		// mark last edit time so scheduled save can wait for stability
+		m.editor.lastEditAt = time.Now()
+		m.editor.saveRetries = 0
 		return m, nil
 	}
 	// Ctrl+D: delete current command
