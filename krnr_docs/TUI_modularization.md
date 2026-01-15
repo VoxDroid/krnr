@@ -76,10 +76,12 @@ Phase 4 — Input & dispatch (COMPLETED)
 - [ ] Add additional unit tests for edge cases (focus toggles, Enter-on-versions behavior, confirm flow restores, deep-scroll/version preview interactions).
 - [ ] Add PTY-based integration tests to validate end-to-end edit→save→run flow (sanitization and no CreateProcess errors).
 
-Phase 5 — Core & interfaces
-- [ ] Create `core.go` that keeps the minimal `TuiModel` and orchestration logic. Ensure `core.go` imports the module files locally (same package) and calls their helpers.
-- [ ] Add `interfaces.go` to declare local interfaces for registry, executor, imp/exp adapters and wire them into the UI model through the `modelpkg.UIModel` or directly for testing.
-- [ ] Re-run the entire `cmd/tui/ui` test package and resolve issues.
+Phase 5 — Core & interfaces (COMPLETED)
+- [x] Create `core.go` that contains the orchestration helpers: `NewModel`, `NewProgram`, and `Init` (now delegates to module helpers in other files).
+- [x] Add `interfaces.go` to declare local `UIModel` interface that the TUI depends on (enables passing fakes and decouples UI from `modelpkg.UIModel`).
+- [x] Moved small utilities and helpers (`readLoop`, `uniqueDestPath`, `trimLastRune`, `filterEmptyLines`) into `core.go` to centralize orchestration utilities.
+- [x] Re-run the entire `cmd/tui/ui` test package and resolve issues (tests pass locally).
+- [x] Follow-up: consider extracting additional small interfaces if needed as Phase 6 approaches.
 
 Phase 6 — Tests & CI
 - [ ] Expand headless tests to cover edge cases (terminal narrow, command sequences with sanitized characters, paging with many versions).
