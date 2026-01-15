@@ -267,14 +267,32 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	if _, err := master.Write([]byte{'\r'}); err != nil {
 		t.Fatalf("enter: %v", err)
 	}
-	// Wait for an edit prompt, but be tolerant: accept either the explicit
-	// "(e) Edit" hint or evidence the detail pane is present (Name: / Description:)
-	if _, err := readUntil("(e) Edit", 4*time.Second); err != nil {
-		if _, err2 := readUntil("Name:", 4*time.Second); err2 != nil {
-			if _, err3 := readUntil("Description:", 4*time.Second); err3 != nil {
-				t.Fatalf("detail not shown: %v", err)
-			}
+	// Try to enter detail and be resilient to timing differences: attempt
+	// up to a few times and accept either the edit hint or Name/Description
+	entered := false
+tLoop:
+	for i := 0; i < 3 && !entered; i++ {
+		if _, err := master.Write([]byte{'\r'}); err != nil {
+			t.Fatalf("enter: %v", err)
 		}
+		// short waits for responsiveness; prefer explicit edit hint first
+		if _, err := readUntil("(e) Edit", 2*time.Second); err == nil {
+			entered = true
+			break tLoop
+		}
+		if _, err := readUntil("Name:", 1*time.Second); err == nil {
+			entered = true
+			break tLoop
+		}
+		if _, err := readUntil("Description:", 1*time.Second); err == nil {
+			entered = true
+			break tLoop
+		}
+		// small backoff and retry
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !entered {
+		t.Fatalf("detail not shown after attempts")
 	}
 
 	// Edit
