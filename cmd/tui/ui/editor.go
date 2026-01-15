@@ -139,6 +139,8 @@ func (m *TuiModel) editorSave() error {
 		cSan := executor.Sanitize(c)
 		if cSan != c {
 			m.logs = append(m.logs, "sanitized command: \""+c+"\" -> \""+cSan+"\"")
+			// diagnostic: include quoted representations and raw bytes to help PTY tests
+			m.logs = append(m.logs, fmt.Sprintf("sanitized debug: orig=%q san=%q bytes=%v", c, cSan, []byte(cSan)))
 			for j := range m.editor.commands {
 				if strings.TrimSpace(m.editor.commands[j]) == strings.TrimSpace(c) {
 					m.editor.commands[j] = cSan
