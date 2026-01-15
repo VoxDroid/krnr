@@ -1,3 +1,6 @@
+// Package nameutil contains helpers for validating and sanitizing user-provided
+// names for command sets. It enforces UTF-8, trims whitespace, and removes
+// common invisible/control characters that are often introduced by copy/paste.
 package nameutil
 
 import (

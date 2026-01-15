@@ -87,6 +87,11 @@ type TuiModel struct {
 type runEventMsg adapters.RunEvent
 type runDoneMsg struct{}
 
+// saveNowMsg schedules an editor save after a short delay to allow PTY input
+// to be processed before committing the edit. This helps make PTY end-to-end
+// flows deterministic when typing then immediately saving.
+type saveNowMsg struct{}
+
 // NewModel, NewProgram and Init were moved to `core.go` as part of
 // Phase 5 modularization (core orchestration and interfaces).
 
@@ -117,6 +122,7 @@ func (m *TuiModel) clearNotification() {
 	m.mu.Unlock()
 }
 
+// IsDetailShown reports detail visibility and the currently shown name (thread-safe).
 func (m *TuiModel) IsDetailShown() (bool, string) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -142,6 +148,15 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}()
 
 	switch msg := msg.(type) {
+	case saveNowMsg:
+		// scheduled save: perform editor save now and clear saving flag
+		if m.editingMeta {
+			if err := m.editorSave(); err != nil {
+				m.logs = append(m.logs, "replace commands: "+err.Error())
+			}
+			m.editor.saving = false
+		}
+		return m, nil
 	case tea.KeyMsg:
 		s := msg.String()
 		// If we're editing metadata, delegate key handling to editor.go

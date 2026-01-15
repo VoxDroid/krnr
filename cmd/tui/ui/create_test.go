@@ -3,9 +3,10 @@ package ui
 
 import (
 	"context"
-	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
@@ -147,11 +148,7 @@ func TestCreateEntryViaKey(t *testing.T) {
 		t.Fatalf("expected 0 save attempts for empty-name spams, got %d (logs: %#v)", attempts, lastFail.logs)
 	}
 	// should still have the prior saved name
-	if f.last.Name == "" {
-		// last saved name remains previous (nset)
-	} else if f.last.Name == "nset" {
-		// ok
-	} else {
+	if f.last.Name != "" && f.last.Name != "nset" {
 		t.Fatalf("unexpected saved name after failed create: %q", f.last.Name)
 	}
 	// expect an error log mentioning invalid name (via replace commands wrapper)

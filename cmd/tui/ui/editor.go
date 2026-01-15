@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -78,20 +79,18 @@ func (m *TuiModel) handleEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Save on Ctrl+S
+	// Save on Ctrl+S: schedule a short delayed save so that recently-typed
+	// runes arriving just before Ctrl+S have a small window to be processed.
 	if msg.Type == tea.KeyCtrlS {
-		// Prevent re-entry: set saving before validation/save begins.
+		// Prevent re-entry: set saving and schedule a delayed save cmd.
 		if m.editor.saving {
 			m.setNotification("save in progress")
 			m.logs = append(m.logs, "notification: save in progress")
 			return m, nil
 		}
 		m.editor.saving = true
-		defer func() { m.editor.saving = false }()
-		if err := m.editorSave(); err != nil {
-			m.logs = append(m.logs, "replace commands: "+err.Error())
-		}
-		return m, nil
+		// delay briefly to allow pending key bytes to be processed
+		return m, tea.Tick(40*time.Millisecond, func(_ time.Time) tea.Msg { return saveNowMsg{} })
 	}
 
 	// Handle rune input and backspace depending on field

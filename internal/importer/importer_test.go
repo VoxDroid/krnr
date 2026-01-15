@@ -14,7 +14,7 @@ func TestInsertCommandSetRejectsEmptyName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// apply migrations so table exists
 	if err := dbpkg.ApplyMigrations(db); err != nil {
@@ -33,7 +33,7 @@ func TestApplyMigrationsDetectsDuplicateTrimmedNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// create a minimal command_sets table (older DB state)
 	if _, err := db.Exec(`CREATE TABLE command_sets (

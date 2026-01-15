@@ -13,7 +13,7 @@ func TestTriggersRejectEmptyAndDuplicateInserts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := ApplyMigrations(db); err != nil {
 		t.Fatalf("apply migrations: %v", err)

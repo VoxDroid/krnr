@@ -63,15 +63,11 @@ func (r *Repository) CreateCommandSet(name string, description *string, authorNa
 	row := r.db.QueryRow("SELECT TRIM(name) FROM command_sets WHERE id = ?", id)
 	if err := row.Scan(&storedName); err != nil {
 		// cannot read back; remove inserted row if possible and return error
-		if _, derr := r.db.Exec("DELETE FROM command_sets WHERE id = ?", id); derr != nil {
-			// ignore cleanup failure
-		}
+		_, _ = r.db.Exec("DELETE FROM command_sets WHERE id = ?", id)
 		return 0, fmt.Errorf("sanity check failed: %w", err)
 	}
 	if storedName == "" || storedName != name {
-		if _, derr := r.db.Exec("DELETE FROM command_sets WHERE id = ?", id); derr != nil {
-			// ignore cleanup failure
-		}
+		_, _ = r.db.Exec("DELETE FROM command_sets WHERE id = ?", id)
 		return 0, fmt.Errorf("sanity check failed: inserted name mismatch")
 	}
 	// record an initial version (may include provided commands)
