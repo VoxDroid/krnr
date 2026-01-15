@@ -151,7 +151,7 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case "q", "esc":
 		return m, tea.Quit, true
 	case "?":
-		m.showDetail = true
+		m.setShowDetail(true)
 		m.detail = "Help:\n\n? show help\nq or Esc to quit\nEnter to view details\n/ to filter\n← → or Tab to switch pane focus\n↑ ↓ to scroll focused pane"
 		return m, nil, true
 	case "enter":
@@ -164,8 +164,8 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 			return m, nil, true
 		}
 		if i, ok := m.list.SelectedItem().(csItem); ok {
-			m.showDetail = true
-			m.detailName = i.cs.Name
+			m.setShowDetail(true)
+			m.setDetailName(i.cs.Name)
 			if cs, err := m.uiModel.GetCommandSet(context.Background(), i.cs.Name); err == nil {
 				m.detail = formatCSFullScreen(cs, m.width, m.height)
 				m.vp.SetContent(m.detail)
@@ -243,7 +243,7 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 		}
 		return m, nil, true
 	case "b":
-		m.showDetail = false
+		m.setShowDetail(false)
 		m.focusRight = false
 		if si := m.list.SelectedItem(); si != nil {
 			if it, ok := si.(csItem); ok {
@@ -359,7 +359,7 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 			m.logs = append(m.logs, fmt.Sprintf("deleted '%s'", name))
 			m.pendingDelete = false
 			m.pendingDeleteName = ""
-			m.showDetail = false
+			m.setShowDetail(false)
 			if len(items) > 0 {
 				m.list.Select(0)
 				if it, ok := items[0].(csItem); ok {

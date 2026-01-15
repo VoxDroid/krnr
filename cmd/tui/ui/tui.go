@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"sync"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
@@ -21,6 +22,7 @@ type TuiModel struct {
 
 	width  int
 	height int
+	mu     sync.RWMutex
 
 	showDetail bool
 	detail     string
@@ -77,6 +79,25 @@ type runDoneMsg struct{}
 
 // NewModel, NewProgram and Init were moved to `core.go` as part of
 // Phase 5 modularization (core orchestration and interfaces).
+
+// thread-safe helpers for detail view state used by integration tests
+func (m *TuiModel) setShowDetail(v bool) {
+	m.mu.Lock()
+	m.showDetail = v
+	m.mu.Unlock()
+}
+
+func (m *TuiModel) setDetailName(name string) {
+	m.mu.Lock()
+	m.detailName = name
+	m.mu.Unlock()
+}
+
+func (m *TuiModel) IsDetailShown() (bool, string) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.showDetail, m.detailName
+}
 
 // Update handles incoming events and updates model state.
 func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

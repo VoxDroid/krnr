@@ -267,29 +267,38 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	if _, err := master.Write([]byte{'\r'}); err != nil {
 		t.Fatalf("enter: %v", err)
 	}
-	// Try to enter detail and be resilient to timing differences: attempt
-	// up to a few times and accept either the edit hint or Name/Description
+	// prefer to detect detail being shown by polling the model state (thread-safe)
 	entered := false
-tLoop:
-	for i := 0; i < 3 && !entered; i++ {
-		if _, err := master.Write([]byte{'\r'}); err != nil {
-			t.Fatalf("enter: %v", err)
-		}
-		// short waits for responsiveness; prefer explicit edit hint first
-		if _, err := readUntil("(e) Edit", 2*time.Second); err == nil {
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if shown, _ := m.IsDetailShown(); shown {
 			entered = true
-			break tLoop
+			break
 		}
-		if _, err := readUntil("Name:", 1*time.Second); err == nil {
-			entered = true
-			break tLoop
+		time.Sleep(50 * time.Millisecond)
+	}
+	// fallback to PTY-based detection if model didn't report detail shown
+	if !entered {
+		for i := 0; i < 3 && !entered; i++ {
+			if _, err := master.Write([]byte{'\r'}); err != nil {
+				t.Fatalf("enter: %v", err)
+			}
+			// short waits for responsiveness; prefer explicit edit hint first
+			if _, err := readUntil("(e) Edit", 2*time.Second); err == nil {
+				entered = true
+				break
+			}
+			if _, err := readUntil("Name:", 1*time.Second); err == nil {
+				entered = true
+				break
+			}
+			if _, err := readUntil("Description:", 1*time.Second); err == nil {
+				entered = true
+				break
+			}
+			// small backoff and retry
+			time.Sleep(100 * time.Millisecond)
 		}
-		if _, err := readUntil("Description:", 1*time.Second); err == nil {
-			entered = true
-			break tLoop
-		}
-		// small backoff and retry
-		time.Sleep(100 * time.Millisecond)
 	}
 	if !entered {
 		t.Fatalf("detail not shown after attempts")
@@ -315,7 +324,7 @@ tLoop:
 	_, _ = master.Write([]byte{0x13})
 
 	// wait for ReplaceCommands to be called
-	deadline := time.Now().Add(2 * time.Second)
+	deadline = time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if len(reg.lastCommands) > 0 {
 			break
