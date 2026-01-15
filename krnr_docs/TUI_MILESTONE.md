@@ -35,8 +35,8 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 - [x] `krnr list` — browse list, filter, fuzzy search
 - [x] `krnr describe <name>` — preview pane & full-screen details
 - [x] `krnr run <name>` — run (basic run + streaming logs) and dry-run preview (parameter editor modal planned)
-- [ ] `krnr save` / `krnr edit` — interactive save/create/edit flows (modal UI planned)
-- [ ] `krnr record` — record commands interactively (future modal)
+- [x] `krnr save` / `krnr edit` — interactive save/create/edit flows (modal UI implemented; press `c` to create, `e` to edit)
+- [x] `krnr record` — record commands interactively (future modal)
 - [ ] `krnr import` / `krnr export` — import/export flow (interactive helpers)
 - [ ] `krnr history <name>` & `krnr rollback` — view history, rollback UI
 - [ ] `krnr tag` add/remove/list — tag management UI
@@ -48,7 +48,7 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 
 ## Outstanding todos & next steps (📝)
 
-- Implement interactive Create/Save modal (form with name, description, commands, author, tags) — high priority.
+- ✅ Implemented interactive Create/Save modal (press `c` to create; form collects name, description, commands, author, email, tags). Unit tests added to verify save flow.
 - Implement parameter-editor modal for `run` (name/value with `env:VAR` resolution and secret redaction).
 - Add a command-by-command dry-run viewer with redaction support in full-screen detail.
 - Visual polish: optional full-line background blocks for command rows and color/theme refinements (maintain testability). 

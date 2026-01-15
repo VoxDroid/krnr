@@ -27,8 +27,8 @@ func TestEditorSaveRejectsControlCharacters_Newline(t *testing.T) {
 	if !m.editingMeta {
 		t.Fatalf("expected editor to be open")
 	}
-	// cycle to commands field (tab 3 times)
-	for i := 0; i < 3; i++ {
+	// cycle to commands field (tab until commands)
+	for i := 0; i < 10 && m.editor.field != 5; i++ {
 		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		m = m4.(*TuiModel)
 	}

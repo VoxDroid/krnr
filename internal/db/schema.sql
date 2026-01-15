@@ -40,3 +40,41 @@ CREATE TABLE IF NOT EXISTS command_set_versions (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_command_set_versions_unique ON command_set_versions (command_set_id, version);
+
+-- Ensure names are non-empty (trimmed) on insert and update. Use triggers so
+-- existing databases will receive this protection when migrations run.
+CREATE TRIGGER IF NOT EXISTS command_sets_check_name_insert
+BEFORE INSERT ON command_sets
+FOR EACH ROW
+WHEN trim(NEW.name) = '' OR typeof(NEW.name) != 'text'
+BEGIN
+    SELECT RAISE(ABORT, 'invalid name: name cannot be empty or non-text');
+END;
+
+CREATE TRIGGER IF NOT EXISTS command_sets_check_name_update
+BEFORE UPDATE OF name ON command_sets
+FOR EACH ROW
+WHEN trim(NEW.name) = '' OR typeof(NEW.name) != 'text'
+BEGIN
+    SELECT RAISE(ABORT, 'invalid name: name cannot be empty or non-text');
+END;
+
+-- Unique index on the trimmed name to enforce uniqueness regardless of surrounding whitespace
+CREATE UNIQUE INDEX IF NOT EXISTS idx_command_sets_trimmed_name_unique ON command_sets (trim(name));
+
+-- Additional trigger: Prevent duplicate trimmed names at DB level as a defense-in-depth
+CREATE TRIGGER IF NOT EXISTS command_sets_check_name_insert_duplicate
+BEFORE INSERT ON command_sets
+FOR EACH ROW
+WHEN EXISTS(SELECT 1 FROM command_sets WHERE TRIM(name) = TRIM(NEW.name))
+BEGIN
+    SELECT RAISE(ABORT, 'invalid name: duplicate trimmed name');
+END;
+
+CREATE TRIGGER IF NOT EXISTS command_sets_check_name_update_duplicate
+BEFORE UPDATE OF name ON command_sets
+FOR EACH ROW
+WHEN EXISTS(SELECT 1 FROM command_sets WHERE TRIM(name) = TRIM(NEW.name) AND id != OLD.id)
+BEGIN
+    SELECT RAISE(ABORT, 'invalid name: duplicate trimmed name');
+END;

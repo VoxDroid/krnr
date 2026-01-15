@@ -7,11 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// _ import for sqlite driver registration
 	_ "modernc.org/sqlite"
 
 	"github.com/VoxDroid/krnr/internal/config"
+	dbpkg "github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/registry"
 )
 
@@ -61,18 +63,18 @@ func ImportDatabase(srcPath string, overwrite bool, opts ImportOptions) error {
 }
 
 func ensureUniqueName(dst *sql.DB, orig string) (string, error) {
-	name := orig
+	name := strings.TrimSpace(orig)
 	si := 1
 	for {
 		var cnt int
-		r := dst.QueryRow("SELECT count(*) FROM command_sets WHERE name = ?", name)
+		r := dst.QueryRow("SELECT count(*) FROM command_sets WHERE TRIM(name) = ?", name)
 		if err := r.Scan(&cnt); err != nil {
 			return "", err
 		}
 		if cnt == 0 {
 			return name, nil
 		}
-		name = fmt.Sprintf("%s-import-%d", orig, si)
+		name = fmt.Sprintf("%s-import-%d", name, si)
 		si++
 	}
 }
@@ -95,6 +97,11 @@ func ImportCommandSet(srcPath string, opts ImportOptions) error {
 		return fmt.Errorf("open dst: %w", err)
 	}
 	defer func() { _ = dst.Close() }()
+
+	// ensure destination DB has the latest migrations (triggers/indexes)
+	if err := dbpkg.ApplyMigrations(dst); err != nil {
+		return fmt.Errorf("apply migrations to destination DB: %w", err)
+	}
 
 	rows, err := src.Query("SELECT id, name, description, created_at, last_run FROM command_sets")
 	if err != nil {
@@ -146,12 +153,35 @@ func ImportCommandSet(srcPath string, opts ImportOptions) error {
 }
 
 func insertCommandSet(dst *sql.DB, name string, desc sql.NullString, created string, lastRun sql.NullString) (int64, error) {
-	res, err := dst.Exec("INSERT INTO command_sets (name, description, created_at, last_run) VALUES (?, ?, ?, ?)", name, desc, created, lastRun)
+	// Defensive: trim and validate name
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, fmt.Errorf("invalid name: name cannot be empty")
+	}
+	trx, err := dst.Begin()
 	if err != nil {
 		return 0, err
 	}
+	defer func() { _ = trx.Rollback() }()
+
+	res, err := trx.Exec(`INSERT INTO command_sets (name, description, created_at, last_run)
+		SELECT ?, ?, ?, ?
+		WHERE NOT EXISTS(SELECT 1 FROM command_sets WHERE TRIM(name) = ?)`, name, desc, created, lastRun, name)
+	if err != nil {
+		return 0, err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, fmt.Errorf("name %q already in use", name)
+	}
 	newID, err := res.LastInsertId()
 	if err != nil {
+		return 0, err
+	}
+	if err := trx.Commit(); err != nil {
 		return 0, err
 	}
 	return newID, nil
@@ -159,7 +189,7 @@ func insertCommandSet(dst *sql.DB, name string, desc sql.NullString, created str
 
 func commandSetExists(dst *sql.DB, name string) (bool, error) {
 	var cnt int
-	r := dst.QueryRow("SELECT count(*) FROM command_sets WHERE name = ?", name)
+	r := dst.QueryRow("SELECT count(*) FROM command_sets WHERE TRIM(name) = ?", strings.TrimSpace(name))
 	if err := r.Scan(&cnt); err != nil {
 		return false, err
 	}
@@ -173,7 +203,7 @@ func deleteCommandSetByName(dst *sql.DB, name string) error {
 	}
 	defer func() { _ = trx.Rollback() }()
 	var id int64
-	row := trx.QueryRow("SELECT id FROM command_sets WHERE name = ?", name)
+	row := trx.QueryRow("SELECT id FROM command_sets WHERE TRIM(name) = ?", strings.TrimSpace(name))
 	if err := row.Scan(&id); err != nil {
 		if err == sql.ErrNoRows {
 			return nil

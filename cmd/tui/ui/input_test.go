@@ -44,6 +44,9 @@ func TestHandleGlobalKeys_QuitAndHelp(t *testing.T) {
 	if !strings.Contains(mt.detail, "Help:") {
 		t.Fatalf("expected detail to contain Help, got %q", mt.detail)
 	}
+	if !strings.Contains(strings.ToLower(mt.detail), "create") {
+		t.Fatalf("expected help to mention create/new entry, got %q", mt.detail)
+	}
 }
 
 func TestTabTogglesFocus(t *testing.T) {

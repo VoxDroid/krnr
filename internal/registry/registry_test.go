@@ -1,6 +1,8 @@
 package registry
 
 import (
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/VoxDroid/krnr/internal/db"
@@ -91,6 +93,106 @@ func TestRepository_Delete(t *testing.T) {
 	}
 	if cs2 != nil {
 		t.Fatalf("expected nil after delete")
+	}
+}
+
+func TestRepository_CreateRejectsEmptyName(t *testing.T) {
+	// init DB
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := NewRepository(dbConn)
+	_, err = r.CreateCommandSet("   ", nil, nil, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid name") {
+		t.Fatalf("expected invalid name error, got %v", err)
+	}
+}
+
+func TestRepository_CreateRejectsDuplicateName(t *testing.T) {
+	// init DB
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := NewRepository(dbConn)
+	_ = r.DeleteCommandSet("dup")
+	d := "dup"
+	_, err = r.CreateCommandSet("dup", &d, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected create error: %v", err)
+	}
+	_, err = r.CreateCommandSet("dup", &d, nil, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "already in use") {
+		t.Fatalf("expected duplicate-name error, got %v", err)
+	}
+}
+
+func TestRepository_ConcurrentCreateDoesNotMakeDuplicates(t *testing.T) {
+	// init DB
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := NewRepository(dbConn)
+	_ = r.DeleteCommandSet("race")
+
+	var wg sync.WaitGroup
+	errs := make([]error, 20)
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			_, errs[idx] = r.CreateCommandSet("race", nil, nil, nil, nil)
+		}(i)
+	}
+	wg.Wait()
+
+	successes := 0
+	for _, e := range errs {
+		if e == nil {
+			successes++
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("expected exactly 1 successful create, got %d (errs=%#v)", successes, errs)
+	}
+	_ = r.DeleteCommandSet("race")
+}
+
+func TestRepository_ConcurrentRejectEmptyNames(t *testing.T) {
+	// init DB
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+
+	r := NewRepository(dbConn)
+	_ = r.DeleteCommandSet("")
+
+	var wg sync.WaitGroup
+	errs := make([]error, 20)
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			_, errs[idx] = r.CreateCommandSet("  ", nil, nil, nil, nil)
+		}(i)
+	}
+	wg.Wait()
+
+	// All should fail with invalid name
+	for i, e := range errs {
+		if e == nil || !strings.Contains(e.Error(), "invalid name") {
+			t.Fatalf("expected invalid name error for attempt %d, got %v", i, e)
+		}
 	}
 }
 

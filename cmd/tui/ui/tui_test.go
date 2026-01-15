@@ -399,6 +399,7 @@ func TestDetailViewShowsTitle(t *testing.T) {
 	if !strings.Contains(view, "krnr — sysinf Details") {
 		t.Fatalf("expected title 'krnr — sysinf Details' in View(), got:\n%s", view)
 	}
+	// detail footer should present edit/delete/export hints
 	if !strings.Contains(view, "(e) Edit") {
 		t.Fatalf("expected detail view to include '(e) Edit' hint, got:\n%s", view)
 	}
@@ -407,6 +408,21 @@ func TestDetailViewShowsTitle(t *testing.T) {
 	}
 	if !strings.Contains(view, "(s) Export") {
 		t.Fatalf("expected detail view to include '(s) Export' hint, got:\n%s", view)
+	}
+}
+
+func TestMainFooterShowsCreateKey(t *testing.T) {
+	// main screen footer should include (C) New Entry hint
+	fakeReg := &fakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}}
+	ui := modelpkg.New(fakeReg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = m1.(*TuiModel)
+	view := m.View()
+	if !strings.Contains(view, "(C) New Entry") {
+		t.Fatalf("expected footer to contain (C) New Entry, got:\n%s", view)
 	}
 }
 
@@ -427,8 +443,8 @@ func TestEditReplacesCommands(t *testing.T) {
 	if !m.editingMeta {
 		t.Fatalf("expected editor to be open")
 	}
-	// cycle to commands field (tab 3 times)
-	for i := 0; i < 3; i++ {
+	// cycle to commands field (tab 5 times)
+	for i := 0; i < 5; i++ {
 		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		m = m4.(*TuiModel)
 	}
@@ -475,8 +491,8 @@ func TestEditorSaveSanitizesCommands(t *testing.T) {
 	if !m.editingMeta {
 		t.Fatalf("expected editor to be open")
 	}
-	// cycle to commands field (tab 3 times)
-	for i := 0; i < 3; i++ {
+	// cycle to commands field (tab until commands)
+	for i := 0; i < 10 && m.editor.field != 5; i++ {
 		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		m = m4.(*TuiModel)
 	}
@@ -530,8 +546,8 @@ func TestEditorSaveRejectsControlCharacters(t *testing.T) {
 	if !m.editingMeta {
 		t.Fatalf("expected editor to be open")
 	}
-	// cycle to commands field (tab 3 times)
-	for i := 0; i < 3; i++ {
+	// cycle to commands field (tab until commands)
+	for i := 0; i < 10 && m.editor.field != 5; i++ {
 		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		m = m4.(*TuiModel)
 	}
@@ -575,8 +591,8 @@ func TestEditorTypingKAndSpaceInCommands(t *testing.T) {
 	if !m.editingMeta {
 		t.Fatalf("expected editor to be open")
 	}
-	// cycle to commands field (tab 3 times)
-	for i := 0; i < 3; i++ {
+	// cycle to commands field (tab until commands)
+	for i := 0; i < 10 && m.editor.field != 5; i++ {
 		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 		m = m4.(*TuiModel)
 	}

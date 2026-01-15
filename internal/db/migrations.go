@@ -22,6 +22,36 @@ func ApplyMigrations(db *sql.DB) error {
 	if err := ensureCommandSetColumns(db); err != nil {
 		return err
 	}
+
+	// Validate existing data integrity: no empty trimmed names and no duplicate trimmed names.
+	// This prevents silent acceptance of invalid rows from older DBs or imports.
+	var cnt int
+	row := db.QueryRow("SELECT count(*) FROM command_sets WHERE trim(name) = '' OR name IS NULL")
+	if err := row.Scan(&cnt); err != nil {
+		return err
+	}
+	if cnt > 0 {
+		return fmt.Errorf("apply migrations: found %d command_sets with empty trimmed names; please remove or fix them before starting", cnt)
+	}
+
+	rows, err := db.Query("SELECT TRIM(name) as tname, count(*) as c FROM command_sets GROUP BY TRIM(name) HAVING c > 1")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	var dupes []string
+	for rows.Next() {
+		var t string
+		var c int
+		if err := rows.Scan(&t, &c); err != nil {
+			return err
+		}
+		dupes = append(dupes, t)
+	}
+	if len(dupes) > 0 {
+		return fmt.Errorf("apply migrations: found duplicate command_set names (trimmed): %v; please dedupe before starting", dupes)
+	}
+
 	return nil
 }
 

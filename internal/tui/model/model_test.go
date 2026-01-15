@@ -2,8 +2,12 @@ package model
 
 import (
 	"context"
+	"strings"
+	"sync"
 	"testing"
 
+	"github.com/VoxDroid/krnr/internal/db"
+	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
 
@@ -23,6 +27,93 @@ func TestRefreshListAndFind(t *testing.T) {
 		t.Fatalf("expected to find 'one' %v", err)
 	}
 }
+
+func TestSaveRejectsEmptyName(t *testing.T) {
+	// registry that records saves
+	rec := &saveRecorder{}
+	m := New(rec, &testExecutor{}, &testImportExport{}, &testInstaller{})
+	// try to save with empty name
+	err := m.Save(context.Background(), adapters.CommandSetSummary{Name: "   "})
+	if err == nil || !strings.Contains(err.Error(), "invalid name") {
+		t.Fatalf("expected invalid name error, got %v", err)
+	}
+	if rec.last.Name != "" {
+		t.Fatalf("expected registry Save not to be called, got %#v", rec.last)
+	}
+}
+
+func TestSaveRejectsDuplicateName(t *testing.T) {
+	// test registry pre-populated with an existing name
+	fake := &testRegistry{items: []adapters.CommandSetSummary{{Name: "exists"}}}
+	m := New(fake, &testExecutor{}, &testImportExport{}, &testInstaller{})
+	err := m.Save(context.Background(), adapters.CommandSetSummary{Name: "exists"})
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("expected duplicate-name error, got %v", err)
+	}
+}
+
+func TestConcurrentSavesDoNotCreateDuplicates(t *testing.T) {
+	// use a real repository-backed adapter to simulate real DB behavior
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+	r := registry.NewRepository(dbConn)
+	regAdapter := adapters.NewRegistryAdapter(r)
+	m := New(regAdapter, &testExecutor{}, &testImportExport{}, &testInstaller{})
+
+	// clean
+	_ = r.DeleteCommandSet("concur")
+
+	var wg sync.WaitGroup
+	errs := make([]error, 10)
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			errs[idx] = m.Save(context.Background(), adapters.CommandSetSummary{Name: "concur"})
+		}(i)
+	}
+	wg.Wait()
+
+	successes := 0
+	for _, e := range errs {
+		if e == nil {
+			successes++
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("expected exactly 1 successful save, got %d (errs=%#v)", successes, errs)
+	}
+	// cleanup
+	_ = r.DeleteCommandSet("concur")
+}
+
+type saveRecorder struct{ last adapters.CommandSetSummary }
+
+func (s *saveRecorder) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
+	return nil, nil
+}
+func (s *saveRecorder) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) {
+	return adapters.CommandSetSummary{}, adapters.ErrNotFound
+}
+func (s *saveRecorder) SaveCommandSet(_ context.Context, cs adapters.CommandSetSummary) error {
+	s.last = cs
+	return nil
+}
+func (s *saveRecorder) DeleteCommandSet(_ context.Context, _ string) error { return nil }
+func (s *saveRecorder) GetCommands(_ context.Context, _ string) ([]string, error) {
+	return nil, adapters.ErrNotFound
+}
+func (s *saveRecorder) ReplaceCommands(_ context.Context, _ string, _ []string) error { return nil }
+func (s *saveRecorder) UpdateCommandSet(_ context.Context, _ string, _ adapters.CommandSetSummary) error {
+	return nil
+}
+func (s *saveRecorder) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
+	return nil, nil
+}
+func (s *saveRecorder) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
 
 // test helpers
 type testRegistry struct{ items []adapters.CommandSetSummary }

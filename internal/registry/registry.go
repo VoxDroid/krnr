@@ -3,6 +3,9 @@ package registry
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+
+	"github.com/VoxDroid/krnr/internal/nameutil"
 )
 
 // Repository provides CRUD operations for command sets and commands.
@@ -18,15 +21,35 @@ func NewRepository(db *sql.DB) *Repository {
 // CreateCommandSet inserts a new command set and returns its ID.
 // initialCommands, if provided, will be recorded as the initial version snapshot.
 func (r *Repository) CreateCommandSet(name string, description *string, authorName *string, authorEmail *string, initialCommands []string) (int64, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, fmt.Errorf("invalid name: name cannot be empty")
+	}
+	if err := nameutil.ValidateName(name); err != nil {
+		return 0, err
+	}
+
+	// Use an atomic INSERT ... SELECT ... WHERE NOT EXISTS(...) so the check-and-insert
+	// happens inside the DB engine and avoids TOCTOU races across processes.
 	trx, err := r.db.Begin()
 	if err != nil {
 		return 0, err
 	}
 	defer func() { _ = trx.Rollback() }()
 
-	res, err := trx.Exec("INSERT INTO command_sets (name, description, author_name, author_email, created_at) VALUES (?, ?, ?, ?, datetime('now'))", name, description, authorName, authorEmail)
+	res, err := trx.Exec(`INSERT INTO command_sets (name, description, author_name, author_email, created_at)
+			SELECT ?, ?, ?, ?, datetime('now')
+			WHERE NOT EXISTS(SELECT 1 FROM command_sets WHERE TRIM(name) = ?)`, name, description, authorName, authorEmail, name)
 	if err != nil {
 		return 0, fmt.Errorf("insert command_set: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		// Another row with the same trimmed name already exists
+		return 0, fmt.Errorf("name %q already in use", name)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
@@ -34,6 +57,22 @@ func (r *Repository) CreateCommandSet(name string, description *string, authorNa
 	}
 	if err := trx.Commit(); err != nil {
 		return 0, err
+	}
+	// Sanity check: ensure stored name matches the trimmed input. If not, remove the bad row and reject.
+	var storedName string
+	row := r.db.QueryRow("SELECT TRIM(name) FROM command_sets WHERE id = ?", id)
+	if err := row.Scan(&storedName); err != nil {
+		// cannot read back; remove inserted row if possible and return error
+		if _, derr := r.db.Exec("DELETE FROM command_sets WHERE id = ?", id); derr != nil {
+			// ignore cleanup failure
+		}
+		return 0, fmt.Errorf("sanity check failed: %w", err)
+	}
+	if storedName == "" || storedName != name {
+		if _, derr := r.db.Exec("DELETE FROM command_sets WHERE id = ?", id); derr != nil {
+			// ignore cleanup failure
+		}
+		return 0, fmt.Errorf("sanity check failed: inserted name mismatch")
 	}
 	// record an initial version (may include provided commands)
 	_ = r.RecordVersion(id, authorName, authorEmail, description, initialCommands, "create")

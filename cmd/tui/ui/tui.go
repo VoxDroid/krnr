@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	"sync"
+
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"sync"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
@@ -51,15 +52,24 @@ type TuiModel struct {
 	// ourselves so the built-in list filtering UI can remain disabled)
 	filterMode bool
 
+	// transient notification message shown in the footer for validation/errors
+	notification string
+
 	// editing metadata modal state
 	editingMeta bool
 	editor      struct {
-		field    int // 0=name,1=desc,2=tags,3=commands
-		name     string
-		desc     string
-		tags     string
-		commands []string
-		cmdIndex int
+		field            int // 0=name,1=desc,2=authorName,3=authorEmail,4=tags,5=commands
+		name             string
+		desc             string
+		author           string
+		authorEmail      string
+		tags             string
+		commands         []string
+		cmdIndex         int
+		create           bool   // true when creating a new entry (vs editing existing)
+		saving           bool   // true while a save is in progress to prevent re-entry
+		lastFailedName   string // last name that failed validation/save to short-circuit repeated spam
+		lastFailedReason string // the notification/reason for why last save failed for that name
 	}
 
 	// versions / rollback state
@@ -90,6 +100,20 @@ func (m *TuiModel) setShowDetail(v bool) {
 func (m *TuiModel) setDetailName(name string) {
 	m.mu.Lock()
 	m.detailName = name
+	m.mu.Unlock()
+}
+
+// setNotification sets the transient footer notification
+func (m *TuiModel) setNotification(msg string) {
+	m.mu.Lock()
+	m.notification = msg
+	m.mu.Unlock()
+}
+
+// clearNotification clears any footer notification
+func (m *TuiModel) clearNotification() {
+	m.mu.Lock()
+	m.notification = ""
 	m.mu.Unlock()
 }
 
@@ -524,6 +548,13 @@ func (m *TuiModel) View() string {
 			}
 			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(base)
 		}
+		// If there's a transient notification show it prominently in the footer
+		m.mu.RLock()
+		notif := m.notification
+		m.mu.RUnlock()
+		if notif != "" {
+			footer = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f43f5e")).Render(notif)
+		}
 		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 	}
 
@@ -606,9 +637,16 @@ func (m *TuiModel) View() string {
 		// Use simple ASCII-friendly footer to ensure compatibility across
 		// environments and avoid encoding issues with exotic characters.
 		footerText = "(<-) / (->) / (Tab) switch focus - (Up)/(Down) scroll focused pane"
-		footerText += " - (Enter) details - (r) run - (T) theme - (q) quit - (?) help"
+		footerText += " - (Enter) details - (r) run - (T) theme - (C) New Entry - (q) quit - (?) help"
 	}
 	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(footerText)
+	// If there's a transient notification show it prominently in the footer
+	m.mu.RLock()
+	notif := m.notification
+	m.mu.RUnlock()
+	if notif != "" {
+		footer = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f43f5e")).Render(notif)
+	}
 
 	// top spacer to ensure the main page has a minimum top height and borders don't touch the terminal edge
 	topSpacer := lipgloss.NewStyle().Height(headH).Width(m.width).Render("")

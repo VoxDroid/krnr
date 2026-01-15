@@ -152,7 +152,7 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 		return m, tea.Quit, true
 	case "?":
 		m.setShowDetail(true)
-		m.detail = "Help:\n\n? show help\nq or Esc to quit\nEnter to view details\n/ to filter\n← → or Tab to switch pane focus\n↑ ↓ to scroll focused pane"
+		m.detail = "Help:\n\n? show help\nq or Esc to quit\nEnter to view details\n(C) Create new entry\n/ to filter\n← → or Tab to switch pane focus\n↑ ↓ to scroll focused pane"
 		return m, nil, true
 	case "enter":
 		if m.showDetail && m.focusRight && len(m.versions) > 0 {
@@ -267,9 +267,12 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 				return m, nil, true
 			}
 			m.editingMeta = true
+			m.editor.create = false
 			m.editor.field = 0
 			m.editor.name = cs.Name
 			m.editor.desc = cs.Description
+			m.editor.author = cs.AuthorName
+			m.editor.authorEmail = cs.AuthorEmail
 			m.editor.tags = strings.Join(cs.Tags, ",")
 			m.editor.commands = append([]string{}, cs.Commands...)
 			if len(m.editor.commands) == 0 {
@@ -277,6 +280,22 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 			}
 			m.editor.cmdIndex = 0
 		}
+		return m, nil, true
+	case "c", "C":
+		// Create new command set modal
+		m.editingMeta = true
+		m.editor.create = true
+		m.editor.field = 0
+		m.editor.name = ""
+		m.editor.desc = ""
+		m.editor.author = ""
+		m.editor.authorEmail = ""
+		m.editor.tags = ""
+		m.editor.commands = []string{""}
+		m.editor.cmdIndex = 0
+		// show full-screen detail so the editor modal is visible
+		m.setShowDetail(true)
+		m.setDetailName("")
 		return m, nil, true
 	case "d":
 		if !m.showDetail {

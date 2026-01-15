@@ -6,8 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
+	"github.com/VoxDroid/krnr/internal/nameutil"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
 
@@ -23,6 +26,9 @@ type UIModel struct {
 	installer adapters.InstallerAdapter
 
 	cache []adapters.CommandSetSummary
+	// serialize Save/Update operations to avoid races when multiple
+	// concurrent saves are attempted (defensive, DB-enforced as well)
+	saveMu sync.Mutex
 }
 
 // New constructs a UIModel backed by the provided adapters.
@@ -79,6 +85,9 @@ func (m *UIModel) ReplaceCommands(ctx context.Context, name string, commands []s
 
 // UpdateCommandSet updates metadata (name, description, author, tags) for an existing set
 func (m *UIModel) UpdateCommandSet(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	// serialize updates that can change names to avoid races with concurrent saves
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
 	return m.registry.UpdateCommandSet(ctx, oldName, cs)
 }
 
@@ -126,6 +135,28 @@ func (m *UIModel) Uninstall(ctx context.Context, name string) error {
 
 // Save creates a new command set from provided metadata and commands
 func (m *UIModel) Save(ctx context.Context, cs adapters.CommandSetSummary) error {
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
+
+	// sanitize names coming from adapters/UI
+	if s, changed := nameutil.SanitizeName(cs.Name); changed {
+		cs.Name = s
+	}
+	name := strings.TrimSpace(cs.Name)
+	if name == "" {
+		return fmt.Errorf("invalid name: name cannot be empty")
+	}
+	// Validate characters (reject control bytes/non-UTF8)
+	if err := nameutil.ValidateName(name); err != nil {
+		return err
+	}
+	cs.Name = name
+	// Do not allow creating duplicate names; check under lock to avoid TOCTOU races
+	if _, err := m.registry.GetCommandSet(ctx, cs.Name); err == nil {
+		return fmt.Errorf("invalid name: name already exists")
+	} else if err != nil && err != adapters.ErrNotFound {
+		return err
+	}
 	return m.registry.SaveCommandSet(ctx, cs)
 }
 
