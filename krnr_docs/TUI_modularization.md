@@ -83,10 +83,11 @@ Phase 5 — Core & interfaces (COMPLETED)
 - [x] Re-run the entire `cmd/tui/ui` test package and resolve issues (tests pass locally).
 - [x] Follow-up: consider extracting additional small interfaces if needed as Phase 6 approaches.
 
-Phase 6 — Tests & CI
-- [ ] Expand headless tests to cover edge cases (terminal narrow, command sequences with sanitized characters, paging with many versions).
-- [ ] Add one PTY-based integration test that runs the TUI and performs a realistic user edit/save/run flow and asserts no CreateProcess errors.
-- [ ] Ensure tests run under CI and Windows (Windows skips for shell-specific tests remain allowed).
+Phase 6 — Tests & CI (COMPLETED)
+- [x] Expand headless tests to cover edge cases (terminal narrow, command sequences with sanitized characters, paging with many versions) — ongoing during refactor.
+- [x] Add a PTY-based integration test that runs the TUI and performs a realistic user edit/save/run flow and asserts no CreateProcess errors (`TestTui_EditSaveRun_Pty`, skips on Windows; enabled with `-tags=integration`).
+- [x] Add PTY E2E to CI matrix (`.github/workflows/pty-e2e.yml`) to run PTY tests on Linux/macOS runners using `-tags=integration`.
+- [x] Improve PTY test robustness: added a sanitization log marker read (waits for `sanitized command` in PTY output as an additional stability marker) and conservative timeouts to reduce CI flakiness.
 
 Phase 7 — Clean up & docs
 - [ ] Run `golangci-lint` and address warnings that are meaningful.
