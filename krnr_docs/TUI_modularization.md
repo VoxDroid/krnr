@@ -53,11 +53,12 @@ Phase 1 — Split rendering (IN PROGRESS)
 - [x] Run `go test ./cmd/tui/ui -run Test* -v` and fix regressions.
 - [ ] Status: Phase 1 extraction complete; follow-up: review and refine exported helpers and add more rendering snapshot tests if needed.
 
-Phase 2 — Split versions & viewport
-- [ ] Create `versions.go`. Move `setVersionsPreviewIndex`, versions list setup, and version-specific commands (rollback flow) there.
-- [ ] Create `viewport.go`. Move viewport creation and scroll helpers.
-- [ ] Add tests: ensure preview updates on list navigation, ensure view guarding (detail not overwritten) stays intact.
-- [ ] Run `go test ./cmd/tui/ui -run TestVersions* -v`.
+Phase 2 — Split versions & viewport (COMPLETED)
+- [x] Create `versions.go` and move `setVersionsPreviewIndex`, `renderVersions`, `formatVersionPreview`, and `formatVersionDetails` there.
+- [x] Create `viewport.go` and add `ensureViewportSize` helper used by `View()`.
+- [x] Add tests: `TestSetVersionsPreviewIndexUpdatesContentAndResetsOffset` verifies preview updates and offset reset.
+- [x] Run `go test ./cmd/tui/ui -run TestVersions* -v` and fix regressions.
+- [ ] Follow-up: add more viewport unit tests and a PTY-based integration test for versions preview if desired.
 
 Phase 3 — Extract editor logic
 - [ ] Create `editor.go`. Move editor state struct (if currently embedded) and all editor key handlers (add/delete/save) and sanitization-on-save logic to use `executor.Sanitize/ValidateCommand` via adapters.

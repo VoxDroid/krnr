@@ -74,10 +74,10 @@ func sanitizeCommand(s string) string {
 		"\u2019", "'", // right single quote
 		"\u201C", "\"", // left double quote
 		"\u201D", "\"", // right double quote
-		"\u00A0", " ",  // NO-BREAK SPACE
-		"\u200B", "",   // zero width space
-		"\u200E", "",   // left-to-right mark
-		"\u200F", "",   // right-to-left mark
+		"\u00A0", " ", // NO-BREAK SPACE
+		"\u200B", "", // zero width space
+		"\u200E", "", // left-to-right mark
+		"\u200F", "", // right-to-left mark
 	)
 	rp := r.Replace(s)
 	// Remove embedded NUL (\x00) and other invisible control runes that are

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -239,30 +238,30 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				// replace commands
 				raw := filterEmptyLines(m.editor.commands)
-			clean := make([]string, 0, len(raw))
-			for i, c := range raw {
-				cSan := executor.Sanitize(c)
-				if cSan != c {
-					m.logs = append(m.logs, "sanitized command: \""+c+"\" -> \""+cSan+"\"")
-					for j := range m.editor.commands {
-						if strings.TrimSpace(m.editor.commands[j]) == strings.TrimSpace(c) {
-							m.editor.commands[j] = cSan
-							break
+				clean := make([]string, 0, len(raw))
+				for i, c := range raw {
+					cSan := executor.Sanitize(c)
+					if cSan != c {
+						m.logs = append(m.logs, "sanitized command: \""+c+"\" -> \""+cSan+"\"")
+						for j := range m.editor.commands {
+							if strings.TrimSpace(m.editor.commands[j]) == strings.TrimSpace(c) {
+								m.editor.commands[j] = cSan
+								break
+							}
 						}
 					}
+					if err := executor.ValidateCommand(cSan); err != nil {
+						m.logs = append(m.logs, "replace commands: "+err.Error())
+						return m, nil
+					}
+					clean = append(clean, cSan)
+					_ = i
 				}
-				if err := executor.ValidateCommand(cSan); err != nil {
+				if err := m.uiModel.ReplaceCommands(context.Background(), newCS.Name, clean); err != nil {
 					m.logs = append(m.logs, "replace commands: "+err.Error())
 					return m, nil
 				}
-				clean = append(clean, cSan)
-				_ = i
-			}
-			if err := m.uiModel.ReplaceCommands(context.Background(), newCS.Name, clean); err != nil {
-				m.logs = append(m.logs, "replace commands: "+err.Error())
-				return m, nil
-			}
-			// refresh detail
+				// refresh detail
 				if cs, err := m.uiModel.GetCommandSet(context.Background(), newCS.Name); err == nil {
 					m.detailName = cs.Name
 					m.detail = formatCSFullScreen(cs, m.width, m.height)
@@ -1236,7 +1235,7 @@ func (m *TuiModel) View() string {
 			}
 			// apply left pane border styling explicitly so focus state is clear
 			leftStyle = leftStyle.BorderStyle(detailLeftBorderStyle).BorderForeground(lipgloss.Color(detailLeftBorder))
-			// ensure viewport matches left content area so the detail becomes scrollable
+			// ensure viewport sized for current layout so detail becomes scrollable
 			vpw := leftW - 4
 			vph := innerBodyH - 2
 			if vpw < 10 {
@@ -1246,12 +1245,7 @@ func (m *TuiModel) View() string {
 				vph = 3
 			}
 			m.detail = strings.TrimRight(m.detail, "\n")
-			// ensure viewport sized for current layout so detail becomes scrollable
-			if m.vp.Width != vpw || m.vp.Height != vph {
-				oldOff := m.vp.YOffset
-				m.vp = viewport.New(vpw, vph)
-				m.vp.YOffset = oldOff
-			}
+			m.ensureViewportSize(vpw, vph)
 			// Only set the main detail content when left pane is focused. If the
 			// right pane (versions) is focused, we should display the preview
 			// content which is set by setVersionsPreviewIndex.
@@ -1279,11 +1273,7 @@ func (m *TuiModel) View() string {
 			if vph < 3 {
 				vph = 3
 			}
-			if m.vp.Width != vpw || m.vp.Height != vph {
-				oldOff := m.vp.YOffset
-				m.vp = viewport.New(vpw, vph)
-				m.vp.YOffset = oldOff
-			}
+			m.ensureViewportSize(vpw, vph)
 			m.vp.SetContent(m.detail)
 			body = contentStyle.Render(m.vp.View())
 		}
@@ -1471,146 +1461,9 @@ func (m *TuiModel) renderEditor() string {
 	return b.String()
 }
 
-// renderVersions renders the versions panel on the details view's right side.
-// It used the versionsList view so the list adapts automatically to the size
-// (same behavior as the main list).
-func (m *TuiModel) renderVersions(width, height int) string {
-	var b strings.Builder
-	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Render("Versions") + "\n\n")
-
-	// list view will already be sized in WindowSizeMsg, so just render it
-	b.WriteString(m.versionsList.View())
-
-	return b.String()
-}
-
-// formatVersionPreview renders a short preview for a version (commands and dry-run)
-func formatVersionPreview(name string, v adapters.Version, _ int, _ int) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("krnr — %s v%d - %s\n", name, v.Version, v.Operation))
-	b.WriteString(strings.Repeat("-", 30) + "\n")
-	for _, c := range v.Commands {
-		b.WriteString("$ " + c + "\n")
-	}
-	return b.String()
-}
-
-// setVersionsPreviewIndex sets the versions preview to the given index and
-// updates internal state; returns a tea.Cmd if needed (nil for now).
-func (m *TuiModel) setVersionsPreviewIndex(idx int) tea.Cmd {
-	if idx < 0 || idx >= len(m.versions) {
-		return nil
-	}
-	// If no change to the selection and we already have a preview set, no work needed
-	if idx == m.versionsSelected && m.versionsPreviewContent != "" {
-		return nil
-	}
-	oldIdx := m.versionsSelected
-	oldContent := m.versionsPreviewContent
-	content := formatVersionDetails(m.detailName, m.versions[idx], m.vp.Width)
-	changed := content != oldContent || idx != oldIdx
-
-	// Update state
-	m.versionsSelected = idx
-	m.versionsPreviewContent = content
-	// reset scroll and set new content if it actually changed
-	if changed {
-		m.vp.YOffset = 0
-		m.vp.SetContent(content)
-	}
-	return nil
-}
-
-// formatVersionDetails renders a full metadata view for a historic version.
-// It is similar to the full-screen command set rendering but for a specific
-// version so users can inspect author, description, created date and commands.
-func formatVersionDetails(name string, v adapters.Version, width int) string {
-	// reuse visual styles from full-screen formatting
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Background(lipgloss.Color("#0b1226"))
-	h := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4"))
-	k := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#94a3b8"))
-	var b strings.Builder
-	contentW := width - 6
-	if contentW < 10 {
-		contentW = 10
-	}
-	// Title header
-	titleText := fmt.Sprintf("v%d %s — %s", v.Version, v.Operation, name)
-	b.WriteString(titleStyle.Render(titleText) + "\n")
-	sepLen := contentW
-	if sepLen > len(titleText)+4 {
-		sepLen = len(titleText) + 4
-	}
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#0ea5a4")).Render(strings.Repeat("─", sepLen)) + "\n\n")
-
-	// compute label widths
-	labels := []string{"Version:", "Created:", "Author:", "Description:", "Commands:"}
-	labelW := 0
-	for _, l := range labels {
-		if utf8.RuneCountInString(l) > labelW {
-			labelW = utf8.RuneCountInString(l)
-		}
-	}
-	valueW := contentW - labelW - 1
-	if valueW < 10 {
-		valueW = 10
-	}
-
-	b.WriteString(h.Render("Version:") + " " + fmt.Sprintf("%d", v.Version) + "\n")
-	if v.CreatedAt != "" {
-		b.WriteString(h.Render("Created:") + " " + v.CreatedAt + "\n")
-	}
-	if v.AuthorName != "" {
-		b.WriteString(h.Render("Author:") + " " + v.AuthorName + "\n")
-	}
-
-	if v.Description != "" {
-		lines := wrapText(v.Description, valueW)
-		b.WriteString("\n")
-		b.WriteString(h.Render("Description:") + "\n")
-		b.WriteString(renderTableBlockHeader("", strings.Join(lines, "\n"), labelW))
-	}
-
-	if len(v.Commands) > 0 {
-		b.WriteString("\n")
-		b.WriteString(h.Render("Commands:") + "\n")
-		maxPrefix := 0
-		for i := range v.Commands {
-			p := fmt.Sprintf("%d) ", i+1)
-			if l := utf8.RuneCountInString(p); l > maxPrefix {
-				maxPrefix = l
-			}
-		}
-		innerTextW := valueW - maxPrefix - 1
-		if innerTextW < 10 {
-			innerTextW = 10
-		}
-		var cb strings.Builder
-		for i, c := range v.Commands {
-			p := fmt.Sprintf("%d) ", i+1)
-			cb.WriteString(renderTwoCol(p, c, maxPrefix, innerTextW))
-		}
-		b.WriteString(renderTableBlockHeader("", strings.TrimSuffix(cb.String(), "\n"), labelW))
-	}
-
-	// metadata fields
-	meta := []string{}
-	if v.AuthorName != "" {
-		meta = append(meta, "Author: "+v.AuthorName)
-	}
-	if v.AuthorEmail != "" {
-		meta = append(meta, "Email: "+v.AuthorEmail)
-	}
-	if len(meta) > 0 {
-		b.WriteString("\n")
-		b.WriteString(h.Render("Metadata:") + "\n")
-		for _, m := range meta {
-			b.WriteString(k.Render("  "+m) + "\n")
-		}
-	}
-
-	return b.String()
-}
+// Versions rendering and helpers moved into cmd/tui/ui/versions.go
+// (renderVersions, formatVersionPreview, setVersionsPreviewIndex,
+// formatVersionDetails)
 
 // detailScrollIndicator builds a small "current/total" indicator for the
 // detail pane based on the viewport's height and vertical offset. It helps
@@ -1637,7 +1490,6 @@ func (m *TuiModel) detailScrollIndicator() string {
 	}
 	return fmt.Sprintf("%d/%d", off+1, total)
 }
-
 
 // trimLastRune removes the last rune from a string if present
 func trimLastRune(s string) string {
