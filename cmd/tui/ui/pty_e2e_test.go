@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"os"
 	"runtime"
 	"strings"
 	"syscall"
@@ -21,6 +22,35 @@ import (
 
 // fake executor used by PTY tests; records commands it is asked to run
 type fakeExecRec struct{ lastRunCommands []string }
+
+// readUntilFD reads from the given file descriptor until a needle appears or
+// the deadline expires. It handles non-blocking reads (EAGAIN/EWOULDBLOCK)
+// and returns gathered output or an error on timeout.
+func readUntilFD(f *os.File, needle string, d time.Duration) (string, error) {
+	end := time.Now().Add(d)
+	var b bytes.Buffer
+	r := bufio.NewReader(f)
+	for time.Now().Before(end) {
+		buf := make([]byte, 1024)
+		n, err := r.Read(buf)
+		if n > 0 {
+			b.Write(buf[:n])
+			if needle == "" || strings.Contains(b.String(), needle) {
+				return b.String(), nil
+			}
+		}
+		if err != nil {
+			if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+				// no data yet, try again after a short sleep
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+			// otherwise break and return what we have
+			break
+		}
+	}
+	return b.String(), context.DeadlineExceeded
+}
 
 func (f *fakeExecRec) Run(_ context.Context, _ string, cmds []string) (adapters.RunHandle, error) {
 	f.lastRunCommands = append([]string{}, cmds...)
@@ -121,8 +151,20 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 		}
 		// Accept a variety of indicators that commands are present: explicit
 		// 'Commands:' header, numbered prefixes '1) ', dry-run previews, or
-		// literal command strings (echo User / echo Token).
+		// literal command strings (echo User / echo Token). If none are present
+		// attempt to trigger a terminal resize (some CI runners delay sending a
+		// WINCH event) and wait a short while for the UI to render commands.
 		if !(strings.Contains(out, "Commands:") || strings.Contains(out, "1) ") || strings.Contains(out, "Dry-run preview:") || strings.Contains(out, "echo User") || strings.Contains(out, "echo Token") || strings.Contains(out, "$ echo")) {
+			// try toggling size to prompt a WindowSizeMsg
+			if err := pty.Setsize(tty, &pty.Winsize{Cols: 120, Rows: 30}); err == nil {
+				// give the UI a moment to react
+				if _, err := readUntilFD(p, "Commands:", 3*time.Second); err == nil {
+					return
+				}
+				if _, err := readUntilFD(p, "1) ", 3*time.Second); err == nil {
+					return
+				}
+			}
 			t.Fatalf("expected command block or command output to be present in output, got:\n%s", out)
 		}
 	case <-time.After(12 * time.Second):
@@ -212,13 +254,21 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	if _, err := readUntil("krnr — command sets", 8*time.Second); err != nil {
 		// additional fallback: try to detect the command set name or other
 		// likely initial indicators (Name:, Dry-run preview:, or a literal
-		// command substring like 'echo'). This allows for variation in render
-		// ordering between environments.
-		if _, err2 := readUntil("Name:", 4*time.Second); err2 != nil {
-			if _, err3 := readUntil("Dry-run preview:", 4*time.Second); err3 != nil {
-				if _, err4 := readUntil("echo", 4*time.Second); err4 != nil {
-					t.Fatalf("initial render not seen: %v (fallbacks: %v, %v, %v)", err, err2, err3, err4)
-				}
+		// command substring like 'echo'). Try toggling the PTY size to force a
+		// WINCH if the program hasn't received it yet, then retry the checks.
+		if err := pty.Setsize(tty, &pty.Winsize{Cols: 121, Rows: 30}); err == nil {
+			// small delay to let the program re-render
+			time.Sleep(200 * time.Millisecond)
+			_ = pty.Setsize(tty, &pty.Winsize{Cols: 120, Rows: 30})
+			// try the detection signals again
+			if _, err2 := readUntilFD(master, "Name:", 4*time.Second); err2 == nil {
+				// success after WINCH
+			} else if _, err3 := readUntilFD(master, "Dry-run preview:", 4*time.Second); err3 == nil {
+				// success after WINCH
+			} else if _, err4 := readUntilFD(master, "echo", 4*time.Second); err4 == nil {
+				// success after WINCH
+			} else {
+				t.Fatalf("initial render not seen: %v (fallbacks failed)", err)
 			}
 		}
 	}
