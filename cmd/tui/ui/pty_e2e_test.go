@@ -352,7 +352,25 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 		t.Logf("sanitization marker not observed in PTY output: %v", err)
 	}
 
-	// Run
+	// Ensure the editor modal has closed so 'r' isn't swallowed by an active
+	// input field. Some PTY timings can leave the editor open briefly after
+	// ReplaceCommands; attempt to gracefully exit it by sending ESC if needed.
+	waitDeadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(waitDeadline) {
+		if shown, _ := m.IsDetailShown(); shown && !m.editingMeta {
+			break
+		}
+		// try to cancel editor and give UI a moment to settle
+		_, _ = master.Write([]byte{0x1B})
+		_, _ = readUntil("(e) Edit", 200*time.Millisecond)
+		// small backoff
+		time.Sleep(50 * time.Millisecond)
+	}
+	if m.editingMeta {
+		t.Fatalf("editor still open after save; logs: %v", m.logs)
+	}
+
+	// Run (now that editor is closed)
 	_, _ = master.Write([]byte{'r'})
 	// wait for executor Run call
 	dead2 := time.Now().Add(2 * time.Second)

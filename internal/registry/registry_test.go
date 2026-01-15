@@ -1,14 +1,25 @@
 package registry
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/VoxDroid/krnr/internal/config"
 	"github.com/VoxDroid/krnr/internal/db"
 )
 
 func setupDemoRepo(t *testing.T) (*Repository, int64) {
+	// Use a test-specific database file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	tdb := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, tdb)
+	// restore env and close db on cleanup
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
@@ -239,7 +250,14 @@ func TestRepository_Tags_Add(t *testing.T) {
 }
 
 func TestRepository_Tags_Remove(t *testing.T) {
-	// init DB
+	// Use a test-specific database file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	tdb := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, tdb)
+	// restore env and close db on cleanup
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
@@ -278,6 +296,14 @@ func TestRepository_Tags_Remove(t *testing.T) {
 }
 
 func setupAlphaBeta(t *testing.T) *Repository {
+	// Use a test-specific database file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	tdb := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, tdb)
+	// restore env and close db on cleanup
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
@@ -365,6 +391,14 @@ func TestRepository_Tags_GetIncludesTags(t *testing.T) {
 }
 
 func setupAlphaBetaForSearch(t *testing.T) *Repository {
+	// Use a test-specific database file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	tdb := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, tdb)
+	// restore env and close db on cleanup
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
