@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -64,6 +65,31 @@ func TestCreateEntryNoDuplicateVersions(t *testing.T) {
 	}
 	if vers[0].Operation != "create" {
 		t.Fatalf("expected operation 'create', got %s", vers[0].Operation)
+	}
+
+	// now test tag-based search against DB-backed cache
+	// find the created command set id and add tag 'whathe' to it
+	cs, err := r.GetCommandSetByName("Test1")
+	if err != nil || cs == nil {
+		t.Fatalf("GetCommandSetByName: %v", err)
+	}
+	if err := r.AddTagToCommandSet(cs.ID, "whathe"); err != nil {
+		t.Fatalf("AddTagToCommandSet: %v", err)
+	}
+	// refresh UI cache and initialize list state
+	_ = ui.RefreshList(context.Background())
+	m2 := NewModel(ui)
+	m2.Init()()
+	// enter filter mode and type '#whathe'
+	m3, _ := m2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m2 = m3.(*TuiModel)
+	for _, ch := range []rune{'#', 'w', 'h', 'a', 't', 'h', 'e'} {
+		m4, _ := m2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{ch}})
+		m2 = m4.(*TuiModel)
+	}
+	view := m2.list.View()
+	if !strings.Contains(view, "Test1") {
+		t.Fatalf("expected '#whathe' to match 'Test1' from DB, got:\n%s", view)
 	}
 
 	// cleanup

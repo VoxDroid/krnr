@@ -69,8 +69,10 @@ func (m *TuiModel) Init() tea.Cmd {
 				// attempt to fetch full details, fall back to summary
 				if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
 					m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
+					m.logPreviewUpdate(cs.Name)
 				} else {
 					m.vp.SetContent(formatCSDetails(it.cs, m.vp.Width))
+					m.logPreviewUpdate(it.cs.Name)
 				}
 			}
 		}

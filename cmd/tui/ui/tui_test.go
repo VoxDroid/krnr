@@ -984,7 +984,16 @@ type fakeRegistry struct{ items []adapters.CommandSetSummary }
 func (f *fakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
 	return f.items, nil
 }
-func (f *fakeRegistry) GetCommandSet(_ context.Context, _ string) (adapters.CommandSetSummary, error) {
+func (f *fakeRegistry) GetCommandSet(_ context.Context, name string) (adapters.CommandSetSummary, error) {
+	for _, it := range f.items {
+		if it.Name == name {
+			cs := it
+			if cs.Commands == nil {
+				cs.Commands = []string{"echo hello"}
+			}
+			return cs, nil
+		}
+	}
 	return adapters.CommandSetSummary{}, nil
 }
 func (f *fakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error {

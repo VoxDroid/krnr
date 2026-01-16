@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -157,6 +158,18 @@ func (m *TuiModel) IsDetailShown() (bool, string) {
 	return m.showDetail, m.detailName
 }
 
+// logPreviewUpdate appends a small trace to the tui logs when the
+// KRNR_TUI_DEBUG_PREVIEW=1 environment variable is set. This helps
+// interactive debugging without spamming logs in normal runs.
+func (m *TuiModel) logPreviewUpdate(name string) {
+	if os.Getenv("KRNR_TUI_DEBUG_PREVIEW") != "1" {
+		return
+	}
+	m.mu.Lock()
+	m.logs = append(m.logs, "preview_update: "+name)
+	m.mu.Unlock()
+} 
+
 // Update handles incoming events and updates model state.
 func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -225,6 +238,20 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m = newM
 			}
 			if !fall {
+				// dispatchKey handled the key (likely navigation while filtering).
+				// Ensure preview stays in sync with the current selection even when
+				// the action was fully handled by the filter dispatcher.
+				if si := m.list.SelectedItem(); si != nil {
+					if it, ok := si.(csItem); ok {
+						if it.cs.Name != m.lastSelectedName {
+							m.lastSelectedName = it.cs.Name
+							if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+								m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
+								m.logPreviewUpdate(cs.Name)
+							}
+						}
+					}
+				}
 				return m, cmd
 			}
 		}

@@ -23,7 +23,7 @@ func (r *RegistryAdapterImpl) ListCommandSets(_ context.Context) ([]CommandSetSu
 	}
 	out := make([]CommandSetSummary, 0, len(sets))
 	for _, s := range sets {
-		out = append(out, CommandSetSummary{Name: s.Name, Description: s.Description.String})
+		out = append(out, CommandSetSummary{Name: s.Name, Description: s.Description.String, Tags: s.Tags})
 	}
 	return out, nil
 }

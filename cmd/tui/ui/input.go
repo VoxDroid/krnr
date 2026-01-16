@@ -60,7 +60,31 @@ func dispatchKey(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		default:
 			// Let list handle navigation keys
 			var listCmd tea.Cmd
+			// capture previous selection to detect changes
+			prevName := ""
+			if si := m.list.SelectedItem(); si != nil {
+				if it, ok := si.(csItem); ok {
+					prevName = it.cs.Name
+				}
+			}
 			m.list, listCmd = m.list.Update(msg)
+			// If the selection changed while filtering, update preview so users
+			// see details while navigating in filter mode. Update preview
+			// regardless of whether the detail pane is visible (consistent with
+			// non-filter navigation behavior).
+			if si := m.list.SelectedItem(); si != nil {
+				if it, ok := si.(csItem); ok {
+					if it.cs.Name != prevName {
+						m.lastSelectedName = it.cs.Name
+						if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+							m.detailName = cs.Name
+							m.detail = formatCSDetails(cs, m.vp.Width)
+							m.vp.SetContent(m.detail)
+							m.logPreviewUpdate(cs.Name)
+						}
+					}
+				}
+			}
 			return m, listCmd, false
 		}
 	}
@@ -74,6 +98,14 @@ func dispatchKey(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 // without checking whether filtering is active. This makes the behavior easy
 // to test in isolation.
 func applyListFilterKey(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	// capture previous selection so we can detect changes after navigation
+	prevSel := ""
+	if si := m.list.SelectedItem(); si != nil {
+		if it, ok := si.(csItem); ok {
+			prevSel = it.cs.Name
+		}
+	}
+
 	m.list, _ = m.list.Update(msg)
 	// Maintain our own live filter text so we can update the list items
 	switch msg.Type {
@@ -101,13 +133,56 @@ func applyListFilterKey(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		m.list.SetItems(items)
 	} else {
 		items := make([]list.Item, 0)
+		// If the filter starts with '#', we perform tag-only matching.
+		tagOnly := false
+		if strings.HasPrefix(m.listFilter, "#") {
+			q = strings.TrimSpace(strings.TrimPrefix(q, "#"))
+			tagOnly = true
+		}
 		for _, s := range m.uiModel.ListCached() {
-			if strings.Contains(strings.ToLower(s.Name+" "+s.Description), q) {
+			if tagOnly {
+				matched := false
+				for _, t := range s.Tags {
+					if strings.Contains(strings.ToLower(t), q) {
+						matched = true
+						break
+					}
+				}
+				if matched {
+					items = append(items, csItem{cs: s})
+				}
+				continue
+			}
+			hay := strings.ToLower(s.Name + " " + s.Description)
+			if len(s.Tags) > 0 {
+				hay = hay + " " + strings.ToLower(strings.Join(s.Tags, " "))
+			}
+			if strings.Contains(hay, q) {
 				items = append(items, csItem{cs: s})
 			}
 		}
 		m.list.SetItems(items)
 	}
+
+	// If the selection changed as a result of navigation or new items being
+	// set, update the preview so the detail pane stays in sync while
+	// navigating the filtered list. Update preview regardless of whether
+	// the detail pane is currently visible to match behavior outside
+	// filter mode.
+	if si := m.list.SelectedItem(); si != nil {
+		if it, ok := si.(csItem); ok {
+			if it.cs.Name != prevSel {
+				m.lastSelectedName = it.cs.Name
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+					m.detailName = cs.Name
+					m.detail = formatCSDetails(cs, m.vp.Width)
+					m.vp.SetContent(m.detail)
+					m.logPreviewUpdate(cs.Name)
+				}
+			}
+		}
+	}
+
 	return m, nil, true
 }
 
@@ -130,8 +205,33 @@ func applyFilterItems(m *TuiModel) {
 			items = append(items, csItem{cs: s})
 		}
 	} else {
+		// If the filter starts with '#', we perform tag-only matching.
+		tagOnly := false
+		if strings.HasPrefix(m.listFilter, "#") {
+			q = strings.TrimSpace(strings.TrimPrefix(q, "#"))
+			tagOnly = true
+		}
 		for _, s := range m.uiModel.ListCached() {
-			if strings.Contains(strings.ToLower(s.Name+" "+s.Description), q) {
+			if tagOnly {
+				// match tag substrings (case-insensitive)
+				matched := false
+				for _, t := range s.Tags {
+					if strings.Contains(strings.ToLower(t), q) {
+						matched = true
+						break
+					}
+				}
+				if matched {
+					items = append(items, csItem{cs: s})
+				}
+				continue
+			}
+			// include tags in the searchable haystack so tag text is matched
+			hay := strings.ToLower(s.Name + " " + s.Description)
+			if len(s.Tags) > 0 {
+				hay = hay + " " + strings.ToLower(strings.Join(s.Tags, " "))
+			}
+			if strings.Contains(hay, q) {
 				items = append(items, csItem{cs: s})
 			}
 		}
@@ -140,6 +240,18 @@ func applyFilterItems(m *TuiModel) {
 	m.list.Title = "Filter: " + m.listFilter
 	if len(items) > 0 {
 		m.list.Select(0)
+		// Update the preview/content for the newly selected item so it stays
+		// in sync while filtering. Do this regardless of whether the detail
+		// pane is currently visible so behavior is consistent with non-filter
+		// navigation (selection should always update the right-hand preview).
+		if it, ok := items[0].(csItem); ok {
+			if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+				m.detailName = cs.Name
+				m.detail = formatCSDetails(cs, m.vp.Width)
+				m.vp.SetContent(m.detail)
+				m.logPreviewUpdate(cs.Name)
+			}
+		}
 	}
 }
 
