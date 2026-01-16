@@ -62,6 +62,9 @@ type RegistryAdapter interface {
 	ReplaceCommands(ctx context.Context, name string, commands []string) error
 	// UpdateCommandSet updates metadata and tags for an existing command set.
 	UpdateCommandSet(ctx context.Context, oldName string, cs CommandSetSummary) error
+	// UpdateCommandSetAndReplaceCommands performs an atomic metadata+commands update
+	// and records a single 'update' version representing the final state.
+	UpdateCommandSetAndReplaceCommands(ctx context.Context, oldName string, cs CommandSetSummary) error
 	// ListVersionsByName returns the versions for a command set (newest first)
 	ListVersionsByName(ctx context.Context, name string) ([]Version, error)
 	// ApplyVersionByName applies the specified historic version to the named command set (rollback)

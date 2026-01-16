@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/VoxDroid/krnr/internal/db"
+	"github.com/VoxDroid/krnr/internal/install"
 	"github.com/VoxDroid/krnr/internal/nameutil"
 	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
-	"github.com/VoxDroid/krnr/internal/install"
 )
 
 // ErrNotFound is returned when a requested command set cannot be found.
@@ -92,6 +92,15 @@ func (m *UIModel) UpdateCommandSet(ctx context.Context, oldName string, cs adapt
 	m.saveMu.Lock()
 	defer m.saveMu.Unlock()
 	return m.registry.UpdateCommandSet(ctx, oldName, cs)
+}
+
+// UpdateCommandSetAndReplaceCommands performs an atomic metadata+commands update
+// and records a single 'update' version representing the final state.
+func (m *UIModel) UpdateCommandSetAndReplaceCommands(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	// serialize updates that can change names to avoid races with concurrent saves
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
+	return m.registry.UpdateCommandSetAndReplaceCommands(ctx, oldName, cs)
 }
 
 // ListVersions fetches historical versions for a command set by name (newest first)

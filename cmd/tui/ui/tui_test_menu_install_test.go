@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
-	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
 	"github.com/VoxDroid/krnr/internal/install"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
+	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // fakeInstaller for UI tests
-type fakeInstaller struct{
+type fakeInstaller struct {
 	called bool
 	opts   install.Options
 }

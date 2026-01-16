@@ -177,71 +177,71 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 				}
 				m.menuPendingSrc = ""
-		case "install-scope":
-			// interpret scope: system|user
-			scope := strings.ToLower(strings.TrimSpace(m.menuInput))
-			if scope == "" {
-				scope = "user"
-			}
-			m.menuAction = "install-addpath"
-			m.menuInput = "n"
-			// store scope temporarily in menuPendingSrc
-			m.menuPendingSrc = scope
-			return m, nil
+			case "install-scope":
+				// interpret scope: system|user
+				scope := strings.ToLower(strings.TrimSpace(m.menuInput))
+				if scope == "" {
+					scope = "user"
+				}
+				m.menuAction = "install-addpath"
+				m.menuInput = "n"
+				// store scope temporarily in menuPendingSrc
+				m.menuPendingSrc = scope
+				return m, nil
 
-		case "install-addpath":
-			add := strings.ToLower(strings.TrimSpace(m.menuInput))
-			addToPath := add == "y" || add == "yes"
-			// construct options
-			scope := m.menuPendingSrc
-			var opts = install.Options{AddToPath: addToPath}
-			if scope == "system" {
-				opts.System = true
-			} else {
-				opts.User = true
-			}
-			actions, err := m.uiModel.Install(context.Background(), opts)
-			if err != nil {
-				m.logs = append(m.logs, "install error: "+err.Error())
-				m.setNotification("install error: " + err.Error())
-				notifyCmd = tea.Tick(5*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
-			} else {
-				// record actions into logs and notify success
-				for _, a := range actions {
-					m.logs = append(m.logs, a)
-				}
-				if len(actions) > 0 {
-					m.setNotification(actions[0])
+			case "install-addpath":
+				add := strings.ToLower(strings.TrimSpace(m.menuInput))
+				addToPath := add == "y" || add == "yes"
+				// construct options
+				scope := m.menuPendingSrc
+				var opts = install.Options{AddToPath: addToPath}
+				if scope == "system" {
+					opts.System = true
 				} else {
-					m.setNotification("installed")
+					opts.User = true
 				}
-				notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
-			}
-			m.menuPendingSrc = ""
-		case "uninstall-confirm":
-			// confirm uninstall: y/N
-			ov := strings.ToLower(strings.TrimSpace(m.menuInput))
-			confirm := ov == "y" || ov == "yes"
-			if !confirm {
-				m.logs = append(m.logs, "uninstall aborted")
-				m.setNotification("uninstall aborted")
-				notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
-			} else {
-				actions, err := m.uiModel.Uninstall(context.Background())
+				actions, err := m.uiModel.Install(context.Background(), opts)
 				if err != nil {
-					m.logs = append(m.logs, "uninstall error: "+err.Error())
-					m.setNotification("uninstall error: " + err.Error())
+					m.logs = append(m.logs, "install error: "+err.Error())
+					m.setNotification("install error: " + err.Error())
 					notifyCmd = tea.Tick(5*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 				} else {
+					// record actions into logs and notify success
 					for _, a := range actions {
 						m.logs = append(m.logs, a)
 					}
-					m.setNotification("uninstalled")
+					if len(actions) > 0 {
+						m.setNotification(actions[0])
+					} else {
+						m.setNotification("installed")
+					}
 					notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 				}
-			}
-		m.menuPendingSrc = ""
-		case "export-db":
+				m.menuPendingSrc = ""
+			case "uninstall-confirm":
+				// confirm uninstall: y/N
+				ov := strings.ToLower(strings.TrimSpace(m.menuInput))
+				confirm := ov == "y" || ov == "yes"
+				if !confirm {
+					m.logs = append(m.logs, "uninstall aborted")
+					m.setNotification("uninstall aborted")
+					notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+				} else {
+					actions, err := m.uiModel.Uninstall(context.Background())
+					if err != nil {
+						m.logs = append(m.logs, "uninstall error: "+err.Error())
+						m.setNotification("uninstall error: " + err.Error())
+						notifyCmd = tea.Tick(5*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+					} else {
+						for _, a := range actions {
+							m.logs = append(m.logs, a)
+						}
+						m.setNotification("uninstalled")
+						notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+					}
+				}
+				m.menuPendingSrc = ""
+			case "export-db":
 				// Ensure directory exists and is writable. If invalid, fallback to data dir.
 				dst := m.menuInput
 				parent := filepath.Dir(dst)

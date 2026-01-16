@@ -106,10 +106,5 @@ func SaveRecorded(r *registry.Repository, name string, description *string, comm
 	if err != nil {
 		return 0, err
 	}
-	for i, c := range commands {
-		if _, err := r.AddCommand(id, i+1, c); err != nil {
-			return 0, err
-		}
-	}
 	return id, nil
 }

@@ -954,6 +954,13 @@ func (f *versionsFakeRegistry) UpdateCommandSet(_ context.Context, _ string, cs 
 	f.full.Description = cs.Description
 	return nil
 }
+func (f *versionsFakeRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, _ string, cs adapters.CommandSetSummary) error {
+	// apply metadata and commands
+	f.full.Name = cs.Name
+	f.full.Description = cs.Description
+	f.full.Commands = append([]string{}, cs.Commands...)
+	return nil
+}
 func (f *versionsFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return append([]adapters.Version{}, f.versions...), nil
 }
@@ -999,6 +1006,17 @@ func (f *fakeRegistry) UpdateCommandSet(_ context.Context, oldName string, cs ad
 	}
 	return nil
 }
+func (f *fakeRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	for i := range f.items {
+		if f.items[i].Name == oldName {
+			f.items[i].Name = cs.Name
+			f.items[i].Description = cs.Description
+			f.items[i].Commands = append([]string{}, cs.Commands...)
+			return nil
+		}
+	}
+	return nil
+}
 func (f *fakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return nil, nil
 }
@@ -1038,6 +1056,15 @@ func (f *detailFakeRegistry) UpdateCommandSet(_ context.Context, oldName string,
 		f.full.Name = cs.Name
 		f.full.Description = cs.Description
 		f.full.Tags = append([]string{}, cs.Tags...)
+	}
+	return nil
+}
+func (f *detailFakeRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	if f.full.Name == oldName {
+		f.full.Name = cs.Name
+		f.full.Description = cs.Description
+		f.full.Tags = append([]string{}, cs.Tags...)
+		f.full.Commands = append([]string{}, cs.Commands...)
 	}
 	return nil
 }
@@ -1104,6 +1131,23 @@ func (f *replaceFakeRegistry) UpdateCommandSet(_ context.Context, oldName string
 	f.full.AuthorName = cs.AuthorName
 	f.full.AuthorEmail = cs.AuthorEmail
 	f.full.Tags = append([]string{}, cs.Tags...)
+	return nil
+}
+func (f *replaceFakeRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, oldName string, cs adapters.CommandSetSummary) error {
+	f.lastName = cs.Name
+	for i := range f.items {
+		if f.items[i].Name == oldName {
+			f.items[i].Name = cs.Name
+			f.items[i].Description = cs.Description
+		}
+	}
+	f.full.Name = cs.Name
+	f.full.Description = cs.Description
+	f.full.AuthorName = cs.AuthorName
+	f.full.AuthorEmail = cs.AuthorEmail
+	f.full.Tags = append([]string{}, cs.Tags...)
+	f.lastCommands = append([]string{}, cs.Commands...)
+	f.full.Commands = append([]string{}, cs.Commands...)
 	return nil
 }
 func (f *replaceFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {

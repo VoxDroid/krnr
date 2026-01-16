@@ -265,6 +265,11 @@ func (s *saveFakeRegistry) UpdateCommandSet(_ context.Context, _ string, cs adap
 	s.last = cs
 	return nil
 }
+func (s *saveFakeRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, _ string, cs adapters.CommandSetSummary) error {
+	// Record final state as last saved summary (commands included)
+	s.last = cs
+	return nil
+}
 func (s *saveFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return nil, nil
 }

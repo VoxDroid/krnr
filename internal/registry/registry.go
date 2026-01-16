@@ -55,23 +55,39 @@ func (r *Repository) CreateCommandSet(name string, description *string, authorNa
 	if err != nil {
 		return 0, err
 	}
-	if err := trx.Commit(); err != nil {
-		return 0, err
-	}
-	// Sanity check: ensure stored name matches the trimmed input. If not, remove the bad row and reject.
+	// Sanity check against the row inside this transaction to ensure the inserted
+	// name matches the trimmed input. If it doesn't, remove the bad row and reject.
 	var storedName string
-	row := r.db.QueryRow("SELECT TRIM(name) FROM command_sets WHERE id = ?", id)
+	row := trx.QueryRow("SELECT TRIM(name) FROM command_sets WHERE id = ?", id)
 	if err := row.Scan(&storedName); err != nil {
 		// cannot read back; remove inserted row if possible and return error
-		_, _ = r.db.Exec("DELETE FROM command_sets WHERE id = ?", id)
+		_, _ = trx.Exec("DELETE FROM command_sets WHERE id = ?", id)
 		return 0, fmt.Errorf("sanity check failed: %w", err)
 	}
 	if storedName == "" || storedName != name {
-		_, _ = r.db.Exec("DELETE FROM command_sets WHERE id = ?", id)
+		_, _ = trx.Exec("DELETE FROM command_sets WHERE id = ?", id)
 		return 0, fmt.Errorf("sanity check failed: inserted name mismatch")
 	}
-	// record an initial version (may include provided commands)
-	_ = r.RecordVersion(id, authorName, authorEmail, description, initialCommands, "create")
+	// insert initial commands (if any) into the commands table
+	filtered := make([]string, 0, len(initialCommands))
+	for _, c := range initialCommands {
+		if strings.TrimSpace(c) == "" {
+			continue
+		}
+		filtered = append(filtered, c)
+	}
+	for i, c := range filtered {
+		if _, err := trx.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", id, i+1, c); err != nil {
+			return 0, fmt.Errorf("insert initial command: %w", err)
+		}
+	}
+	// record an initial version (may include provided commands) inside the same transaction
+	if err := r.recordVersionTx(trx, id, authorName, authorEmail, description, filtered, "create"); err != nil {
+		return 0, err
+	}
+	if err := trx.Commit(); err != nil {
+		return 0, err
+	}
 	return id, nil
 }
 
@@ -200,6 +216,76 @@ func (r *Repository) UpdateCommandSet(commandSetID int64, newName string, descri
 	_ = rows.Close()
 
 	if err := r.recordVersionTx(trx, commandSetID, authorName, authorEmail, description, cmds, "update"); err != nil {
+		return err
+	}
+
+	return trx.Commit()
+}
+
+// UpdateCommandSetAndReplaceCommands performs an atomic metadata+commands update
+// and records exactly one 'update' version representing the final state.
+func (r *Repository) UpdateCommandSetAndReplaceCommands(commandSetID int64, newName string, description *string, authorName *string, authorEmail *string, tags []string, commands []string) error {
+	trx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = trx.Rollback() }()
+
+	// ensure newName does not collide with another set
+	var existingID int64
+	row := trx.QueryRow("SELECT id FROM command_sets WHERE name = ?", newName)
+	if err := row.Scan(&existingID); err == nil {
+		if existingID != commandSetID {
+			return fmt.Errorf("name %q already in use", newName)
+		}
+	} else {
+		if err != sql.ErrNoRows && err != nil {
+			return err
+		}
+	}
+
+	// perform update
+	if _, err := trx.Exec("UPDATE command_sets SET name = ?, description = ?, author_name = ?, author_email = ? WHERE id = ?", newName, description, authorName, authorEmail, commandSetID); err != nil {
+		return err
+	}
+
+	// replace tags
+	if _, err := trx.Exec("DELETE FROM command_set_tags WHERE command_set_id = ?", commandSetID); err != nil {
+		return err
+	}
+	for _, tag := range tags {
+		if _, err := trx.Exec("INSERT OR IGNORE INTO tags (name) VALUES (?)", tag); err != nil {
+			return err
+		}
+		var tagID int64
+		rrow := trx.QueryRow("SELECT id FROM tags WHERE name = ?", tag)
+		if err := rrow.Scan(&tagID); err != nil {
+			return err
+		}
+		if _, err := trx.Exec("INSERT OR IGNORE INTO command_set_tags (command_set_id, tag_id) VALUES (?, ?)", commandSetID, tagID); err != nil {
+			return err
+		}
+	}
+
+	// replace commands
+	if _, err := trx.Exec("DELETE FROM commands WHERE command_set_id = ?", commandSetID); err != nil {
+		return err
+	}
+	pos := 1
+	filtered := make([]string, 0, len(commands))
+	for _, c := range commands {
+		if strings.TrimSpace(c) == "" {
+			continue
+		}
+		filtered = append(filtered, c)
+		if _, err := trx.Exec("INSERT INTO commands (command_set_id, position, command) VALUES (?, ?, ?)", commandSetID, pos, c); err != nil {
+			return fmt.Errorf("insert command: %w", err)
+		}
+		pos++
+	}
+
+	// record a single update version reflecting final commands
+	if err := r.recordVersionTx(trx, commandSetID, authorName, authorEmail, description, filtered, "update"); err != nil {
 		return err
 	}
 

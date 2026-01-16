@@ -111,6 +111,9 @@ func (s *saveRecorder) ReplaceCommands(_ context.Context, _ string, _ []string) 
 func (s *saveRecorder) UpdateCommandSet(_ context.Context, _ string, _ adapters.CommandSetSummary) error {
 	return nil
 }
+func (s *saveRecorder) UpdateCommandSetAndReplaceCommands(_ context.Context, _ string, _ adapters.CommandSetSummary) error {
+	return nil
+}
 func (s *saveRecorder) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return nil, nil
 }
@@ -149,6 +152,9 @@ func (t *testRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) 
 func (t *testRegistry) UpdateCommandSet(_ context.Context, _ string, _ adapters.CommandSetSummary) error {
 	return nil
 }
+func (t *testRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, _ string, _ adapters.CommandSetSummary) error {
+	return nil
+}
 func (t *testRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return nil, nil
 }
@@ -170,5 +176,9 @@ func (t *testImportExport) ImportDB(_ context.Context, _ string, _ bool) error  
 
 type testInstaller struct{}
 
-func (t *testInstaller) Install(_ context.Context, _ install.Options) ([]string, error) { return []string{"installed (test)"}, nil }
-func (t *testInstaller) Uninstall(_ context.Context) ([]string, error) { return []string{"uninstalled (test)"}, nil }
+func (t *testInstaller) Install(_ context.Context, _ install.Options) ([]string, error) {
+	return []string{"installed (test)"}, nil
+}
+func (t *testInstaller) Uninstall(_ context.Context) ([]string, error) {
+	return []string{"uninstalled (test)"}, nil
+}

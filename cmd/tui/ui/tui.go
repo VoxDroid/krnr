@@ -81,6 +81,7 @@ type TuiModel struct {
 		lastFailedName   string // last name that failed validation/save to short-circuit repeated spam
 		lastFailedReason string // the notification/reason for why last save failed for that name
 		lastEditAt       time.Time
+		lastSavedAt      time.Time // timestamp of last successful save
 		saveRetries      int
 	}
 
@@ -185,8 +186,13 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.editor.saveRetries++
 			return m, tea.Tick(stabilityWindow, func(_ time.Time) tea.Msg { return saveNowMsg{} })
 		}
-		// reset retry counter and perform final save
+		// reset retry counter: short-circuit if a recent successful save already covered current edits
 		m.editor.saveRetries = 0
+		if !m.editor.lastSavedAt.IsZero() && m.editor.lastSavedAt.After(m.editor.lastEditAt) {
+			// recent successful save supersedes this scheduled save; skip to avoid redundant updates
+			m.editor.saving = false
+			return m, nil
+		}
 		if err := m.editorSave(); err != nil {
 			if !strings.Contains(err.Error(), "already in use") {
 				m.logs = append(m.logs, "replace commands: "+err.Error())

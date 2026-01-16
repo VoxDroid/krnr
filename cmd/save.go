@@ -74,15 +74,8 @@ var saveCmd = &cobra.Command{
 			name = newName
 		}
 
-		id, err := r.CreateCommandSet(name, &desc, authorNamePtr, authorEmailPtr, cmds)
-		if err != nil {
+		if _, err := r.CreateCommandSet(name, &desc, authorNamePtr, authorEmailPtr, cmds); err != nil {
 			return err
-		}
-
-		for i, c := range cmds {
-			if _, err := r.AddCommand(id, i+1, c); err != nil {
-				return err
-			}
 		}
 
 		fmt.Printf("saved '%s' with %d commands\n", name, len(cmds))

@@ -131,6 +131,32 @@ func (r *RegistryAdapterImpl) UpdateCommandSet(_ context.Context, oldName string
 	return r.repo.UpdateCommandSet(cur.ID, cs.Name, desc, an, ae, cs.Tags)
 }
 
+// UpdateCommandSetAndReplaceCommands performs an atomic metadata+commands update
+// and records a single 'update' version representing the final state.
+func (r *RegistryAdapterImpl) UpdateCommandSetAndReplaceCommands(_ context.Context, oldName string, cs CommandSetSummary) error {
+	cur, err := r.repo.GetCommandSetByName(oldName)
+	if err != nil {
+		return err
+	}
+	if cur == nil {
+		return ErrNotFound
+	}
+	// prepare pointers for nullable fields
+	var desc *string
+	if cs.Description != "" {
+		desc = &cs.Description
+	}
+	var an *string
+	if cs.AuthorName != "" {
+		an = &cs.AuthorName
+	}
+	var ae *string
+	if cs.AuthorEmail != "" {
+		ae = &cs.AuthorEmail
+	}
+	return r.repo.UpdateCommandSetAndReplaceCommands(cur.ID, cs.Name, desc, an, ae, cs.Tags, cs.Commands)
+}
+
 // ListVersionsByName lists historical versions for the named command set.
 func (r *RegistryAdapterImpl) ListVersionsByName(_ context.Context, name string) ([]Version, error) {
 	vers, err := r.repo.ListVersionsByName(name)

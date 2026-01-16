@@ -318,17 +318,14 @@ func (m *TuiModel) editorSave() error {
 		m.vp.SetContent(m.detail)
 		// clear any prior notification if save succeeded
 		m.clearNotification()
+		// record successful save timestamp so scheduled delayed saves can skip redundant work
+		m.editor.lastSavedAt = time.Now()
 	} else {
-		// call update for metadata
-		if err := m.uiModel.UpdateCommandSet(context.Background(), m.detailName, newCS); err != nil {
+		// perform atomic metadata + commands update (record a single 'update' version)
+		if err := m.uiModel.UpdateCommandSetAndReplaceCommands(context.Background(), m.detailName, newCS); err != nil {
 			m.setNotification(err.Error())
 			m.logs = append(m.logs, "notification: "+err.Error())
 			return fmt.Errorf("update: %w", err)
-		}
-		// replace commands
-		if err := m.uiModel.ReplaceCommands(context.Background(), newCS.Name, clean); err != nil {
-			m.setNotification(err.Error())
-			return fmt.Errorf("replace commands: %w", err)
 		}
 		// refresh detail
 		if cs, err := m.uiModel.GetCommandSet(context.Background(), newCS.Name); err == nil {
@@ -336,6 +333,8 @@ func (m *TuiModel) editorSave() error {
 			m.detail = formatCSFullScreen(cs, m.width, m.height)
 			m.vp.SetContent(m.detail)
 		}
+		// record successful save timestamp so scheduled delayed saves can skip redundant work
+		m.editor.lastSavedAt = time.Now()
 		m.clearNotification()
 	}
 	m.editingMeta = false

@@ -31,6 +31,9 @@ type Model interface {
 	Close() error
 	UpdateCommandSet(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error
 	ReplaceCommands(ctx context.Context, name string, cmds []string) error
+	// UpdateCommandSetAndReplaceCommands performs an atomic metadata+commands update
+	// and records a single 'update' version representing the final state.
+	UpdateCommandSetAndReplaceCommands(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error
 	Run(ctx context.Context, name string, _ []string) (adapters.RunHandle, error)
 	Save(ctx context.Context, cs adapters.CommandSetSummary) error
 	Install(ctx context.Context, opts install.Options) ([]string, error)
