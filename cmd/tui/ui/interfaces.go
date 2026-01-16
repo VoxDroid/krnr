@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 
+	"github.com/VoxDroid/krnr/internal/install"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
 
@@ -32,6 +33,6 @@ type Model interface {
 	ReplaceCommands(ctx context.Context, name string, cmds []string) error
 	Run(ctx context.Context, name string, _ []string) (adapters.RunHandle, error)
 	Save(ctx context.Context, cs adapters.CommandSetSummary) error
-	Install(ctx context.Context, name string) error
-	Uninstall(ctx context.Context, name string) error
+	Install(ctx context.Context, opts install.Options) ([]string, error)
+	Uninstall(ctx context.Context) ([]string, error)
 }

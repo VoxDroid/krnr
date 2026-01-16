@@ -183,6 +183,8 @@ func removeMetadata() error {
 }
 
 // ExecuteInstall performs the install actions (will create dirs, copy file, set modes).
+// It returns human-friendly messages describing what was actually done (created
+// directories, copied the binary, added to PATH, etc.).
 func ExecuteInstall(opts Options) ([]string, error) {
 	actions, targetPath, err := PlanInstall(opts)
 	if err != nil {
@@ -191,19 +193,31 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	if opts.DryRun {
 		return actions, nil
 	}
-	// Perform actions
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-		return nil, fmt.Errorf("create target dir: %w", err)
+	// Prepare result messages to return to callers
+	result := []string{}
+
+	// Ensure the directory exists (report whether we created it or it already existed)
+	targetDir := filepath.Dir(targetPath)
+	if stat, err := os.Stat(targetDir); err == nil && stat.IsDir() {
+		result = append(result, fmt.Sprintf("directory exists: %s", targetDir))
+	} else {
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
+			return nil, fmt.Errorf("create target dir: %w", err)
+		}
+		result = append(result, fmt.Sprintf("created directory: %s", targetDir))
 	}
+
 	// resolve source executable
 	src, err := resolveSourceExecutable(opts.From)
 	if err != nil {
 		return nil, fmt.Errorf("determine source executable: %w", err)
 	}
-	// Copy file
+
+	// Copy file into place
 	if err := copyExecutable(src, targetPath); err != nil {
 		return nil, err
 	}
+	result = append(result, fmt.Sprintf("copied %s -> %s", src, targetPath))
 
 	// Attempt to add to PATH if requested. For system installs on Unix this may fail
 	// due to lack of privileges; in that case we do not abort the install but record a
@@ -212,16 +226,21 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(addActions) > 0 {
-		actions = append(actions, addActions...)
+	if addedToPath {
+		result = append(result, fmt.Sprintf("added to PATH (%s)", pathFile))
 	}
+	if len(addActions) > 0 {
+		result = append(result, addActions...)
+	}
+
 	// Persist metadata regardless of whether PATH modifications succeeded; this allows
 	// uninstall to locate and remove the installed binary even if PATH changes were skipped.
 	if err := saveMetadata(targetPath, addedToPath, pathFile, oldPath); err != nil {
 		return nil, fmt.Errorf("save metadata: %w", err)
 	}
+	result = append(result, "saved install metadata")
 
-	return actions, nil
+	return result, nil
 
 }
 

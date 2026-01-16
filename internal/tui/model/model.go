@@ -14,6 +14,7 @@ import (
 	"github.com/VoxDroid/krnr/internal/nameutil"
 	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
+	"github.com/VoxDroid/krnr/internal/install"
 )
 
 // ErrNotFound is returned when a requested command set cannot be found.
@@ -183,13 +184,20 @@ func (m *UIModel) Close() error {
 }
 
 // Install / Uninstall
-func (m *UIModel) Install(ctx context.Context, name string) error {
-	return m.installer.Install(ctx, name)
+// Install performs an installation of the krnr binary using the provided options.
+func (m *UIModel) Install(ctx context.Context, opts install.Options) ([]string, error) {
+	if m.installer == nil {
+		return nil, fmt.Errorf("installer adapter not configured")
+	}
+	return m.installer.Install(ctx, opts)
 }
 
-// Uninstall removes an installed item by name.
-func (m *UIModel) Uninstall(ctx context.Context, name string) error {
-	return m.installer.Uninstall(ctx, name)
+// Uninstall removes an installed krnr from the host and returns actions performed.
+func (m *UIModel) Uninstall(ctx context.Context) ([]string, error) {
+	if m.installer == nil {
+		return nil, fmt.Errorf("installer adapter not configured")
+	}
+	return m.installer.Uninstall(ctx)
 }
 
 // Save creates a new command set from provided metadata and commands

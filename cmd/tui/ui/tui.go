@@ -137,6 +137,18 @@ func (m *TuiModel) clearNotification() {
 	m.mu.Unlock()
 }
 
+// logsContains reports whether any log entry contains the provided substring.
+func (m *TuiModel) logsContains(s string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, l := range m.logs {
+		if strings.Contains(l, s) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsDetailShown reports detail visibility and the currently shown name (thread-safe).
 func (m *TuiModel) IsDetailShown() (bool, string) {
 	m.mu.RLock()

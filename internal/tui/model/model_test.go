@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/VoxDroid/krnr/internal/db"
+	"github.com/VoxDroid/krnr/internal/install"
 	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
@@ -169,5 +170,5 @@ func (t *testImportExport) ImportDB(_ context.Context, _ string, _ bool) error  
 
 type testInstaller struct{}
 
-func (t *testInstaller) Install(_ context.Context, _ string) error   { return nil }
-func (t *testInstaller) Uninstall(_ context.Context, _ string) error { return nil }
+func (t *testInstaller) Install(_ context.Context, _ install.Options) ([]string, error) { return []string{"installed (test)"}, nil }
+func (t *testInstaller) Uninstall(_ context.Context) ([]string, error) { return []string{"uninstalled (test)"}, nil }

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/VoxDroid/krnr/internal/config"
+	"github.com/VoxDroid/krnr/internal/install"
 	"github.com/VoxDroid/krnr/internal/user"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -176,8 +177,71 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 				}
 				m.menuPendingSrc = ""
+		case "install-scope":
+			// interpret scope: system|user
+			scope := strings.ToLower(strings.TrimSpace(m.menuInput))
+			if scope == "" {
+				scope = "user"
+			}
+			m.menuAction = "install-addpath"
+			m.menuInput = "n"
+			// store scope temporarily in menuPendingSrc
+			m.menuPendingSrc = scope
+			return m, nil
 
-			case "export-db":
+		case "install-addpath":
+			add := strings.ToLower(strings.TrimSpace(m.menuInput))
+			addToPath := add == "y" || add == "yes"
+			// construct options
+			scope := m.menuPendingSrc
+			var opts = install.Options{AddToPath: addToPath}
+			if scope == "system" {
+				opts.System = true
+			} else {
+				opts.User = true
+			}
+			actions, err := m.uiModel.Install(context.Background(), opts)
+			if err != nil {
+				m.logs = append(m.logs, "install error: "+err.Error())
+				m.setNotification("install error: " + err.Error())
+				notifyCmd = tea.Tick(5*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+			} else {
+				// record actions into logs and notify success
+				for _, a := range actions {
+					m.logs = append(m.logs, a)
+				}
+				if len(actions) > 0 {
+					m.setNotification(actions[0])
+				} else {
+					m.setNotification("installed")
+				}
+				notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+			}
+			m.menuPendingSrc = ""
+		case "uninstall-confirm":
+			// confirm uninstall: y/N
+			ov := strings.ToLower(strings.TrimSpace(m.menuInput))
+			confirm := ov == "y" || ov == "yes"
+			if !confirm {
+				m.logs = append(m.logs, "uninstall aborted")
+				m.setNotification("uninstall aborted")
+				notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+			} else {
+				actions, err := m.uiModel.Uninstall(context.Background())
+				if err != nil {
+					m.logs = append(m.logs, "uninstall error: "+err.Error())
+					m.setNotification("uninstall error: " + err.Error())
+					notifyCmd = tea.Tick(5*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+				} else {
+					for _, a := range actions {
+						m.logs = append(m.logs, a)
+					}
+					m.setNotification("uninstalled")
+					notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
+				}
+			}
+		m.menuPendingSrc = ""
+		case "export-db":
 				// Ensure directory exists and is writable. If invalid, fallback to data dir.
 				dst := m.menuInput
 				parent := filepath.Dir(dst)
@@ -258,22 +322,17 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.menuAction = "import-set"
 			m.menuInput = ""
 		case "Install":
-			// Installation UI is outside scope; log and close menu
-			if si := m.list.SelectedItem(); si != nil {
-				if it, ok := si.(csItem); ok {
-					_ = m.uiModel.Install(context.Background(), it.cs.Name)
-					m.logs = append(m.logs, "installed "+it.cs.Name)
-				}
-			}
-			m.showMenu = false
+			// Start interactive install flow: ask for scope then add-to-path.
+			m.menuInputMode = true
+			m.menuAction = "install-scope"
+			m.menuInput = "user" // default
+			return m, nil
 		case "Uninstall":
-			if si := m.list.SelectedItem(); si != nil {
-				if it, ok := si.(csItem); ok {
-					_ = m.uiModel.Uninstall(context.Background(), it.cs.Name)
-					m.logs = append(m.logs, "uninstalled "+it.cs.Name)
-				}
-			}
-			m.showMenu = false
+			// Ask for interactive confirmation before uninstalling the application
+			m.menuInputMode = true
+			m.menuAction = "uninstall-confirm"
+			m.menuInput = "n" // default No
+			return m, nil
 		case "Status":
 			// placeholder: show a status log entry
 			m.logs = append(m.logs, "status: OK")
@@ -374,6 +433,15 @@ func (m *TuiModel) renderMenu() string {
 			b.WriteString(m.menuInput)
 		case "import-set-dedupe":
 			b.WriteString("Dedupe when merging? [y/N]: ")
+			b.WriteString(m.menuInput)
+		case "install-scope":
+			b.WriteString("Install scope (system|user) [user]: ")
+			b.WriteString(m.menuInput)
+		case "install-addpath":
+			b.WriteString("Add to PATH? [y/N]: ")
+			b.WriteString(m.menuInput)
+		case "uninstall-confirm":
+			b.WriteString("Are you sure you want to uninstall? [y/N]: ")
 			b.WriteString(m.menuInput)
 		default:
 			b.WriteString("Path: ")

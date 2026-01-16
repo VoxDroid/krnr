@@ -31,8 +31,9 @@ var tuiCmd = &cobra.Command{
 		runner := executor.New(false, false)
 		execAdapter := adapters.NewExecutorAdapter(runner)
 		impExpAdapter := adapters.NewImportExportAdapter(dbConn)
+		installer := adapters.NewInstallerAdapter()
 
-		uiModel := modelpkg.New(regAdapter, execAdapter, impExpAdapter, nil)
+		uiModel := modelpkg.New(regAdapter, execAdapter, impExpAdapter, installer)
 		if err := uiModel.RefreshList(ctx); err != nil {
 			return err
 		}

@@ -5,6 +5,8 @@ package adapters
 import (
 	"context"
 	"errors"
+
+	"github.com/VoxDroid/krnr/internal/install"
 )
 
 // ErrNotFound is used when a requested item cannot be found in the repository.
@@ -84,7 +86,9 @@ type ImportExportAdapter interface {
 }
 
 // InstallerAdapter minimal interface for install/uninstall
+// Install accepts options controlling system/user scope and add-to-path behavior.
+// Uninstall returns the human-readable actions performed.
 type InstallerAdapter interface {
-	Install(ctx context.Context, name string) error
-	Uninstall(ctx context.Context, name string) error
+	Install(ctx context.Context, opts install.Options) ([]string, error)
+	Uninstall(ctx context.Context) ([]string, error)
 }
