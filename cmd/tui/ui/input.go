@@ -297,6 +297,14 @@ func handleGlobalKeys(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.setShowDetail(true)
 		m.setDetailName("")
 		return m, nil, true
+	case "m":
+		// Menu modal for miscellaneous actions (import/export, install/uninstall, status, whoami)
+		m.showMenu = true
+		m.menuIndex = 0
+		if m.menuItems == nil || len(m.menuItems) == 0 {
+			m.menuItems = []string{"Export database", "Import database", "Import set", "Install", "Uninstall", "Status", "Whoami", "Close"}
+		}
+		return m, nil, true
 	case "d":
 		if !m.showDetail {
 			return m, nil, true

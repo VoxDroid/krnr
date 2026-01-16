@@ -424,6 +424,9 @@ func TestMainFooterShowsCreateKey(t *testing.T) {
 	if !strings.Contains(view, "(C) New Entry") {
 		t.Fatalf("expected footer to contain (C) New Entry, got:\n%s", view)
 	}
+	if !strings.Contains(view, "(m) Menu") {
+		t.Fatalf("expected footer to contain (m) Menu, got:\n%s", view)
+	}
 }
 
 func TestEditReplacesCommands(t *testing.T) {
@@ -647,8 +650,13 @@ func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
 
 // fake import/export adapter for tests
 type fakeImpExp struct {
-	lastName string
-	lastDest string
+	lastName      string
+	lastDest      string
+	lastSrc       string
+	lastPolicy    string
+	lastDedupe    bool
+	lastOverwrite bool
+	reg           *replaceFakeRegistry
 }
 
 func (f *fakeImpExp) Export(_ context.Context, name string, dest string) error {
@@ -656,7 +664,25 @@ func (f *fakeImpExp) Export(_ context.Context, name string, dest string) error {
 	f.lastDest = dest
 	return nil
 }
-func (f *fakeImpExp) Import(_ context.Context, _ string, _ string) error { return nil }
+func (f *fakeImpExp) ImportSet(_ context.Context, src string, policy string, dedupe bool) error {
+	f.lastSrc = src
+	f.lastPolicy = policy
+	f.lastDedupe = dedupe
+	// simulate registry mutation by appending an imported set so UI can refresh
+	if f.reg != nil {
+		f.reg.items = append(f.reg.items, adapters.CommandSetSummary{Name: "imported-set", Description: "Imported"})
+	}
+	return nil
+}
+func (f *fakeImpExp) ImportDB(_ context.Context, src string, overwrite bool) error {
+	f.lastSrc = src
+	f.lastOverwrite = overwrite
+	// simulate DB replace: set registry items to a DB-imported set
+	if f.reg != nil {
+		f.reg.items = []adapters.CommandSetSummary{{Name: "db-imported", Description: "DB Imported"}}
+	}
+	return nil
+}
 
 func TestExportFromDetailPromptsAndExportsWhenConfirmed(t *testing.T) {
 	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
@@ -738,10 +764,79 @@ func TestExportConfirmUppercaseY(t *testing.T) {
 	if !strings.Contains(m.detail, "Export 'upcaseexp' to") {
 		t.Fatalf("expected export prompt in detail, got:\n%s", m.detail)
 	}
-	// confirm with uppercase Y
+	// confirm with uppercase 'Y'
 	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Y'}})
 	if imp.lastName != "upcaseexp" {
 		t.Fatalf("expected Export called for 'upcaseexp', got %q", imp.lastName)
+	}
+	if imp.lastDest == "" {
+		t.Fatalf("expected destination to be set")
+	}
+	if !strings.Contains(strings.Join(m.logs, "\n"), "exported") {
+		t.Fatalf("expected exported log, got: %v", m.logs)
+	}
+}
+
+func TestMenuOpens(t *testing.T) {
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	m = m2.(*TuiModel)
+	if !m.showMenu {
+		t.Fatalf("expected menu to be open")
+	}
+	if len(m.menuItems) == 0 {
+		t.Fatalf("expected menu items to be present")
+	}
+}
+
+func TestMenuExportDatabase(t *testing.T) {
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: adapters.CommandSetSummary{Name: "one", Commands: []string{"echo hi"}}}
+	imp := &fakeImpExp{}
+	ui := modelpkg.New(reg, &fakeExec{}, imp, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	// open menu
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	m = m2.(*TuiModel)
+	if !m.showMenu {
+		t.Fatalf("expected menu to be open")
+	}
+	// select the default (Export database) to enter input mode
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m3.(*TuiModel)
+	if !m.menuInputMode || m.menuAction != "export-db" {
+		t.Fatalf("expected export prompt mode after selecting Export database, got menuInputMode=%v action=%q", m.menuInputMode, m.menuAction)
+	}
+	// confirm default destination by pressing Enter
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m4.(*TuiModel)
+	if imp.lastName != "" {
+		t.Fatalf("expected Export called with empty name for DB export, got %q", imp.lastName)
+	}
+	if imp.lastDest == "" {
+		t.Fatalf("expected destination to be set, got empty")
+	}
+	found := false
+	for _, l := range m.logs {
+		if strings.Contains(l, "exported database to") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected export log, got: %v", m.logs)
+	}
+	if !strings.Contains(m.notification, "exported database to") {
+		t.Fatalf("expected export notification, got %q", m.notification)
 	}
 }
 

@@ -75,7 +75,12 @@ type ExecutorAdapter interface {
 // ImportExportAdapter describes import/export operations.
 type ImportExportAdapter interface {
 	Export(ctx context.Context, name string, dest string) error
-	Import(ctx context.Context, src string, policy string) error
+	// ImportSet imports a command set file into the active DB. `policy` is one of
+	// rename|skip|overwrite|merge and `dedupe` applies when merging.
+	ImportSet(ctx context.Context, src string, policy string, dedupe bool) error
+	// ImportDB imports an entire database file as the active DB; `overwrite`
+	// indicates whether to replace the destination if it exists.
+	ImportDB(ctx context.Context, src string, overwrite bool) error
 }
 
 // InstallerAdapter minimal interface for install/uninstall

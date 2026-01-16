@@ -31,10 +31,14 @@ func (i *ImportExportAdapterImpl) Export(_ context.Context, name string, dest st
 	return exporter.ExportCommandSet(i.db, name, dest)
 }
 
-// Import imports a command set file from src using the given policy (currently unused).
-func (i *ImportExportAdapterImpl) Import(_ context.Context, src string, _ string) error {
-	// Wire into internal/importer helpers; policy could be used to set options.
-	// For now use ImportCommandSet with default options (no dedupe, rename on conflict).
-	opts := importer.ImportOptions{Dedupe: false}
+// ImportSet imports a command set file from src using the given policy and
+// dedupe options.
+func (i *ImportExportAdapterImpl) ImportSet(_ context.Context, src string, policy string, dedupe bool) error {
+	opts := importer.ImportOptions{OnConflict: policy, Dedupe: dedupe}
 	return importer.ImportCommandSet(src, opts)
+}
+
+// ImportDB imports a database file into the active DB, overwriting if requested.
+func (i *ImportExportAdapterImpl) ImportDB(_ context.Context, src string, overwrite bool) error {
+	return importer.ImportDatabase(src, overwrite, importer.ImportOptions{})
 }

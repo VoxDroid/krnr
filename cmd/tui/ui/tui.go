@@ -26,6 +26,15 @@ type TuiModel struct {
 	height int
 	mu     sync.RWMutex
 
+	// menu modal state
+	showMenu       bool
+	menuItems      []string
+	menuIndex      int
+	menuInput      string // used when an item requires a path input (e.g., import db)
+	menuPendingSrc string // holds the source path while we prompt for additional options
+	menuInputMode  bool   // whether the menu is in input mode
+	menuAction     string // action to perform on input confirmation
+
 	showDetail bool
 	detail     string
 	detailName string
@@ -99,6 +108,8 @@ type saveNowMsg struct{}
 // are still arriving; it contains the current retry count so we can limit retries.
 type editorSaveRetryMsg struct{ retry int }
 
+type clearNotificationMsg struct{}
+
 // thread-safe helpers for detail view state used by integration tests
 func (m *TuiModel) setShowDetail(v bool) {
 	m.mu.Lock()
@@ -171,11 +182,18 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.editor.saving = false
 		return m, nil
+	case clearNotificationMsg:
+		m.clearNotification()
+		return m, nil
 	case tea.KeyMsg:
 		s := msg.String()
 		// If we're editing metadata, delegate key handling to editor.go
 		if m.editingMeta {
 			return m.handleEditorKey(msg)
+		}
+		// If the menu modal is open, delegate to menu handler
+		if m.showMenu {
+			return m.handleMenuKey(msg)
 		}
 
 		// If we're in our custom filter mode, use the centralized dispatch helper
@@ -422,6 +440,19 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the current TUI view as a string.
 func (m *TuiModel) View() string {
+	// If the menu modal is open, render it as a centered overlay to avoid
+	// interfering with regular detail/list flows. This keeps the menu
+	// accessible from any context.
+	if m.showMenu {
+		// compute an appropriate height for the menu overlay (leave space for Footer)
+		h := m.height - 4
+		if h < 3 {
+			h = 3
+		}
+		contentStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#c084fc")).Padding(1).Width(m.width - 4).Height(h)
+		return contentStyle.Render(m.renderMenu())
+	}
+
 	if m.showDetail {
 		// Use the same top title bar and content container approach as the main
 		// page so borders and colors remain consistent across views.
@@ -666,7 +697,7 @@ func (m *TuiModel) View() string {
 		// Use simple ASCII-friendly footer to ensure compatibility across
 		// environments and avoid encoding issues with exotic characters.
 		footerText = "(<-) / (->) / (Tab) switch focus - (Up)/(Down) scroll focused pane"
-		footerText += " - (Enter) details - (r) run - (T) theme - (C) New Entry - (q) quit - (?) help"
+		footerText += " - (Enter) details - (r) run - (T) theme - (C) New Entry - (m) Menu - (q) quit - (?) help"
 	}
 	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(footerText)
 	// If there's a transient notification show it prominently in the footer

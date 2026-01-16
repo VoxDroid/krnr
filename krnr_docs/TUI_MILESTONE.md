@@ -37,7 +37,9 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 - [x] `krnr run <name>` — run (basic run + streaming logs) and dry-run preview (parameter editor modal planned)
 - [x] `krnr save` / `krnr edit` — interactive save/create/edit flows (modal UI implemented; press `c` to create, `e` to edit)
 - [x] `krnr record` — record commands interactively (future modal)
-- [ ] `krnr import` / `krnr export` — import/export flow (interactive helpers)
+- [x] `krnr import` / `krnr export` — import/export flow (interactive helpers) (menu modal added; export/import DB and sets available via `m` Menu)
+- [x] `krnr install` / `krnr uninstall` — installer actions available from `m` Menu
+- [x] `krnr whoami` — accessible from `m` Menu (shows stored identity)
 - [x] `krnr history <name>` & `krnr rollback` — view history, rollback UI
 - [ ] `krnr tag` add/remove/list — tag management UI
 - [ ] `krnr install` / `krnr uninstall` — installer views and dry-run planning

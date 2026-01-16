@@ -121,6 +121,11 @@ type testRegistry struct{ items []adapters.CommandSetSummary }
 func (t *testRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
 	return t.items, nil
 }
+
+func (t *testRegistry) ReopenDB(ctx context.Context) error {
+	// noop for test registry as it does not maintain a DB connection
+	return nil
+}
 func (t *testRegistry) GetCommandSet(_ context.Context, name string) (adapters.CommandSetSummary, error) {
 	for _, it := range t.items {
 		if it.Name == name {
@@ -158,8 +163,9 @@ func (t *testExecutor) Run(_ context.Context, _ string, _ []string) (adapters.Ru
 
 type testImportExport struct{}
 
-func (t *testImportExport) Export(_ context.Context, _ string, _ string) error { return nil }
-func (t *testImportExport) Import(_ context.Context, _ string, _ string) error { return nil }
+func (t *testImportExport) Export(_ context.Context, _ string, _ string) error            { return nil }
+func (t *testImportExport) ImportSet(_ context.Context, _ string, _ string, _ bool) error { return nil }
+func (t *testImportExport) ImportDB(_ context.Context, _ string, _ bool) error            { return nil }
 
 type testInstaller struct{}
 

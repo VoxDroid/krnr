@@ -156,3 +156,11 @@ func (r *RegistryAdapterImpl) ListVersionsByName(_ context.Context, name string)
 func (r *RegistryAdapterImpl) ApplyVersionByName(_ context.Context, name string, versionNum int) error {
 	return r.repo.ApplyVersionByName(name, versionNum)
 }
+
+// Close closes the underlying repository database connection if present.
+func (r *RegistryAdapterImpl) Close() error {
+	if r.repo == nil {
+		return nil
+	}
+	return r.repo.Close()
+}

@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/nameutil"
+	"github.com/VoxDroid/krnr/internal/registry"
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
 
@@ -111,16 +113,73 @@ func (m *UIModel) Export(ctx context.Context, name string, dest string) error {
 	if m.impExp == nil {
 		return fmt.Errorf("import/export adapter not configured")
 	}
-	_, err := m.registry.GetCommandSet(ctx, name)
-	if err != nil {
-		return err
+	// When name is empty, we are exporting the whole database, so skip
+	// validating a command set exists. For named exports, ensure the set
+	// exists before delegating to the adapter.
+	if name != "" {
+		if _, err := m.registry.GetCommandSet(ctx, name); err != nil {
+			return err
+		}
 	}
 	return m.impExp.Export(ctx, name, dest)
 }
 
-// Import imports a file and returns after completion (blocking)
-func (m *UIModel) Import(ctx context.Context, src string, policy string) error {
-	return m.impExp.Import(ctx, src, policy)
+// ImportSet imports a command-set file using the given conflict policy and
+// dedupe option.
+func (m *UIModel) ImportSet(ctx context.Context, src string, policy string, dedupe bool) error {
+	if m.impExp == nil {
+		return fmt.Errorf("import/export adapter not configured")
+	}
+	return m.impExp.ImportSet(ctx, src, policy, dedupe)
+}
+
+// ImportDB imports a database file into the active DB. If overwrite is true
+// it replaces the active DB file.
+func (m *UIModel) ImportDB(ctx context.Context, src string, overwrite bool) error {
+	if m.impExp == nil {
+		return fmt.Errorf("import/export adapter not configured")
+	}
+	return m.impExp.ImportDB(ctx, src, overwrite)
+}
+
+// ReopenDB re-initializes the registry adapter using a fresh DB connection.
+// This is useful after a full DB overwrite which replaces the on-disk file;
+// existing SQL connections may continue to reference the old file contents.
+func (m *UIModel) ReopenDB(ctx context.Context) error {
+	if m.registry == nil {
+		return fmt.Errorf("registry adapter not configured")
+	}
+	// If the current registry adapter is not the concrete implementation
+	// used in production (i.e., a test fake), avoid re-opening a real DB
+	// connection so tests that inject fake registries continue to work.
+	if _, ok := m.registry.(*adapters.RegistryAdapterImpl); !ok {
+		// just refresh the list from whatever adapter is present
+		return m.RefreshList(ctx)
+	}
+	// attempt to close the existing adapter's DB connection if it exposes Close
+	if c, ok := m.registry.(interface{ Close() error }); ok {
+		_ = c.Close()
+	}
+	// Obtain a fresh DB connection and create a new repository/adapter.
+	dbConn, err := db.InitDB()
+	if err != nil {
+		return err
+	}
+	repo := registry.NewRepository(dbConn)
+	m.registry = adapters.NewRegistryAdapter(repo)
+	// Refresh cache with new adapter
+	return m.RefreshList(ctx)
+}
+
+// Close cleans up any resources held by the UIModel (e.g., DB connections).
+func (m *UIModel) Close() error {
+	if m.registry == nil {
+		return nil
+	}
+	if c, ok := m.registry.(interface{ Close() error }); ok {
+		return c.Close()
+	}
+	return nil
 }
 
 // Install / Uninstall

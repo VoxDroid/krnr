@@ -20,6 +20,14 @@ type Model interface {
 	ApplyVersion(ctx context.Context, name string, version int) error
 	Delete(ctx context.Context, name string) error
 	Export(ctx context.Context, name string, dest string) error
+	ImportSet(ctx context.Context, src string, policy string, dedupe bool) error
+	ImportDB(ctx context.Context, src string, overwrite bool) error
+	// ReopenDB forces the model to re-open the underlying DB connection and
+	// refresh its registry adapter. This is necessary after a full DB file
+	// overwrite so subsequent queries read the new file contents.
+	ReopenDB(ctx context.Context) error
+	// Close cleans up any resources held by the model (e.g., DB connections).
+	Close() error
 	UpdateCommandSet(ctx context.Context, oldName string, cs adapters.CommandSetSummary) error
 	ReplaceCommands(ctx context.Context, name string, cmds []string) error
 	Run(ctx context.Context, name string, _ []string) (adapters.RunHandle, error)
