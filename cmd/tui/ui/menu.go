@@ -11,7 +11,6 @@ import (
 
 	"github.com/VoxDroid/krnr/internal/config"
 	"github.com/VoxDroid/krnr/internal/install"
-	"github.com/VoxDroid/krnr/internal/user"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -334,17 +333,19 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.menuInput = "n" // default No
 			return m, nil
 		case "Status":
-			// placeholder: show a status log entry
-			m.logs = append(m.logs, "status: OK")
-			m.showMenu = false
-		case "Whoami":
-			if p, ok, err := user.GetProfile(); err == nil && ok {
-				m.logs = append(m.logs, "whoami: "+strings.TrimSpace(p.Name+" <"+p.Email+">"))
-			} else if err != nil {
-				m.logs = append(m.logs, "whoami: error: "+err.Error())
+			// Use the same status logic as the CLI: call internal/install.GetStatus
+			statusLines := []string{"krnr status:"}
+			if st, err := install.GetStatus(); err != nil {
+				statusLines = append(statusLines, "status: error: "+err.Error())
 			} else {
-				m.logs = append(m.logs, "whoami: (not set)")
+				statusLines = append(statusLines, fmt.Sprintf("  User: installed=%v, on_path=%v, path=%s", st.UserInstalled, st.UserOnPath, st.UserPath))
+				statusLines = append(statusLines, fmt.Sprintf("  System: installed=%v, on_path=%v, path=%s", st.SystemInstalled, st.SystemOnPath, st.SystemPath))
+				statusLines = append(statusLines, fmt.Sprintf("  Metadata found: %v", st.MetadataFound))
 			}
+			// Display status in the preview (do not append to m.logs to avoid duplication)
+			m.detail = strings.Join(statusLines, "\n")
+			m.vp.SetContent(m.detail)
+			m.setShowDetail(true)
 			m.showMenu = false
 		case "Close":
 			m.showMenu = false

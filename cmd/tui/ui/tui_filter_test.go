@@ -2,8 +2,8 @@ package ui
 
 import (
 	"context"
-	"strings"
 	"os"
+	"strings"
 	"testing"
 
 	adapters "github.com/VoxDroid/krnr/internal/tui/adapters"
