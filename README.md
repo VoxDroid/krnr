@@ -176,7 +176,7 @@ go test ./...
 
 ## Security
 
-krnr executes shell commands with the privileges of the current user. 
+krnr executes shell commands with the privileges of the current user.
 
 - Always inspect command sets before running them (use `krnr describe <name>`).
 - Use the `--confirm` flag for workflows that perform destructive operations.

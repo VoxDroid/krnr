@@ -20,7 +20,7 @@ func TestFormatCSDetailsContainsFields(t *testing.T) {
 	if out == "" {
 		t.Fatalf("expected non-empty output")
 	}
-	if !(contains(out, "Name:") && contains(out, "Commands:")) {
+	if !contains(out, "Name:") || !contains(out, "Commands:") {
 		t.Fatalf("expected Name and Commands in output, got:\n%s", out)
 	}
 }

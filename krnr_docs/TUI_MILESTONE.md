@@ -50,7 +50,7 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 - ✅ Implemented interactive Create/Save modal (press `c` to create; form collects name, description, commands, author, email, tags). Unit tests added to verify save flow.
 - Implement parameter-editor modal for `run` (name/value with `env:VAR` resolution and secret redaction).
 - Add a command-by-command dry-run viewer with redaction support in full-screen detail.
-- Visual polish: optional full-line background blocks for command rows and color/theme refinements (maintain testability). 
+- Visual polish: optional full-line background blocks for command rows and color/theme refinements (maintain testability).
 - Accessibility: keyboard help modal, high-contrast theme tuning, screen reader testing and aria-like support (where applicable).
 - Expand PTY E2E coverage and add CI jobs to run headless/PTY tests on Linux/macOS runners (ensure Windows behavior is covered via skipping assertions or separate expectations).
 - Add interactive flow tests (headless) for create/save/import/export and rollback.
@@ -85,6 +85,6 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 
 ## Notes / Next owner items
 
-- I will implement the Create/Save modal or visual polish next depending on your priority — tell me whether you prefer color/styling parity first or the interactive create flow. 
+- I will implement the Create/Save modal or visual polish next depending on your priority — tell me whether you prefer color/styling parity first or the interactive create flow.
 
 ---

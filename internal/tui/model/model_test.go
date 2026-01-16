@@ -126,7 +126,7 @@ func (t *testRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSet
 	return t.items, nil
 }
 
-func (t *testRegistry) ReopenDB(ctx context.Context) error {
+func (t *testRegistry) ReopenDB(_ context.Context) error {
 	// noop for test registry as it does not maintain a DB connection
 	return nil
 }

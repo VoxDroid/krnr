@@ -9,6 +9,7 @@ import (
 // InstallerAdapterImpl delegates install/uninstall operations to internal/install.
 type InstallerAdapterImpl struct{}
 
+// NewInstallerAdapter returns a new InstallerAdapterImpl.
 func NewInstallerAdapter() *InstallerAdapterImpl { return &InstallerAdapterImpl{} }
 
 // Install executes the install with given options and returns performed actions.

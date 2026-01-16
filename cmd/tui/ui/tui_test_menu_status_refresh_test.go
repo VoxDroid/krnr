@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/VoxDroid/krnr/internal/install"
 	adapters "github.com/VoxDroid/krnr/internal/tui/adapters"
 	modelpkg "github.com/VoxDroid/krnr/internal/tui/model"
-	"github.com/VoxDroid/krnr/internal/install"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

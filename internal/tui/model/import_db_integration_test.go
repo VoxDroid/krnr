@@ -22,7 +22,7 @@ func TestImportDatabaseReopen(t *testing.T) {
 	dst := filepath.Join(tmp, "krnr.db")
 	src := filepath.Join(tmp, "src.db")
 	_ = os.Setenv(config.EnvKRNRDB, dst)
-	defer os.Unsetenv(config.EnvKRNRDB)
+	defer func() { _ = os.Unsetenv(config.EnvKRNRDB) }()
 
 	// create a source DB with one command set
 	srcDB, err := sql.Open("sqlite", src)
@@ -41,7 +41,7 @@ func TestImportDatabaseReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open src2: %v", err)
 	}
-	defer srcConn2.Close()
+	defer func() { _ = srcConn2.Close() }()
 	if err := db.ApplyMigrations(srcConn2); err != nil {
 		t.Fatalf("apply migrations src: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestImportDatabaseReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init active db: %v", err)
 	}
-	defer activeConn.Close()
+	defer func() { _ = activeConn.Close() }()
 
 	// New model backed by active DB
 	r := registry.NewRepository(activeConn)

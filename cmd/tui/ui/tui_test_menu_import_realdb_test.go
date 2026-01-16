@@ -20,14 +20,14 @@ func TestMenuImportDatabaseOverwrite_RealDB(t *testing.T) {
 	dst := filepath.Join(tmp, "krnr.db")
 	src := filepath.Join(tmp, "src.db")
 	_ = os.Setenv("KRNR_DB", dst)
-	defer os.Unsetenv("KRNR_DB")
+	defer func() { _ = os.Unsetenv("KRNR_DB") }()
 
 	// create source DB and populate a command set
 	srcConn, err := sql.Open("sqlite", src)
 	if err != nil {
 		t.Fatalf("open src db: %v", err)
 	}
-	defer srcConn.Close()
+	defer func() { _ = srcConn.Close() }()
 	if err := db.ApplyMigrations(srcConn); err != nil {
 		t.Fatalf("apply migrations src: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestMenuImportDatabaseOverwrite_RealDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init active db: %v", err)
 	}
-	defer activeConn.Close()
+	defer func() { _ = activeConn.Close() }()
 
 	// construct real adapters and model
 	r := registry.NewRepository(activeConn)

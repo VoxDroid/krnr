@@ -262,7 +262,7 @@ func TestFilterUpdatesPreviewWhenDetailHidden(t *testing.T) {
 func TestPreviewLoggingWhenDebugEnabled(t *testing.T) {
 	old := os.Getenv("KRNR_TUI_DEBUG_PREVIEW")
 	_ = os.Setenv("KRNR_TUI_DEBUG_PREVIEW", "1")
-	defer os.Setenv("KRNR_TUI_DEBUG_PREVIEW", old)
+	defer func() { _ = os.Setenv("KRNR_TUI_DEBUG_PREVIEW", old) }()
 
 	reg := &previewFakeRegistry{items: []adapters.CommandSetSummary{{Name: "b0"}, {Name: "b1"}}}
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
@@ -294,20 +294,32 @@ func TestPreviewLoggingWhenDebugEnabled(t *testing.T) {
 // so preview updates in tests can assert the correct content.
 type previewFakeRegistry struct{ items []adapters.CommandSetSummary }
 
-func (p *previewFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) { return p.items, nil }
-func (p *previewFakeRegistry) ReopenDB(ctx context.Context) error                                          { return nil }
+func (p *previewFakeRegistry) ListCommandSets(_ context.Context) ([]adapters.CommandSetSummary, error) {
+	return p.items, nil
+}
+func (p *previewFakeRegistry) ReopenDB(_ context.Context) error { return nil }
 func (p *previewFakeRegistry) GetCommandSet(_ context.Context, name string) (adapters.CommandSetSummary, error) {
 	return adapters.CommandSetSummary{Name: name, Description: "desc", Commands: []string{"echo hi"}}, nil
 }
-func (p *previewFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error { return nil }
-func (p *previewFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error                    { return nil }
-func (p *previewFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error)             { return nil, adapters.ErrNotFound }
-func (p *previewFakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error         { return nil }
+func (p *previewFakeRegistry) SaveCommandSet(_ context.Context, _ adapters.CommandSetSummary) error {
+	return nil
+}
+func (p *previewFakeRegistry) DeleteCommandSet(_ context.Context, _ string) error { return nil }
+func (p *previewFakeRegistry) GetCommands(_ context.Context, _ string) ([]string, error) {
+	return nil, adapters.ErrNotFound
+}
+func (p *previewFakeRegistry) ReplaceCommands(_ context.Context, _ string, _ []string) error {
+	return nil
+}
 func (p *previewFakeRegistry) UpdateCommandSet(_ context.Context, _ string, _ adapters.CommandSetSummary) error {
 	return nil
 }
 func (p *previewFakeRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, _ string, _ adapters.CommandSetSummary) error {
 	return nil
 }
-func (p *previewFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) { return nil, nil }
-func (p *previewFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error                { return nil }
+func (p *previewFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
+	return nil, nil
+}
+func (p *previewFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error {
+	return nil
+}

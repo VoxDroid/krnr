@@ -106,10 +106,6 @@ type runDoneMsg struct{}
 // flows deterministic when typing then immediately saving.
 type saveNowMsg struct{}
 
-// editorSaveRetryMsg is used to retry a scheduled save when recent edits
-// are still arriving; it contains the current retry count so we can limit retries.
-type editorSaveRetryMsg struct{ retry int }
-
 type clearNotificationMsg struct{}
 
 // thread-safe helpers for detail view state used by integration tests
@@ -168,7 +164,7 @@ func (m *TuiModel) logPreviewUpdate(name string) {
 	m.mu.Lock()
 	m.logs = append(m.logs, "preview_update: "+name)
 	m.mu.Unlock()
-} 
+}
 
 // Update handles incoming events and updates model state.
 func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

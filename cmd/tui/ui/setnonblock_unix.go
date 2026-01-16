@@ -9,3 +9,6 @@ import "syscall"
 func setNonblock(fd uintptr) error {
 	return syscall.SetNonblock(int(fd), true)
 }
+
+// keep reference to avoid staticcheck unused warning while function is kept for platform needs
+var _ func(uintptr) error = setNonblock

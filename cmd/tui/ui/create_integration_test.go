@@ -52,8 +52,7 @@ func TestCreateEntryNoDuplicateVersions(t *testing.T) {
 	m = m6.(*TuiModel)
 
 	// simulate delayed save tick that would normally arrive via tea.Tick
-	m7, _ := m.Update(saveNowMsg{})
-	m = m7.(*TuiModel)
+	_, _ = m.Update(saveNowMsg{})
 
 	// ensure one version exists and it's a create
 	vers, err := ui.ListVersions(context.Background(), "Test1")

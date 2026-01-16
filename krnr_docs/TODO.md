@@ -45,7 +45,7 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
   - [ ] Docs, user guide, and packaging updates (document `krnr tui`, add examples, update release notes and packaging manifests)
   - Acceptance: Users can complete common interactive workflows via `krnr tui` with **parity for interactive flows** — specifically, there must be interactive TUI equivalents for the existing CLI commands (create/save, edit, run with parameter entry and streaming logs, list, describe, history, rollback, import/export, tag management, install/uninstall/status). The CLI remains the authoritative scripting surface; the TUI is a supported interactive client. UI models are unit-tested and headless UI tests run in CI.
 
-#### N/A 
+#### N/A
 - [ ] Automate manifest updates (winget/Scoop/Chocolatey): on release replace Url/Sha in manifest templates and open PRs automatically to the target registries (winget-pkgs, Scoop bucket, community Chocolatey); include PR template and validation checks.
 - Security & Safety Hardening
   - [x] Conduct a security review; document checklist in `docs/security.md`

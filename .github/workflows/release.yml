@@ -427,62 +427,62 @@ jobs:
           TAG: ${{ needs.check.outputs.version }}
         run: |
           set -euo pipefail
-          
+
           echo "Looking for MSI files to upload"
-          
+
           # Find MSI files from backup location
           if [ ! -d "/tmp/msi-backup" ]; then
             echo "No MSI backup directory found"
             exit 1
           fi
-          
+
           msi_files=$(find /tmp/msi-backup -type f -name "krnr-*.msi" 2>/dev/null || true)
-          
+
           if [ -z "$msi_files" ]; then
             echo "No MSI files found in backup directory"
             exit 1
           fi
-          
+
           # Get release information
           releaseJson=$(curl -s -H "Authorization: token $PERSONAL_TOKEN" "https://api.github.com/repos/$GITHUB_REPO/releases/tags/$TAG" || true)
           uploadUrl=$(echo "$releaseJson" | jq -r '.upload_url // empty' | sed 's/{.*}//')
           releaseId=$(echo "$releaseJson" | jq -r '.id // empty')
-          
+
           if [ -z "$uploadUrl" ] || [ "$uploadUrl" == "null" ]; then
             echo "Release for tag $TAG not found; aborting" >&2
             exit 1
           fi
-          
+
           echo "Release ID: $releaseId"
           echo "Upload URL: $uploadUrl"
-          
+
           # Get version without 'v' prefix
           VERSION_NO_V="${TAG#v}"
-          
+
           # Upload each MSI file
           for msi_path in $msi_files; do
             if [ -f "$msi_path" ]; then
               original_name=$(basename "$msi_path")
               echo "Found MSI: $original_name (from $msi_path)"
-              
+
               # Rename to format: krnr_X.Y.Z_windows_installer.msi
               # Remove trailing .0 ONLY if version is X.Y.Z.0 (i.e., drop a fourth component)
               clean_version=$(echo "$VERSION_NO_V" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)\.0$/\1/')
               new_name="krnr_${clean_version}_windows_installer.msi"
-              
+
               echo "Renaming: $original_name -> $new_name"
-              
+
               # Calculate SHA256
               sha=$(sha256sum "$msi_path" | awk '{print toupper($1)}')
               echo "SHA256: $sha"
-              
+
               # Upload the MSI file with new name
               upload_response=$(curl -s -X POST \
                 -H "Authorization: token $PERSONAL_TOKEN" \
                 -H "Content-Type: application/octet-stream" \
                 --data-binary @"$msi_path" \
                 "$uploadUrl?name=$new_name")
-              
+
               upload_state=$(echo "$upload_response" | jq -r '.state // empty')
               if [ "$upload_state" == "uploaded" ]; then
                 echo "✓ Successfully uploaded $new_name"

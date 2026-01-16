@@ -118,8 +118,6 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					// ask for dedupe option
 					m.menuAction = "import-set-dedupe"
 					m.menuInput = "n"
-					m.menuPendingSrc = m.menuPendingSrc
-					m.menuInput = "n"
 					return m, nil
 				}
 				// else perform import with dedupe=false
@@ -206,9 +204,7 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					notifyCmd = tea.Tick(5*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 				} else {
 					// record actions into logs and notify success
-					for _, a := range actions {
-						m.logs = append(m.logs, a)
-					}
+					m.logs = append(m.logs, actions...)
 					if len(actions) > 0 {
 						m.setNotification(actions[0])
 					} else {
@@ -232,9 +228,7 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						m.setNotification("uninstall error: " + err.Error())
 						notifyCmd = tea.Tick(5*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 					} else {
-						for _, a := range actions {
-							m.logs = append(m.logs, a)
-						}
+						m.logs = append(m.logs, actions...)
 						m.setNotification("uninstalled")
 						notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 					}
@@ -250,12 +244,9 @@ func (m *TuiModel) handleMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						dst = filepath.Join(d, filepath.Base(dst))
 						m.logs = append(m.logs, "destination invalid; falling back to data dir")
 						m.setNotification("destination invalid; falling back to data dir")
-						notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 					} else {
 						m.logs = append(m.logs, "export error: invalid destination and data dir not available")
 						m.setNotification("export error: invalid destination and data dir not available")
-						dst = dst // will likely fail
-						notifyCmd = tea.Tick(3*time.Second, func(time.Time) tea.Msg { return clearNotificationMsg{} })
 					}
 				}
 				// if dest exists, pick unique path to avoid overwriting

@@ -37,8 +37,7 @@ func TestMenuExportFallbackInvalidPath(t *testing.T) {
 	invalid := filepath.Join(os.TempDir(), "no-such-dir-hopefully-not-exists", "out.db")
 	m.menuInput = invalid
 	// confirm
-	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = m4.(*TuiModel)
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if imp.lastDest == "" {
 		t.Fatalf("expected destination to be set after fallback, got empty")
 	}

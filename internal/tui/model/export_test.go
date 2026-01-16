@@ -15,12 +15,12 @@ func (r *recordingImportExport) Export(_ context.Context, name string, dest stri
 	r.lastDest = dest
 	return nil
 }
-func (r *recordingImportExport) ImportSet(_ context.Context, src string, policy string, dedupe bool) error {
+func (r *recordingImportExport) ImportSet(_ context.Context, src string, _ string, _ bool) error {
 	r.lastName = "<set>"
 	r.lastDest = src
 	return nil
 }
-func (r *recordingImportExport) ImportDB(_ context.Context, src string, overwrite bool) error {
+func (r *recordingImportExport) ImportDB(_ context.Context, src string, _ bool) error {
 	r.lastName = "<db>"
 	r.lastDest = src
 	return nil

@@ -93,8 +93,7 @@ func TestCtrlAFromOtherFieldsAddsCommand(t *testing.T) {
 		t.Fatalf("expected typed command 'echo x', got %q", m.editor.commands[idx])
 	}
 	// Save with Ctrl+S and ensure ReplaceCommands is invoked with the updated command
-	m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
-	m = m6.(*TuiModel)
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
 	if len(reg.lastCommands) == 0 {
 		t.Fatalf("expected ReplaceCommands to be called, got none")
 	}
