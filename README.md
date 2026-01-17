@@ -4,6 +4,12 @@ _Record. Automate. Run._
 
 [![CI](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/VoxDroid/krnr?label=release)](https://github.com/VoxDroid/krnr/releases) [![Downloads](https://img.shields.io/github/downloads/VoxDroid/krnr/total?label=downloads&color=blue)](https://github.com/VoxDroid/krnr/releases) [![Go Version](https://img.shields.io/github/go-mod/go-version/VoxDroid/krnr?label=go)](https://github.com/VoxDroid/krnr) [![License](https://img.shields.io/github/license/VoxDroid/krnr)](LICENSE) [![Go Report Card](https://goreportcard.com/badge/github.com/VoxDroid/krnr)](https://goreportcard.com/report/github.com/VoxDroid/krnr) [![pkg.go.dev](https://pkg.go.dev/badge/github.com/VoxDroid/krnr)](https://pkg.go.dev/github.com/VoxDroid/krnr)
 
+<p align="center">
+  <a href="assets/gif/krnr.gif">
+    <img src="assets/gif/krnr.gif" alt="krnr demo: save & run plus TUI" />
+  </a>
+</p>
+
 **krnr** is a fast, cross-platform CLI that turns recurring terminal sequences into first-class, shareable workflows stored in a global, versioned SQLite registry. Save time, reduce one-off scripts and human error, and make your workflows reproducible, discoverable, and portable across machines, teams, and CI systems. It's approachable for everyone, start with a single saved command or the optional interactive TUI; no heavy configuration or background services required.
 
 **Quick comparison - why krnr at a glance:**
