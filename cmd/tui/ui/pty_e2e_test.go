@@ -224,19 +224,6 @@ func tryEnterTTYFallback(master *os.File) bool {
 	return false
 }
 
-// tryEnterWaitModel presses Enter and polls the model state until timeout.
-func tryEnterWaitModel(master *os.File, m *TuiModel, d time.Duration) bool {
-	_, _ = master.Write([]byte{'\r'})
-	deadline := time.Now().Add(d)
-	for time.Now().Before(deadline) {
-		if shown, _ := m.IsDetailShown(); shown {
-			return true
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	return false
-}
-
 // enterDetail waits for the detail pane to be shown by pressing Enter and
 // polling the model state (falling back to PTY reads on timeout).
 func enterDetail(t *testing.T, master *os.File, m *TuiModel) {
