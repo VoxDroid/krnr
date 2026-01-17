@@ -16,6 +16,8 @@ Author metadata:
 - `--author-email` (`-e`) optionally sets the author email.
 - If `--author` is not provided, `krnr save` will use the stored `whoami` identity if present.
 
+Quoting & save behavior: The `save` command (v1.2.1) is more tolerant of common shell quoting mistakes. When leftover tokens are detected (for example, when shells split quoted arguments), `save` will join leftover tokens into a single `-c` command or merge them into an existing single `-c` value when appropriate. For simple `findstr /C:` patterns it will attempt to reinsert expected quotes so the saved command better matches user intent. Prefer providing command values as a single quoted `-c` when possible; see `docs/releases/v1.2.1.md` for details.
+
 ## whoami
 
 `krnr whoami set --name "Your Name" [--email "you@example.com"]` — store a default author identity for future `save` operations.

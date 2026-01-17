@@ -3,6 +3,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.1 - 2026-01-17
+
+- CLI: **save** — Enhanced the `krnr save` command to better handle shell quoting mistakes by joining or merging split command arguments (e.g., when shells split embedded quotes) and heuristically reinserting `/C:"pattern"` quoting for common `findstr` usages. Adds robust argument splitting via `github.com/kballard/go-shellquote` and new unit tests.
+- Executor: On Windows, the executor now directly handles simple `A | findstr ...` pipelines by executing the left command and piping its stdout into `findstr` without invoking `cmd.exe`, avoiding fragile cmd parsing/quoting issues.
+- Tests & Quality: New tests covering save/merge behavior and Windows `findstr` pipeline execution added; cyclomatic complexity and linter issues addressed.
+- Docs & Release Notes: Update `docs/cli.md`, `docs/releases/v1.2.1.md`, and `RELEASE_NOTES/GITHUB_v1.2.1.md` to document these changes.
+
 ## v1.2.0 - 2026-01-17
 
 - UI: **TUI initial release (v1.2.0)** — The Terminal UI (`krnr tui`) is now available as an interactive entrypoint. Initial release focuses on delivering interactive parity for common CLI workflows while keeping the CLI as the canonical, scriptable surface.

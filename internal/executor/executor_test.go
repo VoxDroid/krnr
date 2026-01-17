@@ -3,6 +3,7 @@ package executor
 import (
 	"bytes"
 	"context"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -98,5 +99,63 @@ func TestShellInvocationPowershellMapping(t *testing.T) {
 		if !strings.Contains(strings.ToLower(shell), "pwsh") {
 			t.Fatalf("expected pwsh on non-Windows, got: %q", shell)
 		}
+	}
+}
+
+func TestExecute_Exit1ButHasStdout_ShouldSucceed(t *testing.T) {
+	// Use a shell that supports `exit` and `echo`; if 'sh' isn't available on
+	// Windows CI skip the test.
+	e := &Executor{}
+	if runtime.GOOS == "windows" {
+		if p, err := exec.LookPath("sh"); err == nil {
+			e.Shell = p
+		} else {
+			t.Skip("sh not available, skipping test")
+		}
+	}
+
+	var out bytes.Buffer
+	var errb bytes.Buffer
+	if err := e.Execute(context.Background(), "echo hello; exit 1", "", &out, &errb); err != nil {
+		t.Fatalf("expected nil error for exit 1 with stdout, got: %v", err)
+	}
+	if !strings.Contains(out.String(), "hello") {
+		t.Fatalf("expected 'hello' in stdout, got: %q", out.String())
+	}
+}
+
+func TestExecute_Exit2WithStdout_ShouldReturnError(t *testing.T) {
+	// Confirm that non-1 exit codes remain fatal even if stdout is present.
+	e := &Executor{}
+	if runtime.GOOS == "windows" {
+		if p, err := exec.LookPath("sh"); err == nil {
+			e.Shell = p
+		} else {
+			t.Skip("sh not available, skipping test")
+		}
+	}
+
+	var out bytes.Buffer
+	var errb bytes.Buffer
+	if err := e.Execute(context.Background(), "echo bye; exit 2", "", &out, &errb); err == nil {
+		t.Fatalf("expected error for exit 2 even with stdout")
+	}
+}
+
+func TestExecute_FindstrPipeline_Windows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("windows-only test")
+	}
+	ctx := context.Background()
+	e := &Executor{}
+	var out, errb bytes.Buffer
+	// left side runs two echoes inside a cmd /C so we can produce two lines
+	command := "cmd /C \"echo OS Name & echo OS Version\" | findstr /C:\"OS Name\" /C:\"OS Version\""
+	if err := e.Execute(ctx, command, "", &out, &errb); err != nil {
+		t.Fatalf("Execute pipeline failed: %v, stderr: %q", err, errb.String())
+	}
+	normalized := strings.ReplaceAll(strings.TrimSpace(out.String()), "\r\n", "\n")
+	if !strings.Contains(normalized, "OS Name") || !strings.Contains(normalized, "OS Version") {
+		t.Fatalf("expected findstr to match both lines, got: %q", normalized)
 	}
 }

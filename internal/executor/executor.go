@@ -2,12 +2,15 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/kballard/go-shellquote"
 )
 
 // Executor runs shell commands in an OS-aware way.
@@ -103,11 +106,17 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 		return err
 	}
 
-	if e.DryRun {
-		if e.Verbose {
-			_, _ = fmt.Fprintf(stdout, "dry-run: %s\n", command)
-		}
+	// Handle dry-run early
+	if handled := e.handleDryRunIfNeeded(command, stdout); handled {
 		return nil
+	}
+
+	// On Windows try a specialized handler for `| findstr ...` pipelines
+	// to avoid cmd.exe's quoting pitfalls. If it succeeds, we're done.
+	if runtime.GOOS == "windows" {
+		if tryHandleWindowsFindstr(ctx, command, cwd, stdout, stderr) {
+			return nil
+		}
 	}
 
 	shell, args := shellInvocation(command, e.Shell)
@@ -115,29 +124,208 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, shell, args...)
-	if cwd != "" {
-		cmd.Dir = cwd
-	}
-	// On Windows, some shells may emit backslash-escaped quotes (\") so
-	// wrap the writers with a filter that unescapes them for friendlier output.
-	if runtime.GOOS == "windows" {
-		cmd.Stdout = &unescapeWriter{w: stdout}
-		cmd.Stderr = &unescapeWriter{w: stderr}
-	} else {
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-	}
+	bout, berr, err := runShellCommand(ctx, shell, args, cwd)
 
-	if err := cmd.Run(); err != nil {
-		// Wrap the error with shell information to make the cause clearer to users
-		return fmt.Errorf("command failed: %w (shell=%s args=%q)", err, shell, args)
+	writeOutputs(bout, berr, stdout, stderr)
+
+	if err != nil {
+		return checkExecutionError(err, bout, berr, shell, args)
 	}
 	return nil
 }
 
 // shellInvocation returns the shell executable and arguments for the platform.
 // Optional `override` lets callers request alternate shell (e.g., pwsh).
+// splitArgs splits a command string into tokens respecting single and double
+// quotes. It removes the surrounding quotes from quoted tokens (so
+// `/C:\"OS Name\"` becomes `/C:OS Name` as a single token).
+func splitArgs(s string) []string {
+	// Prefer a robust third-party splitter that understands quoted tokens.
+	if toks, err := shellquote.Split(s); err == nil {
+		return toks
+	}
+	// Fall back to simple whitespace splitting if the splitter fails.
+	return strings.Fields(s)
+}
+
+// handleWindowsFindstrPipeline detects simple pipelines of the form
+// `<left> | findstr <args...>` and executes them without invoking the
+// shell, piping stdout from the left command into the findstr process.
+// This avoids cmd.exe's tricky quoting behavior for /C:"..." patterns.
+func handleWindowsFindstrPipeline(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
+	leftTokens, findstrExe, findstrArgs, err := parseFindstrPipeline(command)
+	if err != nil {
+		return err
+	}
+	return runFindstrPipeline(ctx, leftTokens, findstrExe, findstrArgs, cwd, stdout, stderr)
+}
+
+func parseFindstrPipeline(command string) ([]string, string, []string, error) {
+	parts := strings.SplitN(command, "|", 2)
+	if len(parts) != 2 {
+		return nil, "", nil, fmt.Errorf("not a pipeline")
+	}
+	left := strings.TrimSpace(parts[0])
+	right := strings.TrimSpace(parts[1])
+	if len(right) < 7 || strings.ToLower(right[:7]) != "findstr" {
+		return nil, "", nil, fmt.Errorf("not a findstr pipeline")
+	}
+	leftTokens := splitArgs(left)
+	rightTokens := splitArgs(right)
+	if len(leftTokens) == 0 || len(rightTokens) == 0 {
+		return nil, "", nil, fmt.Errorf("invalid pipeline tokens")
+	}
+	findstrArgs := normalizeFindstrArgs(rightTokens[1:])
+	return leftTokens, rightTokens[0], findstrArgs, nil
+}
+
+func normalizeFindstrArgs(tokens []string) []string {
+	var out []string
+	for i := 0; i < len(tokens); i++ {
+		t := tokens[i]
+		if strings.HasPrefix(strings.ToUpper(t), "/C:") {
+			arg := t
+			if arg == "/C:" && i+1 < len(tokens) {
+				i++
+				arg = arg + tokens[i]
+			} else if !strings.Contains(arg, " ") && i+1 < len(tokens) && !strings.HasPrefix(strings.ToUpper(tokens[i+1]), "/C:") {
+				i++
+				arg = arg + " " + tokens[i]
+			}
+			out = append(out, arg)
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+func runFindstrPipeline(ctx context.Context, leftTokens []string, findstrExe string, findstrArgs []string, cwd string, stdout io.Writer, stderr io.Writer) error {
+	leftCmd := exec.CommandContext(ctx, leftTokens[0], leftTokens[1:]...)
+	if cwd != "" {
+		leftCmd.Dir = cwd
+	}
+	leftStdout, err := leftCmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	findCmd := exec.CommandContext(ctx, findstrExe, findstrArgs...)
+	if cwd != "" {
+		findCmd.Dir = cwd
+	}
+	findCmd.Stdin = leftStdout
+	var bout, berr bytes.Buffer
+	findCmd.Stdout = &bout
+	findCmd.Stderr = &berr
+
+	if err := leftCmd.Start(); err != nil {
+		return err
+	}
+	if err := findCmd.Start(); err != nil {
+		_ = leftCmd.Process.Kill()
+		return err
+	}
+
+	leftErr := leftCmd.Wait()
+	_ = leftStdout.Close()
+	findErr := findCmd.Wait()
+
+	_, _ = stdout.Write(bout.Bytes())
+	_, _ = stderr.Write(berr.Bytes())
+
+	if err := reportPipelineResult(&bout, &berr, findErr, strings.Join(append(leftTokens, findstrExe), " | ")); err != nil {
+		return err
+	}
+	_ = leftErr
+	return nil
+}
+
+func reportPipelineResult(bout *bytes.Buffer, berr *bytes.Buffer, findErr error, pipelineDesc string) error {
+	if findErr != nil {
+		if exitErr, ok := findErr.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 && bout.Len() > 0 {
+				return nil
+			}
+		}
+		outStr := strings.TrimSpace(bout.String())
+		errStr := strings.TrimSpace(berr.String())
+		if outStr != "" || errStr != "" {
+			return fmt.Errorf("command failed: %w (pipeline=%q stdout=%q stderr=%q)", findErr, pipelineDesc, outStr, errStr)
+		}
+		return fmt.Errorf("command failed: %w (pipeline=%q)", findErr, pipelineDesc)
+	}
+	return nil
+}
+
+// runShellCommand executes a command by running the given executable and
+// arguments, returning captured stdout/stderr buffers along with any error.
+func runShellCommand(ctx context.Context, shell string, args []string, cwd string) (*bytes.Buffer, *bytes.Buffer, error) {
+	cmd := exec.CommandContext(ctx, shell, args...)
+	if cwd != "" {
+		cmd.Dir = cwd
+	}
+	var bout, berr bytes.Buffer
+	cmd.Stdout = &bout
+	cmd.Stderr = &berr
+	if err := cmd.Run(); err != nil {
+		return &bout, &berr, err
+	}
+	return &bout, &berr, nil
+}
+
+// tryHandleWindowsFindstr inspects the command to see if it looks like a
+// `A | findstr ...` pipeline and, if so, tries to handle it. Returns true
+// if the pipeline was handled successfully.
+func tryHandleWindowsFindstr(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) bool {
+	if !strings.Contains(command, "|") {
+		return false
+	}
+	rhs := strings.TrimSpace(strings.SplitN(command, "|", 2)[1])
+	if !strings.HasPrefix(strings.ToLower(rhs), "findstr") {
+		return false
+	}
+	if err := handleWindowsFindstrPipeline(ctx, command, cwd, stdout, stderr); err == nil {
+		return true
+	}
+	return false
+}
+
+func (e *Executor) handleDryRunIfNeeded(command string, stdout io.Writer) bool {
+	if e.DryRun {
+		if e.Verbose {
+			_, _ = fmt.Fprintf(stdout, "dry-run: %s\n", command)
+		}
+		return true
+	}
+	return false
+}
+
+func writeOutputs(bout, berr *bytes.Buffer, stdout io.Writer, stderr io.Writer) {
+	if runtime.GOOS == "windows" {
+		_, _ = (&unescapeWriter{w: stdout}).Write(bout.Bytes())
+		_, _ = (&unescapeWriter{w: stderr}).Write(berr.Bytes())
+	} else {
+		_, _ = stdout.Write(bout.Bytes())
+		_, _ = stderr.Write(berr.Bytes())
+	}
+}
+
+func checkExecutionError(err error, bout, berr *bytes.Buffer, shell string, args []string) error {
+	// If the process exited with status 1 but produced stdout, treat
+	// that as a non-fatal condition.
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		if exitErr.ExitCode() == 1 && bout.Len() > 0 {
+			return nil
+		}
+	}
+	outStr := strings.TrimSpace(bout.String())
+	errStr := strings.TrimSpace(berr.String())
+	if outStr != "" || errStr != "" {
+		return fmt.Errorf("command failed: %w (shell=%s args=%q stdout=%q stderr=%q)", err, shell, args, outStr, errStr)
+	}
+	return fmt.Errorf("command failed: %w (shell=%s args=%q)", err, shell, args)
+}
+
 func shellInvocation(command string, overrideShell string) (string, []string) {
 	if overrideShell != "" {
 		// Handle PowerShell variants explicitly so users can request the
