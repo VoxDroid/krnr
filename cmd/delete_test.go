@@ -2,13 +2,23 @@ package cmd
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/VoxDroid/krnr/internal/config"
 	"github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/registry"
 )
 
 func TestDeleteCommand_PromptsAndDeletesWhenConfirmed(t *testing.T) {
+	// Use a test-specific DB file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, dbPath)
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
@@ -37,6 +47,13 @@ func TestDeleteCommand_PromptsAndDeletesWhenConfirmed(t *testing.T) {
 }
 
 func TestDeleteCommand_AbortsOnNo(t *testing.T) {
+	// Use a test-specific DB file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, dbPath)
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
@@ -68,6 +85,13 @@ func TestDeleteCommand_AbortsOnNo(t *testing.T) {
 }
 
 func TestDeleteCommand_SkipsPromptWithYesFlag(t *testing.T) {
+	// Use a test-specific DB file to avoid collisions when tests run concurrently
+	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, dbPath)
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
