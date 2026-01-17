@@ -68,10 +68,3 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 - Tests: `cmd/tui/ui/tui_test.go` (headless), `cmd/tui/ui/pty_e2e_test.go` (PTY E2E)
 - Docs: `docs/cli.md` (TUI section), `docs/releases/v1.2.0.md`
 
----
-
-## Notes / Next owner items
-
-- I will implement the Create/Save modal or visual polish next depending on your priority — tell me whether you prefer color/styling parity first or the interactive create flow.
-
----

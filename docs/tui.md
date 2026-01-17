@@ -63,5 +63,3 @@ Milestones
 Notes
 - Keep adapters small and easily mockable; prefer returning channels of typed events to tight-coupling the UI.
 - Avoid UI logic in adapters; adapters should translate domain operations into simple primitives (list, get, run, stream, cancel).
-
-"Next steps": define exact Go interfaces and add a minimal `internal/tui` package with tests and a simple mock. (I'll create these now.)

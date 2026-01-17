@@ -152,5 +152,3 @@ If you'd like, we can automate manifest replacement and PR submission on release
 - Which exact per-user location on macOS do we prefer? (`~/bin` vs `~/.local/bin`) — choose consistent cross-platform default (use `$HOME/.local/bin` for consistency).
 
 ---
-
-If this looks good, I'll implement the CLI scaffold and add unit tests for `--dry-run` and path-shell editing behaviors next. Otherwise tell me what to adjust in the design.

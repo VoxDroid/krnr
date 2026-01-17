@@ -33,5 +33,3 @@ krnr defaults to **safe execution**: it will not run obviously destructive comma
 - For automation (CI), use `--force` only in controlled runners and ensure CI secrets are protected by the platform.
 
 ---
-
-If you want, I can add the CI scanning jobs and pre-commit hooks now (I recommend starting with `govulncheck` + `gosec`, and a simple pre-commit rule to detect common token patterns).

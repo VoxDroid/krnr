@@ -342,11 +342,8 @@ func (m *TuiModel) renderMenu() string {
 	title := "Menu"
 	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")).Render(title))
 	b.WriteString("\n\n")
-	if m.width >= 80 {
-		b.WriteString(m.renderMenuTwoCol())
-	} else {
-		b.WriteString(m.renderMenuSingleCol())
-	}
+	// Use a single-column menu for a cleaner, consistent layout.
+	b.WriteString(m.renderMenuSingleCol())
 	if m.menuInputMode {
 		b.WriteString("\n")
 		b.WriteString(m.renderMenuInputPrompt())
@@ -354,74 +351,27 @@ func (m *TuiModel) renderMenu() string {
 	return b.String()
 }
 
-func (m *TuiModel) renderMenuTwoCol() string {
-	leftLines, rightLines := m.menuSplitColumns()
-	maxLeft := m.menuMaxLeftWidth(leftLines)
-	return m.menuRenderPaired(leftLines, rightLines, maxLeft)
-}
 
-func (m *TuiModel) menuSplitColumns() ([]string, []string) {
-	leftLines := []string{}
-	rightLines := []string{}
-	for i, it := range m.menuItems {
-		line := it
-		if i == m.menuIndex {
-			line = "> " + line
-		} else {
-			line = "  " + line
-		}
-		if i%2 == 0 {
-			leftLines = append(leftLines, line)
-		} else {
-			rightLines = append(rightLines, line)
-		}
-	}
-	return leftLines, rightLines
-}
-
-func (m *TuiModel) menuMaxLeftWidth(leftLines []string) int {
-	maxLeft := 0
-	for _, l := range leftLines {
-		if utf8.RuneCountInString(l) > maxLeft {
-			maxLeft = utf8.RuneCountInString(l)
-		}
-	}
-	return maxLeft
-}
-
-func (m *TuiModel) menuRenderPaired(leftLines, rightLines []string, maxLeft int) string {
-	var b strings.Builder
-	n := len(leftLines)
-	if len(rightLines) > n {
-		n = len(rightLines)
-	}
-	for i := 0; i < n; i++ {
-		l := ""
-		if i < len(leftLines) {
-			l = leftLines[i]
-		}
-		r := ""
-		if i < len(rightLines) {
-			r = rightLines[i]
-		}
-		// pad left to maxLeft
-		if utf8.RuneCountInString(l) < maxLeft {
-			l = l + strings.Repeat(" ", maxLeft-utf8.RuneCountInString(l))
-		}
-		b.WriteString(l + "  " + r + "\n")
-	}
-	return b.String()
-}
 
 func (m *TuiModel) renderMenuSingleCol() string {
 	var b strings.Builder
+	// Compute maximum item width so we can pad items to a consistent length
+	maxWidth := 0
+	for _, it := range m.menuItems {
+		if l := utf8.RuneCountInString(it); l > maxWidth {
+			maxWidth = l
+		}
+	}
+	// Style for selected item: bold with a visible background and dark foreground
+	selStyle := lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("#fde047")).Foreground(lipgloss.Color("#000000"))
 	for i, it := range m.menuItems {
-		prefix := "  "
+		padded := it + strings.Repeat(" ", maxWidth-utf8.RuneCountInString(it))
+		// Add a single space of padding around the text for visual breathing room
+		row := " " + padded + " "
 		if i == m.menuIndex {
-			prefix = "> "
-			b.WriteString(lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("#fde047")).Render(prefix + it))
+			b.WriteString(selStyle.Render(row))
 		} else {
-			b.WriteString(prefix + it)
+			b.WriteString(row)
 		}
 		b.WriteString("\n")
 	}

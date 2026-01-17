@@ -203,5 +203,3 @@ echo "Demo completed and cleaned up."
   - `krnr run demo | Out-String -Stream | Select-String "Demo done"`
 
 ---
-
-Generated on 2026-01-11 — ready to use demo sequences for CI or local testing.
