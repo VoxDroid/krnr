@@ -17,9 +17,23 @@ _Record. Automate. Run._
 - **Aliases**: Fast to add but per-shell and hard to discover or share.
 - **Dotfiles / Scripts**: Flexible but scattered; sharing requires a repo or manual copying.
 - **Task Runners** (Make, npm scripts): Great for project tasks but scoped to a repository.
-- **krnr**: Global and cross-machine, highly discoverable (fuzzy search + `tui`), built-in snapshots & rollbacks, and simple to share via `export` / `import`.
+- **krnr**: Global and cross-machine (see below), highly discoverable (fuzzy search + `tui`), built-in snapshots & rollbacks, and simple to share via `export` / `import`.
 
 ---
+
+### Why not just an alias or a shell script? 
+
+- **Aliases** - Fast to add, but per‑shell and per‑machine. They live in whichever RC file you edited and are invisible to others unless you share your dotfiles manually. Hard to discover across many short‑lived aliases.
+- **Shell scripts / dotfiles** - Flexible and shareable, but scattered. To share you need a repo, copy instructions, or a package. Scripts don’t include author/metadata, versioned history for the command itself, or a simple, interactive discovery UI.
+- **git** - Excellent for source control and team collaboration, but file‑centric: commits operate on files, not on discoverable, runnable command sets. Git workflows require manual commits and searches; they aren’t optimized for quick ad hoc rollbacks or interactive discovery of hundreds of tiny workflows.
+
+### How krnr helps 
+
+- **Global (per‑user, per‑machine)** - krnr stores a single, versioned SQLite registry in your user config path (see `KRNR_HOME`), so any shell on your machine (bash, zsh, PowerShell, TUI, CI sessions) can access the same saved workflows without per‑shell setup.
+- **Cross‑machine** — Use `krnr export` to produce a portable SQLite file (whole DB or selected sets) and `krnr import` on another machine. Exports are single files with metadata, timestamps, authorship, and configurable conflict policies (`--on-conflict` rename|skip|overwrite|merge) to avoid clobbering local setups.
+- **Discoverability & ergonomics** - Fuzzy search (`krnr list --filter <text> --fuzzy`), tags, and `krnr tui` make finding the right workflow faster than grepping dotfiles or commit histories.
+- **Built‑in snapshots & rollbacks** - Every change creates a version snapshot; inspect with `krnr history <name>` and revert with `krnr rollback <name> --version <n>`. This is faster and more focused for workflow recovery than making a git commit for every change.
+- **Better than sharing raw scripts** - Exported artifacts are self‑contained and include history, parameters, and import options, so an imported workflow behaves the same as the original and can be merged intelligently.
 
 ## Why krnr?
 
