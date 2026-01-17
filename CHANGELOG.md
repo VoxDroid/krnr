@@ -3,6 +3,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.2 - 2026-01-17
+
+- Bugfix: Preserve comma-containing commands passed via a single `-c` flag (e.g., PowerShell `Select-Object` usage such as `Get-ComputerInfo | Select-Object OsName, OsVersion, OsArchitecture`). The CLI no longer splits a single `-c` value on commas — instead we use repeatable `-c` flags (`StringArray`) and ensure a single quoted `-c` is preserved literally.
+- Internal: Switch `-c` command flags from `StringSlice` (which splits on commas) to `StringArray` to avoid unintended splitting; update retrieval functions accordingly and add unit tests to validate behavior.
+- Tests: Add `TestSaveCommand_PreservesCommasInFlag` and update save-related tests to be robust across Windows-style inputs and quoting edge cases.
+- Docs: Update `docs/cli.md` and add release notes for v1.2.2 describing the change and upgrade guidance.
+
 ## v1.2.1 - 2026-01-17
 
 - CLI: **save** — Enhanced the `krnr save` command to better handle shell quoting mistakes by joining or merging split command arguments (e.g., when shells split embedded quotes) and heuristically reinserting `/C:"pattern"` quoting for common `findstr` usages. Adds robust argument splitting via `github.com/kballard/go-shellquote` and new unit tests.

@@ -19,7 +19,7 @@ var editCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
-		cmdsFlags, _ := cmd.Flags().GetStringSlice("command")
+		cmdsFlags, _ := cmd.Flags().GetStringArray("command")
 
 		dbConn, err := db.InitDB()
 		if err != nil {
@@ -89,6 +89,6 @@ var editCmd = &cobra.Command{
 }
 
 func init() {
-	editCmd.Flags().StringSliceP("command", "c", []string{}, "Replace commands non-interactively (use multiple times)")
+	editCmd.Flags().StringArrayP("command", "c", []string{}, "Replace commands non-interactively (use multiple times)")
 	rootCmd.AddCommand(editCmd)
 }

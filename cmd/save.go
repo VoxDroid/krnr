@@ -23,7 +23,7 @@ Note: When using Windows shells, be sure to properly quote embedded double-quote
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 		desc, _ := cmd.Flags().GetString("description")
-		cmds, _ := cmd.Flags().GetStringSlice("command")
+		cmds, _ := cmd.Flags().GetStringArray("command")
 		// If the user accidentally allowed the shell to split a quoted
 		// command into multiple positionals, join the remaining args into a
 		// single command. If exactly one `-c` was provided, merge the
@@ -161,7 +161,7 @@ func normalizeFindstrCArgs(s string) string {
 
 func init() {
 	saveCmd.Flags().StringP("description", "d", "", "Description for the command set")
-	saveCmd.Flags().StringSliceP("command", "c", []string{}, "Command to add to the set (can be repeated)")
+	saveCmd.Flags().StringArrayP("command", "c", []string{}, "Command to add to the set (can be repeated)")
 	saveCmd.Flags().StringP("author", "a", "", "Author name for this command set (overrides stored whoami)")
 	saveCmd.Flags().StringP("author-email", "e", "", "Author email for this command set (optional)")
 	rootCmd.AddCommand(saveCmd)

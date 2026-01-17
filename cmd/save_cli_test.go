@@ -54,7 +54,7 @@ func TestSaveWithSplitArgs_MergeIntoSingle(t *testing.T) {
 	// the flag parser returning a single command element and the CLI args
 	// holding the remaining tokens.
 	local := &cobra.Command{RunE: saveCmd.RunE, Args: saveCmd.Args}
-	local.Flags().StringSliceP("command", "c", []string{}, "Command to add to the set (can be repeated)")
+	local.Flags().StringArrayP("command", "c", []string{}, "Command to add to the set (can be repeated)")
 	if err := local.Flags().Set("command", "systeminfo | findstr /C:"); err != nil {
 		t.Fatalf("set flag: %v", err)
 	}
@@ -84,5 +84,43 @@ func TestSaveWithSplitArgs_MergeIntoSingle(t *testing.T) {
 	expected := "systeminfo | findstr /C:\"OS Name\" /C:\"OS Version\""
 	if cs.Commands[0].Command != expected {
 		t.Fatalf("expected merged and normalized command %q, got %q", expected, cs.Commands[0].Command)
+	}
+}
+
+func TestSaveCommand_PreservesCommasInFlag(t *testing.T) {
+	_ = setupTempDB(t)
+	// Ensure no pre-existing set with the same name
+	dbConn, err := db.InitDB()
+	if err != nil {
+		t.Fatalf("InitDB(): %v", err)
+	}
+	defer func() { _ = dbConn.Close() }()
+	r2 := registry.NewRepository(dbConn)
+	_ = r2.DeleteCommandSet("PS-preserve-comma")
+
+	// Simulate: krnr save PS-preserve-comma -c "Get-ComputerInfo | Select-Object OsName, OsVersion, OsArchitecture"
+	rootCmd.SetArgs([]string{"save", "PS-preserve-comma", "-c", "Get-ComputerInfo | Select-Object OsName, OsVersion, OsArchitecture"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	// Verify the command set exists and the command was preserved as a single entry
+	cs, err := r2.GetCommandSetByName("PS-preserve-comma")
+	if err != nil {
+		t.Fatalf("GetCommandSetByName: %v", err)
+	}
+	if cs == nil {
+		t.Fatalf("expected saved command set 'PS-preserve-comma' in DB")
+	}
+	expected := "Get-ComputerInfo | Select-Object OsName, OsVersion, OsArchitecture"
+	found := false
+	for _, c := range cs.Commands {
+		if c.Command == expected {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected preserved command %q to be present in commands, got: %+v", expected, cs.Commands)
 	}
 }

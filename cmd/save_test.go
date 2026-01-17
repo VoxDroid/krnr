@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -24,10 +23,13 @@ func TestSaveCommand_SavesCommands(t *testing.T) {
 	// use a fresh command with its own FlagSet to avoid global flag state
 	local := &cobra.Command{RunE: saveCmd.RunE, Args: saveCmd.Args}
 	local.Flags().StringP("description", "d", "", "Description for the command set")
-	local.Flags().StringSliceP("command", "c", []string{}, "Command to add to the set (can be repeated)")
+	local.Flags().StringArrayP("command", "c", []string{}, "Command to add to the set (can be repeated)")
 	local.Flags().StringP("author", "a", "", "Author name for this command set (overrides stored whoami)")
 	local.Flags().StringP("author-email", "e", "", "Author email for this command set (optional)")
-	if err := local.Flags().Set("command", "echo save1,echo save2"); err != nil {
+	if err := local.Flags().Set("command", "echo save1"); err != nil {
+		t.Fatalf("set flag: %v", err)
+	}
+	if err := local.Flags().Set("command", "echo save2"); err != nil {
 		t.Fatalf("set flag: %v", err)
 	}
 
@@ -70,12 +72,14 @@ func runSaveWithInput(t *testing.T, initialName string, stdin string, commands [
 
 	local := &cobra.Command{RunE: saveCmd.RunE, Args: saveCmd.Args}
 	local.Flags().StringP("description", "d", "", "Description for the command set")
-	local.Flags().StringSliceP("command", "c", []string{}, "Command to add to the set (can be repeated)")
+	local.Flags().StringArrayP("command", "c", []string{}, "Command to add to the set (can be repeated)")
 	local.Flags().StringP("author", "a", "", "Author name for this command set (overrides stored whoami)")
 	local.Flags().StringP("author-email", "e", "", "Author email for this command set (optional)")
 	local.SetIn(bytes.NewBufferString(stdin))
-	if err := local.Flags().Set("command", strings.Join(commands, ",")); err != nil {
-		t.Fatalf("set flag: %v", err)
+	for _, c := range commands {
+		if err := local.Flags().Set("command", c); err != nil {
+			t.Fatalf("set flag: %v", err)
+		}
 	}
 
 	if err := local.RunE(local, []string{initialName}); err != nil {
