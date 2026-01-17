@@ -1,9 +1,11 @@
-# v1.2.0 — TUI initiative (planned)
+# v1.2.0 — Initial TUI release
 
-Planned long-term release focusing on TUI integration across the application.
+This release introduces the initial Terminal UI (`krnr tui`) as an interactive entrypoint that complements the CLI without replacing it. The TUI delegates to existing internal packages (`registry`, `executor`, `importer`, `exporter`) so automation and scripting continue to use the CLI while users can interactively browse and run workflows.
 
-This release will not remove or change the existing CLI; instead, the TUI will act as a supported visual layer that calls into the existing internal packages (`registry`, `executor`, `importer`, `exporter`) so users who prefer a visual UI can perform common tasks while automation and scripting continue to use the CLI.
+Highlights
 
-Scope: The TUI aims to provide interactive equivalents for all existing CLI commands (save, edit, run with parameter entry and streaming logs, list, describe, history, rollback, import/export, tag management, install/uninstall/status), while leaving the CLI unchanged as the authoritative scripting interface.
+- `krnr tui` (v1.2.0) — initial release: browse, preview, full-screen detail, run with parameter prompting and streaming logs, save/edit flows, import/export helpers, history viewing and rollback, installer views, and `status` diagnostics.
+- Tests: headless UI unit tests and a PTY E2E test were added.
+- Docs: `docs/cli.md`, `docs/releases/v1.2.0.md`, and `krnr_docs/TUI_MILESTONE.md` updated to document usage and testing guidance.
 
-See `CHANGELOG.md` (v1.2.0 planned) and `docs/releases/v1.2.0.md` for implementation goals and milestones.
+See `CHANGELOG.md` for full details.

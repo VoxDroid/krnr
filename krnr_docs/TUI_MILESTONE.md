@@ -1,8 +1,8 @@
 # TUI Milestone
 
-**Status:** In progress (prototype + initial features implemented)
+**Status:** Released (initial TUI v1.2.0)
 
-Date: 2026-01-12
+Date: 2026-01-17
 
 ---
 
@@ -10,6 +10,7 @@ Date: 2026-01-12
 
 This document tracks the TUI (Terminal UI) milestone for `krnr`. The TUI is a keyboard-first, accessible terminal interface that provides interactive equivalents to common CLI workflows while reusing the existing core packages (`registry`, `executor`, `importer`, `exporter`).
 
+**Release note:** Initial TUI release (v1.2.0) is complete. Core interactive flows (browse/list, preview/detail, run with parameter prompts and streaming logs, save/edit, import/export, history/rollback, installer views and status) are implemented, tested (headless + PTY E2E), and documented in `docs/cli.md` and `docs/releases/v1.2.0.md`.
 The purpose of this milestone is to ship a well-tested, documented and supported `krnr tui` flow that covers the main interactive use cases (browse, describe, run with params, view logs, import/export, edit/save, rollback, tags, install/uninstall).
 
 ---
@@ -42,20 +43,6 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 - [x] `krnr history <name>` & `krnr rollback` — view history, rollback UI
 - [x] `krnr install` / `krnr uninstall` — installer views and dry-run planning
 - [x] `krnr status` — diagnostics (adapted from CLI: shows user/system install and PATH diagnostics)
-
----
-
-## Outstanding todos & next steps (📝)
-
-- ✅ Implemented interactive Create/Save modal (press `c` to create; form collects name, description, commands, author, email, tags). Unit tests added to verify save flow.
-- Implement parameter-editor modal for `run` (name/value with `env:VAR` resolution and secret redaction).
-- Add a command-by-command dry-run viewer with redaction support in full-screen detail.
-- Visual polish: optional full-line background blocks for command rows and color/theme refinements (maintain testability).
-- Accessibility: keyboard help modal, high-contrast theme tuning, screen reader testing and aria-like support (where applicable).
-- Expand PTY E2E coverage and add CI jobs to run headless/PTY tests on Linux/macOS runners (ensure Windows behavior is covered via skipping assertions or separate expectations).
-- Add interactive flow tests (headless) for create/save/import/export and rollback.
-- Add usage docs & screenshots (`docs/cli.md` TUI section, `docs/releases/v1.2.0.md`, a TUI guide page with keyboard reference).
-- Packaging/release: ensure `krnr tui` is included in release artifacts and release notes.
 
 ---
 

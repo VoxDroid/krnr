@@ -3,20 +3,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## v1.2.0 - 2026-01-12 (planned)
+## v1.2.0 - 2026-01-17
 
-- UI: **TUI initiative (long-term)** — begin a sustained effort to provide a first-class, keyboard-first Terminal User Interface that complements the existing CLI. The goal is to allow users to perform common workflows (browse, describe, run with parameters, rollback, import/export, history, edit, tag management) using interactive screens while keeping the CLI as the canonical, scriptable interface.
-  - Implementation approach: the TUI will be implemented as a support layer that *reuses existing internal packages* (`registry`, `executor`, `importer`, `exporter`) rather than re-implementing business logic. Initial prototype is Bubble Tea based and available as `cmd/tui` (PoC: list + detail).
-  - Planned steps:
-    - Design `internal/tui` adapters and component architecture to avoid duplication and keep logic testable.
-    - Expand prototype components (list, detail, run modal, logs viewport, confirmations, search/filter).
-    - Add headless UI tests (pseudo-tty) and CI jobs across Windows/Linux/macOS.
-    - Add accessibility and theming (high-contrast, keyboard help, screen-reader considerations).
-    - Document `krnr tui` usage and add release notes and packaging adjustments.
-  - Parity: The TUI aims to provide interactive equivalents for the existing CLI commands and workflows, including but not limited to: `save`, `edit`, `run` (with parameter editor and streaming logs), `list`, `describe`, `history`, `rollback`, `import/export`, `tag` management, `install`/`uninstall`, and `status`.
-  - Milestone doc: `krnr_docs/TUI_MILESTONE.md` added with a detailed checklist and status notes.
-  - Acceptance: Prototype (list+detail+run modal) exists; `krnr tui` is documented in `docs/cli.md`; UI models are unit-tested; CI includes headless UI checks; users can complete the same interactive tasks via the TUI that are available in the CLI (parity for interactive workflows).
-  - Recent progress: deterministic two-column renderer, preview selection updates, Init population, run streaming, headless UI tests and PTY E2E test (skips on unsupported platforms).
+- UI: **TUI initial release (v1.2.0)** — The Terminal UI (`krnr tui`) is now available as an interactive entrypoint. Initial release focuses on delivering interactive parity for common CLI workflows while keeping the CLI as the canonical, scriptable surface.
+  - Included features: browse (`list`) with filtering & fuzzy search, preview & full-screen details (`describe`), `run` with parameter prompts and streaming logs viewport, save/create/edit modals, import/export helpers (set & db), history viewing and rollback, installer views (`install`/`uninstall` dry-run planning), and `status` diagnostics.
+  - Implementation: `cmd/tui` (Bubble Tea model) and `internal/tui` adapters reuse existing core packages (`registry`, `executor`, `importer`, `exporter`) and avoid duplicating business logic.
+  - Tests & CI: Headless UI unit tests and PTY-based E2E tests added; CI includes headless TUI checks and PTY E2E runs where supported.
+  - Docs & packaging: `docs/cli.md` documents `krnr tui`; `krnr_docs/TUI_MILESTONE.md` and `docs/releases/v1.2.0.md` updated; release notes and packaging guidance added to `RELEASE_NOTES/GITHUB_v1.2.0.md`.
+  - Acceptance: Users can perform common interactive workflows via `krnr tui` with parity for interactive flows; the CLI remains the authoritative automation interface.
 
 ## v1.1.0 - 2026-01-12
 

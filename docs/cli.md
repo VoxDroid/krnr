@@ -47,7 +47,7 @@ Examples:
 
 `krnr tui`
 
-Starts the interactive terminal UI (TUI) prototype. The TUI provides a keyboard-first interface for browsing command sets.
+Starts the interactive Terminal UI (TUI) — initial release shipped in v1.2.0. The TUI provides a keyboard-first interface for browsing command sets and performing common interactive flows with parity to the CLI.
 
 Shortcuts:
 
@@ -60,13 +60,13 @@ Shortcuts:
 - `r` — run the selected command set (streams output to the right pane)
 - `Ctrl+T` — toggle high-contrast theme (accessibility)
 
-This prototype is implemented using Bubble Tea (`github.com/charmbracelet/bubbletea`) and is intended as an iterative starting point for further UX and feature work.
+This implementation is built using Bubble Tea (`github.com/charmbracelet/bubbletea`) and focuses on reusing existing core packages to remain thin and testable.
 
 Headless tests:
 
 Run `go test ./cmd/tui/... -v` to execute the headless TUI unit tests that simulate key presses and streaming behavior.
 
-Note: The TUI is a long-term initiative (v1.2.0). The goal is to make `krnr tui` a fully-supported, accessible interface that allows interactive browsing and runs while keeping the CLI as the canonical, scriptable interface. See `CHANGELOG.md` (v1.2.0 planned) and `docs/releases/v1.2.0.md` for the initiative plan. For a detailed checklist and current progress see `krnr_docs/TUI_MILESTONE.md`.
+Note: The TUI initial release is available in v1.2.0. See `CHANGELOG.md` and `docs/releases/v1.2.0.md` for release details and `krnr_docs/TUI_MILESTONE.md` for the implementation checklist and testing notes.
 
 ## describe
 

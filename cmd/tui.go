@@ -15,7 +15,7 @@ import (
 
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
-	Short: "Start interactive terminal UI (Bubble Tea prototype)",
+	Short: "Start interactive Terminal UI (initial release v1.2.0)",
 	RunE: func(_ *cobra.Command, _ []string) error {
 		// Init DB
 		dbConn, err := db.InitDB()

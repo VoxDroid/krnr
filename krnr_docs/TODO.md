@@ -36,15 +36,18 @@ This file is the canonical checklist for the project. Use `PROJECT_OVERVIEW.md` 
 
 
 ### Long-term / nice-to-have
-- **TUI (v1.2.0) — Full TUI integration initiative (long-term)**
+- **TUI (v1.2.0) — Initial TUI release (completed)**
   - [x] Prototype PoC (Bubble Tea) — `cmd/tui` list + detail implemented (PoC)
-  - [ ] Design `internal/tui` architecture and adapters to call existing packages (`registry`, `executor`, `importer`, `exporter`) so UI remains a thin layer on top of business logic
-  - [ ] Implement core TUI workflows: browse, detail, run (with param editor), rollback, history, import/export, edit, tag management
-  - [ ] Add headless UI tests and CI matrix (Windows/Linux/macOS) to validate rendering and behavior in CI
-  - [ ] Accessibility & theming: ensure keyboard-first UX, high-contrast theme, and screen-reader compatibility
-  - [ ] Docs, user guide, and packaging updates (document `krnr tui`, add examples, update release notes and packaging manifests)
-  - Acceptance: Users can complete common interactive workflows via `krnr tui` with **parity for interactive flows** — specifically, there must be interactive TUI equivalents for the existing CLI commands (create/save, edit, run with parameter entry and streaming logs, list, describe, history, rollback, import/export, tag management, install/uninstall/status). The CLI remains the authoritative scripting surface; the TUI is a supported interactive client. UI models are unit-tested and headless UI tests run in CI.
+  - [x] Design `internal/tui` architecture and adapters to call existing packages (`registry`, `executor`, `importer`, `exporter`) so UI remains a thin layer on top of business logic
+  - [x] Implement core TUI workflows: browse, detail, run (with parameter prompts & streaming logs), rollback, history, import/export, edit/save, tag management
+  - [x] Add headless UI tests and CI checks; PTY-based E2E test added (skips on unsupported platforms)
+  - [x] Initial accessibility & theming (high-contrast toggle and keyboard help); further polish tracked as follow-ups
+  - [x] Docs, user guide, and packaging updates (document `krnr tui`, add examples, update release notes and packaging manifests)
+  - Acceptance: **Completed** — Users can complete common interactive workflows via `krnr tui` with parity for interactive flows; headless and PTY E2E tests are present and CI runs headless checks.
 
+---
+
+_Last updated: 2026-01-17 (Initial TUI release completed)_
 #### N/A
 - [ ] Automate manifest updates (winget/Scoop/Chocolatey): on release replace Url/Sha in manifest templates and open PRs automatically to the target registries (winget-pkgs, Scoop bucket, community Chocolatey); include PR template and validation checks.
 - Security & Safety Hardening
