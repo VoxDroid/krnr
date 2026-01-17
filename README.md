@@ -1,31 +1,46 @@
-# krnr — Kernel Runner
+# krnr - Kernel Runner
+
+_Record. Automate. Run._
 
 [![CI](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/VoxDroid/krnr/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/VoxDroid/krnr?label=release)](https://github.com/VoxDroid/krnr/releases) [![Downloads](https://img.shields.io/github/downloads/VoxDroid/krnr/total?label=downloads&color=blue)](https://github.com/VoxDroid/krnr/releases) [![Go Version](https://img.shields.io/github/go-mod/go-version/VoxDroid/krnr?label=go)](https://github.com/VoxDroid/krnr) [![License](https://img.shields.io/github/license/VoxDroid/krnr)](LICENSE) [![Go Report Card](https://goreportcard.com/badge/github.com/VoxDroid/krnr)](https://goreportcard.com/report/github.com/VoxDroid/krnr) [![pkg.go.dev](https://pkg.go.dev/badge/github.com/VoxDroid/krnr)](https://pkg.go.dev/github.com/VoxDroid/krnr)
 
-**krnr** is a high-performance, cross-platform CLI that provides a **global, persistent registry of named terminal workflows** backed by SQLite. It eliminates the need for managing scattered shell scripts and non-portable aliases by centralizing your command sets in a versioned, durable database accessible from any directory.
+**krnr** is a fast, cross-platform CLI that turns recurring terminal sequences into first-class, shareable workflows stored in a global, versioned SQLite registry. Save time, reduce one-off scripts and human error, and make your workflows reproducible, discoverable, and portable across machines, teams, and CI systems. It's approachable for everyone, start with a single saved command or the optional interactive TUI; no heavy configuration or background services required.
+
+**Quick comparison - why krnr at a glance:**
+
+- **Aliases**: Fast to add but per-shell and hard to discover or share.
+- **Dotfiles / Scripts**: Flexible but scattered; sharing requires a repo or manual copying.
+- **Task Runners** (Make, npm scripts): Great for project tasks but scoped to a repository.
+- **krnr**: Global and cross-machine, highly discoverable (fuzzy search + `tui`), built-in snapshots & rollbacks, and simple to share via `export` / `import`.
 
 ---
 
 ## Why krnr?
 
-Modern terminal users handle complex sequences across different project roots and operating systems. Standard solutions fall short:
+Automating repeated terminal work often produces scattered scripts, fragile aliases, and per-project task files that are hard to find, maintain, and share. krnr provides a single global execution layer so your commands become:
 
-*   **Shell Scripts**: Require file management, PATH modification, and lack structured metadata.
-*   **Aliases**: Non-portable across machines and invisible within automated workflows.
-*   **Task Runners**: Usually scoped to a specific project directory (e.g., `Makefile`, `package.json`).
+- **Reproducible**: Versioned snapshots, full history and safe rollbacks for confident changes.
+- **Discoverable**: Fuzzy search, tagging, and an interactive TUI make it fast to find the right workflow.
+- **Shareable**: Export/import single-file workflows so teams run the exact same steps.
+- **Safe & Auditable**: Confirmations, streaming logs, and recorded authorship for accountability.
 
-**krnr** introduces a **global execution layer**:
+**Who is it for?** Developers, SREs, operators, data scientists, and anyone who runs repeatable terminal tasks from single one-liners to complex runbooks. krnr is lightweight and approachable: start small with quick saved commands and adopt more features (TUI, versioning, export/import) as your needs grow.
 
-*   **Global Access**: Call your workflows from any path without searching for script files.
-*   **Industrial Infrastructure**: Powered by SQLite for ACID compliance, versioning, and instant full-text search.
-*   **Safety First**: Built-in dry-runs, interactive confirmations, and execution safety checks.
-*   **Portable Logic**: Export and import workflows via single-file SQLite "entries" to share across your team.
+**Use cases**:
+
+* **Onboarding** — ship vetted, runnable workflows for new teammates.
+* **CI parity** — run the same workflow locally and in automation.
+* **Ops Runbooks** — capture maintenance and recovery as executable entries.
+* **Cross-project Tasks** — standardize multi-step builds, deploys, and migrations.
 
 ---
 
 ## Key Features
 
+Designed for everyone: CLI-first power with a discoverable TUI for fast exploration and safe execution. Lightweight, optional, and easy to start with one-liners.
+
 - **Interactive Recording**: Capture complex terminal sessions in real-time with `krnr record`.
+- **Interactive TUI**: `krnr tui` — fully interactive terminal UI to browse, describe, run (with streaming logs), save/edit, import/export, view history/rollbacks, and access installer views.
 - **Dynamic Parameterization**: Inject variables at runtime using `--param key=value` or interactive prompts.
 - **Auto-Versioning**: Every modification creates a version snapshot, allowing for instant rollbacks.
 - **Native Shell Integration**: Intelligently selects the best shell (Bash, PowerShell Core, CMD) for your OS while allowing manual overrides.
@@ -34,6 +49,8 @@ Modern terminal users handle complex sequences across different project roots an
 ---
 
 ## Quick Start
+
+Start small: save and run a single command in seconds; no setup or external services required.
 
 ### 1. Installation
 Install the binary and add it to your PATH automatically:
@@ -131,6 +148,7 @@ Use `--shell <name>` to force a specific executable for a run.
 | `krnr run <name>` | Execute a saved command set safely | `krnr run deploy --confirm -p env=prod` |
 | `krnr list` | List and search saved command sets | `krnr list --filter "deploy" --fuzzy` |
 | `krnr describe <name>`| View detailed command set structure and metadata | `krnr describe build` |
+| `krnr tui` | Launch the interactive TUI to browse, run, edit, import/export, and view history | `krnr tui` |
 | `krnr edit <name>` | Modify a command set using your favorite `$EDITOR` | `krnr edit build` |
 | `krnr delete <name>` | Remove a command set from the registry | `krnr delete legacy --yes` |
 | `krnr history <name>` | View the versioned history of a command set | `krnr history deploy` |
@@ -143,6 +161,19 @@ Use `--shell <name>` to force a specific executable for a run.
 | `krnr version` | Show current version and build info | `krnr version` |
 
 ---
+
+## Alternatives
+
+Quick comparison to common approaches and why **krnr** may be a better fit for general-purpose use:
+
+| Approach | Portability | Discoverability | Versioning | Shareability | Ease to start |
+|---|---|---|---|---|---|
+| **Aliases** | Per-shell only | Low (hard to find) | None | Difficult (per machine) | Very easy (single line) |
+| **Dotfiles / Scripts** | Copying or repo needed | Low (scattered) | Manual | Medium (repo-based) | Easy (manual) |
+| **Task Runners** (Make, npm scripts) | Project-scoped | Project-only | Manual | Medium | Moderate |
+| **krnr** | Global & cross-machine | High — fuzzy search + `tui` | Built-in snapshots & rollbacks | Simple — `export` / `import` | Very easy — `krnr save <name>` |
+
+**krnr** is designed to be approachable: start with a single saved command and adopt the TUI, versioning, and sharing features as needed — no background services or heavy configuration required.
 
 ## Roadmap
 
