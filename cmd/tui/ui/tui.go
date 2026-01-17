@@ -184,294 +184,373 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}()
 
+	dm, cmd := m.handleUpdateMsg(msg)
+	if newM, ok := dm.(*TuiModel); ok {
+		m = newM
+	}
+	return m, cmd
+}
+
+func (m *TuiModel) handleUpdateMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case saveNowMsg:
-		// scheduled save: if edits are still arriving, retry a few times before
-		// performing the save. This avoids races where the delayed save fires
-		// while the PTY is still delivering multi-byte rune sequences.
-		const stabilityWindow = 50 * time.Millisecond
-		const maxRetries = 5
-		if time.Since(m.editor.lastEditAt) < stabilityWindow && m.editor.saveRetries < maxRetries {
-			m.editor.saveRetries++
-			return m, tea.Tick(stabilityWindow, func(_ time.Time) tea.Msg { return saveNowMsg{} })
-		}
-		// reset retry counter: short-circuit if a recent successful save already covered current edits
-		m.editor.saveRetries = 0
-		if !m.editor.lastSavedAt.IsZero() && m.editor.lastSavedAt.After(m.editor.lastEditAt) {
-			// recent successful save supersedes this scheduled save; skip to avoid redundant updates
-			m.editor.saving = false
-			return m, nil
-		}
-		if err := m.editorSave(); err != nil {
-			if !strings.Contains(err.Error(), "already in use") {
-				m.logs = append(m.logs, "replace commands: "+err.Error())
-			}
-		}
-		m.editor.saving = false
-		return m, nil
+		return m.handleSaveNowWrapped()
 	case clearNotificationMsg:
 		m.clearNotification()
 		return m, nil
 	case tea.KeyMsg:
-		s := msg.String()
-		// If we're editing metadata, delegate key handling to editor.go
-		if m.editingMeta {
-			return m.handleEditorKey(msg)
-		}
-		// If the menu modal is open, delegate to menu handler
-		if m.showMenu {
-			return m.handleMenuKey(msg)
-		}
-
-		// If we're in our custom filter mode, use the centralized dispatch helper
-		// which will handle editing/filter behaviors. This keeps `Update()` small
-		// and makes it easier to unit test the input rules in isolation.
-		if m.filterMode {
-			var dm tea.Model
-			var fall bool
-			dm, cmd, fall = dispatchKey(m, msg)
-			if newM, ok := dm.(*TuiModel); ok {
-				m = newM
-			}
-			if !fall {
-				// dispatchKey handled the key (likely navigation while filtering).
-				// Ensure preview stays in sync with the current selection even when
-				// the action was fully handled by the filter dispatcher.
-				if si := m.list.SelectedItem(); si != nil {
-					if it, ok := si.(csItem); ok {
-						if it.cs.Name != m.lastSelectedName {
-							m.lastSelectedName = it.cs.Name
-							if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
-								m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
-								m.logPreviewUpdate(cs.Name)
-							}
-						}
-					}
-				}
-				return m, cmd
-			}
-		}
-		// If the list is in filtering state, delegate to helper
-		if dm, cmd, handled := handleListFiltering(m, msg); handled {
-			if newM, ok := dm.(*TuiModel); ok {
-				m = newM
-			}
-			return m, cmd
-		}
-		// Global keybindings handled BEFORE passing to the list so they are
-		// not swallowed when filtering is enabled. Delegate to handler.
-		dm, cmd, handled := handleGlobalKeys(m, s, msg)
-		if handled {
-			if newM, ok := dm.(*TuiModel); ok {
-				m = newM
-			}
-			return m, cmd
-		}
-
-		// non-printable bindings
-		if msg.Type == tea.KeyCtrlT {
-			m.themeHighContrast = !m.themeHighContrast
-			return m, nil
-		}
-
-		// Hand message to the list so filtering input will be processed
-		// When filtering, let list handle keys
-		if m.list.FilterState() == list.Filtering {
-			m.list, cmd = m.list.Update(msg)
-			return m, cmd
-		}
-
-		// Delegate focused navigation (right/left pane scrolling and versions list)
-		if dm, cmd, handled := handleFocusedNavigation(m, s, msg); handled {
-			if newM, ok := dm.(*TuiModel); ok {
-				m = newM
-			}
-			return m, cmd
-		}
-
-		m.list, cmd = m.list.Update(msg)
-
-		if s == "/" {
-			// enter our custom filter mode which shows a prompt and filters items
-			m.filterMode = true
-			m.listFilter = ""
-			m.list.Title = "Filter: "
-			items := make([]list.Item, 0, len(m.uiModel.ListCached()))
-			for _, s := range m.uiModel.ListCached() {
-				items = append(items, csItem{cs: s})
-			}
-			m.list.SetItems(items)
-			return m, cmd
-		}
-
-		// If the selection changed, update the preview pane by fetching the
-		// full CommandSet (including commands) from the model and rendering it.
-		if si := m.list.SelectedItem(); si != nil {
-			if it, ok := si.(csItem); ok {
-				if it.cs.Name != m.lastSelectedName {
-					// attempt to fetch full details (may include commands)
-					if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
-						m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
-					}
-					m.lastSelectedName = it.cs.Name
-				}
-			}
-		}
-
+		return m.handleKeyMsgWrapped(msg)
 	case runEventMsg:
-		ev := adapters.RunEvent(msg)
-		if ev.Err != nil {
-			m.logs = append(m.logs, "err: "+ev.Err.Error())
-			m.runInProgress = false
-			m.runCh = nil
-			return m, nil
-		}
-		m.logs = append(m.logs, ev.Line)
-		// keep viewport scrolled to bottom
-		m.vp.SetContent(strings.Join(m.logs, "\n"))
-		m.vp.GotoBottom()
-		// continue reading
-		if m.runCh != nil {
-			return m, readLoop(m.runCh)
-		}
-		return m, nil
+		return m.handleRunEventWrapped(adapters.RunEvent(msg))
 	case runDoneMsg:
 		m.runInProgress = false
 		m.runCh = nil
 		return m, nil
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		headH := 1
-		footerH := 1
-		bodyH := m.height - headH - footerH - 2
-		if bodyH < 3 {
-			bodyH = 3
-		}
+		return m.handleWindowSizeWrapped(msg)
+	}
+	return m, nil
+}
 
-		// compute side/right widths with safe bounds to avoid overflow on narrow terminals
-		sideW := int(float64(m.width) * 0.35)
-		if sideW > 36 {
-			sideW = 36
-		}
-		if sideW < 10 {
-			sideW = 10
-		}
-		// ensure sideW leaves room for the right pane; adjust if necessary
-		minRightW := 12
-		if m.width-sideW-4 < minRightW {
-			sideW = m.width - minRightW - 4
-			if sideW < 6 {
-				sideW = 6
-			}
-		}
-		innerSideW := sideW - 2
-		if innerSideW < 4 {
-			innerSideW = 4
-		}
+func (m *TuiModel) handleSaveNowWrapped() (tea.Model, tea.Cmd) {
+	dm, cmd := m.handleSaveNow()
+	if newM, ok := dm.(*TuiModel); ok {
+		m = newM
+	}
+	return m, cmd
+}
 
-		rightW := m.width - sideW - 4
-		if rightW < 12 {
-			rightW = 12
+func (m *TuiModel) handleKeyMsgWrapped(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if dm, cmd, handled := m.processKeyMsg(msg); handled {
+		if newM, ok := dm.(*TuiModel); ok {
+			m = newM
 		}
-		innerRightW := rightW - 2
-		if innerRightW < 10 {
-			innerRightW = 10
-		}
+		return m, cmd
+	}
+	return m, nil
+}
 
-		innerBodyH := bodyH - 2
-		if innerBodyH < 1 {
-			innerBodyH = 1
-		}
+func (m *TuiModel) handleRunEventWrapped(ev adapters.RunEvent) (tea.Model, tea.Cmd) {
+	dm, cmd := m.handleRunEvent(ev)
+	if newM, ok := dm.(*TuiModel); ok {
+		m = newM
+	}
+	return m, cmd
+}
 
-		m.list.SetSize(innerSideW, innerBodyH)
-		// Configure the detail/preview viewport size based on whether we are
-		// showing details (and whether the versions panel is present). This
-		// ensures the viewport is anchored within the content box (top/bottom)
-		// and avoids recreating it in View(), which previously caused truncation
-		// and overlap when layout calculations drifted between renders.
-		if m.showDetail && len(m.versions) > 0 {
-			// when versions panel exists, left pane width is the remaining width
-			rightW := 36
-			if rightW > m.width/3 {
-				rightW = m.width / 3
-			}
-			leftW := m.width - rightW - 6
-			if leftW < 20 {
-				leftW = 20
-			}
-			vpw := leftW - 4
-			vph := innerBodyH - 2
-			if vpw < 10 {
-				vpw = 10
-			}
-			if vph < 3 {
-				vph = 3
-			}
-			m.vp = viewport.New(vpw, vph)
-		} else if m.showDetail {
-			// full-screen detail (no versions)
-			vpw := m.width - 8
-			vph := bodyH - 4
-			if vpw < 10 {
-				vpw = 10
-			}
-			if vph < 3 {
-				vph = 3
-			}
-			m.vp = viewport.New(vpw, vph)
-		} else {
-			// list preview area (default)
-			m.vp = viewport.New(innerRightW, innerBodyH)
-		}
+func (m *TuiModel) handleWindowSizeWrapped(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	dm, cmd := m.handleWindowSize(msg)
+	if newM, ok := dm.(*TuiModel); ok {
+		m = newM
+	}
+	return m, cmd
+}
 
-		// configure versionsList sizing to match the inner area when present
-		if len(m.versions) > 0 {
-			// reserve one line for the versions pane shortcuts at the bottom
-			indicatorH := 1
-			available := innerBodyH - indicatorH - 2
-			if available < 1 {
-				available = 1
-			}
-			m.versionsList.SetSize(innerRightW, available)
-		}
+func (m *TuiModel) handleRunEvent(ev adapters.RunEvent) (tea.Model, tea.Cmd) {
+	if ev.Err != nil {
+		m.logs = append(m.logs, "err: "+ev.Err.Error())
+		m.runInProgress = false
+		m.runCh = nil
+		return m, nil
+	}
+	m.logs = append(m.logs, ev.Line)
+	// keep viewport scrolled to bottom
+	m.vp.SetContent(strings.Join(m.logs, "\n"))
+	m.vp.GotoBottom()
+	// continue reading
+	if m.runCh != nil {
+		return m, readLoop(m.runCh)
+	}
+	return m, nil
+}
 
-		// update content for selected
-		if m.showDetail {
-			// when in details mode, reformat the full-screen detail to match the
-			// current terminal width/height so it remains responsive. Only update
-			// the main detail when the left pane has focus; otherwise keep the
-			// versions preview visible while focus is on the right pane.
-			if !m.focusRight {
-				if m.detailName != "" {
-					if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
-						m.detail = formatCSFullScreen(cs, m.width, m.height)
-						m.vp.SetContent(m.detail)
+// processKeyMsg centralizes KeyMsg handling to keep Update() concise.
+func (m *TuiModel) processKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	// handlers in prioritized order
+	handlers := []func(tea.KeyMsg) (tea.Model, tea.Cmd, bool){
+		m.handleEditorOrMenuKeys,
+		m.handleFilterModeKeys,
+		func(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+			if dm, cmd, handled := handleListFiltering(m, msg); handled {
+				return dm, cmd, true
+			}
+			return m, nil, false
+		},
+		m.handleGlobalKeysWrapper,
+		m.handleNonPrintableKey,
+		m.handleListFilteringState,
+		m.handleFocusedNavWrapper,
+		m.handleListUpdateAndSelection,
+	}
+	for _, h := range handlers {
+		if dm, cmd, handled := h(msg); handled {
+			if newM, ok := dm.(*TuiModel); ok {
+				m = newM
+			}
+			return m, cmd, true
+		}
+	}
+	return m, nil, false
+}
+
+func (m *TuiModel) handleEditorOrMenuKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if m.editingMeta {
+		dm, cmd := m.handleEditorKey(msg)
+		return dm, cmd, true
+	}
+	if m.showMenu {
+		dm, cmd := m.handleMenuKey(msg)
+		return dm, cmd, true
+	}
+	return m, nil, false
+}
+
+func (m *TuiModel) handleFilterModeKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if !m.filterMode {
+		return m, nil, false
+	}
+	var dm tea.Model
+	var cmd tea.Cmd
+	var fall bool
+	dm, cmd, fall = dispatchKey(m, msg)
+	if newM, ok := dm.(*TuiModel); ok {
+		m = newM
+	}
+	if !fall {
+		if si := m.list.SelectedItem(); si != nil {
+			if it, ok := si.(csItem); ok {
+				if it.cs.Name != m.lastSelectedName {
+					m.lastSelectedName = it.cs.Name
+					if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+						m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
+						m.logPreviewUpdate(cs.Name)
 					}
 				}
-			} else {
-				// when focus is on the versions pane, ensure the preview matches
-				// the currently-selected versions list index (if any)
-				if len(m.versions) > 0 {
-					idx := m.versionsList.Index()
-					if idx < 0 {
-						idx = 0
-					}
-					m.setVersionsPreviewIndex(idx)
-				}
 			}
-		} else {
-			if si := m.list.SelectedItem(); si != nil {
-				if cs, ok := si.(csItem); ok {
-					// construct a full metadata view
-					full := formatCSDetails(cs.cs, m.vp.Width)
-					m.vp.SetContent(full)
+		}
+		return m, cmd, true
+	}
+	return m, nil, false
+}
+
+func (m *TuiModel) handleGlobalKeysWrapper(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	s := msg.String()
+	dm, cmd, handled := handleGlobalKeys(m, s, msg)
+	if handled {
+		return dm, cmd, true
+	}
+	return m, nil, false
+}
+
+func (m *TuiModel) handleNonPrintableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if msg.Type == tea.KeyCtrlT {
+		m.themeHighContrast = !m.themeHighContrast
+		return m, nil, true
+	}
+	return m, nil, false
+}
+
+func (m *TuiModel) handleListFilteringState(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if m.list.FilterState() == list.Filtering {
+		var cmd tea.Cmd
+		m.list, cmd = m.list.Update(msg)
+		return m, cmd, true
+	}
+	return m, nil, false
+}
+
+func (m *TuiModel) handleFocusedNavWrapper(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	s := msg.String()
+	if dm, cmd, handled := handleFocusedNavigation(m, s, msg); handled {
+		return dm, cmd, true
+	}
+	return m, nil, false
+}
+
+func (m *TuiModel) handleListUpdateAndSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	if msg.String() == "/" {
+		m.filterMode = true
+		m.listFilter = ""
+		m.list.Title = "Filter: "
+		items := make([]list.Item, 0, len(m.uiModel.ListCached()))
+		for _, s := range m.uiModel.ListCached() {
+			items = append(items, csItem{cs: s})
+		}
+		m.list.SetItems(items)
+		return m, cmd, true
+	}
+	if si := m.list.SelectedItem(); si != nil {
+		if it, ok := si.(csItem); ok {
+			if it.cs.Name != m.lastSelectedName {
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
+					m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
 				}
+				m.lastSelectedName = it.cs.Name
 			}
 		}
 	}
+	return m, cmd, true
+}
 
-	return m, cmd
+func (m *TuiModel) handleSaveNow() (tea.Model, tea.Cmd) {
+	// scheduled save: if edits are still arriving, retry a few times before
+	// performing the save. This avoids races where the delayed save fires
+	// while the PTY is still delivering multi-byte rune sequences.
+	const stabilityWindow = 50 * time.Millisecond
+	const maxRetries = 5
+	if time.Since(m.editor.lastEditAt) < stabilityWindow && m.editor.saveRetries < maxRetries {
+		m.editor.saveRetries++
+		return m, tea.Tick(stabilityWindow, func(_ time.Time) tea.Msg { return saveNowMsg{} })
+	}
+	// reset retry counter: short-circuit if a recent successful save already covered current edits
+	m.editor.saveRetries = 0
+	if !m.editor.lastSavedAt.IsZero() && m.editor.lastSavedAt.After(m.editor.lastEditAt) {
+		// recent successful save supersedes this scheduled save; skip to avoid redundant updates
+		m.editor.saving = false
+		return m, nil
+	}
+	if err := m.editorSave(); err != nil {
+		if !strings.Contains(err.Error(), "already in use") {
+			m.logs = append(m.logs, "replace commands: "+err.Error())
+		}
+	}
+	m.editor.saving = false
+	return m, nil
+}
+
+func (m *TuiModel) handleWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	m.width = msg.Width
+	m.height = msg.Height
+	innerSideW, innerRightW, innerBodyH := m.computeLayoutDimensions()
+	m.list.SetSize(innerSideW, innerBodyH)
+	m.updateViewportForLayout(innerRightW, innerBodyH)
+	m.updateVersionsListSize(innerRightW, innerBodyH)
+	m.updateSelectedContentForResize()
+	return m, nil
+}
+
+func (m *TuiModel) computeLayoutDimensions() (int, int, int) {
+	headH := 1
+	footerH := 1
+	bodyH := m.height - headH - footerH - 2
+	if bodyH < 3 {
+		bodyH = 3
+	}
+
+	// compute side/right widths with safe bounds to avoid overflow on narrow terminals
+	sideW := int(float64(m.width) * 0.35)
+	if sideW > 36 {
+		sideW = 36
+	}
+	if sideW < 10 {
+		sideW = 10
+	}
+	// ensure sideW leaves room for the right pane; adjust if necessary
+	minRightW := 12
+	if m.width-sideW-4 < minRightW {
+		sideW = m.width - minRightW - 4
+		if sideW < 6 {
+			sideW = 6
+		}
+	}
+	innerSideW := sideW - 2
+	if innerSideW < 4 {
+		innerSideW = 4
+	}
+
+	rightW := m.width - sideW - 4
+	if rightW < 12 {
+		rightW = 12
+	}
+	innerRightW := rightW - 2
+	if innerRightW < 10 {
+		innerRightW = 10
+	}
+
+	innerBodyH := bodyH - 2
+	if innerBodyH < 1 {
+		innerBodyH = 1
+	}
+	return innerSideW, innerRightW, innerBodyH
+}
+
+func (m *TuiModel) updateViewportForLayout(innerRightW, innerBodyH int) {
+	if m.showDetail && len(m.versions) > 0 {
+		// when versions panel exists, left pane width is the remaining width
+		rightW := 36
+		if rightW > m.width/3 {
+			rightW = m.width / 3
+		}
+		leftW := m.width - rightW - 6
+		if leftW < 20 {
+			leftW = 20
+		}
+		vpw := leftW - 4
+		vph := innerBodyH - 2
+		if vpw < 10 {
+			vpw = 10
+		}
+		if vph < 3 {
+			vph = 3
+		}
+		m.vp = viewport.New(vpw, vph)
+	} else if m.showDetail {
+		// full-screen detail (no versions)
+		vpw := m.width - 8
+		vph := (innerBodyH + 1) - 4
+		if vpw < 10 {
+			vpw = 10
+		}
+		if vph < 3 {
+			vph = 3
+		}
+		m.vp = viewport.New(vpw, vph)
+	} else {
+		// list preview area (default)
+		m.vp = viewport.New(innerRightW, innerBodyH)
+	}
+}
+
+func (m *TuiModel) updateVersionsListSize(innerRightW, innerBodyH int) {
+	if len(m.versions) > 0 {
+		// reserve one line for the versions pane shortcuts at the bottom
+		indicatorH := 1
+		available := innerBodyH - indicatorH - 2
+		if available < 1 {
+			available = 1
+		}
+		m.versionsList.SetSize(innerRightW, available)
+	}
+}
+
+func (m *TuiModel) updateSelectedContentForResize() {
+	if m.showDetail {
+		if !m.focusRight {
+			if m.detailName != "" {
+				if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
+					m.detail = formatCSFullScreen(cs, m.width, m.height)
+					m.vp.SetContent(m.detail)
+				}
+			}
+		} else {
+			if len(m.versions) > 0 {
+				idx := m.versionsList.Index()
+				if idx < 0 {
+					idx = 0
+				}
+				m.setVersionsPreviewIndex(idx)
+			}
+		}
+	} else {
+		if si := m.list.SelectedItem(); si != nil {
+			if cs, ok := si.(csItem); ok {
+				full := formatCSDetails(cs.cs, m.vp.Width)
+				m.vp.SetContent(full)
+			}
+		}
+	}
 }
 
 // Rendering helpers moved to cmd/tui/ui/render.go
@@ -481,184 +560,202 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the current TUI view as a string.
 func (m *TuiModel) View() string {
-	// If the menu modal is open, render it as a centered overlay to avoid
-	// interfering with regular detail/list flows. This keeps the menu
-	// accessible from any context.
 	if m.showMenu {
-		// compute an appropriate height for the menu overlay (leave space for Footer)
-		h := m.height - 4
-		if h < 3 {
-			h = 3
-		}
-		contentStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#c084fc")).Padding(1).Width(m.width - 4).Height(h)
-		return contentStyle.Render(m.renderMenu())
+		return m.renderMenuOverlay()
 	}
-
 	if m.showDetail {
-		// Use the same top title bar and content container approach as the main
-		// page so borders and colors remain consistent across views.
-		var rightBorder, bottomBg, bottomFg string
-		if m.themeHighContrast {
-			rightBorder = "#ffffff"
-			bottomBg, bottomFg = "#000000", "#ffffff"
-		} else {
-			rightBorder = "#c084fc"
-			bottomBg, bottomFg = "#0b1226", "#cbd5e1"
-		}
+		return m.renderDetailView()
+	}
+	return m.renderMainView()
+}
 
-		headH := 0 // removed top title box; inner detail contains its own title
-		footerH := 1
-		bottomH := 1
-		// Account for footer and bottom bar when computing the available body height
-		bodyH := m.height - headH - footerH - bottomH - 2
-		if bodyH < 3 {
-			bodyH = 3
-		}
+func (m *TuiModel) renderMenuOverlay() string {
+	// compute an appropriate height for the menu overlay (leave space for Footer)
+	h := m.height - 4
+	if h < 3 {
+		h = 3
+	}
+	contentStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#c084fc")).Padding(1).Width(m.width - 4).Height(h)
+	return contentStyle.Render(m.renderMenu())
+}
 
-		contentStyle := lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(lipgloss.Color(rightBorder)).
-			Padding(1).
-			Width(m.width - 2).
-			Height(bodyH)
-		var body string
-		if m.editingMeta {
-			body = contentStyle.Render(m.renderEditor())
-		} else if len(m.versions) > 0 {
-			// split the content region into main detail (left) and versions (right)
-			rightW := 30
-			if rightW > m.width/3 {
-				rightW = m.width / 3
-			}
-			leftW := m.width - rightW - 6 // account for borders and padding
-			if leftW < 20 {
-				leftW = 20
-			}
-			leftStyle := contentStyle
-			leftStyle = leftStyle.Width(leftW)
-			// compute inner sizes for the right pane and pass them to the renderer
-			innerRightW := rightW - 2
-			if innerRightW < 10 {
-				innerRightW = 10
-			}
-			innerBodyH := bodyH - 2
-			if innerBodyH < 1 {
-				innerBodyH = 1
-			}
-			// Determine border color and thickness to match main page focus styling
-			var detailRightBorder string
-			var detailRightBorderStyle lipgloss.Border
-			var detailLeftBorder string
-			var detailLeftBorderStyle lipgloss.Border
-			if m.themeHighContrast {
-				if m.focusRight {
-					detailRightBorder = "#ffffff"
-					detailRightBorderStyle = lipgloss.ThickBorder()
-					detailLeftBorder = "#444444"
-					detailLeftBorderStyle = lipgloss.NormalBorder()
-				} else {
-					detailRightBorder = "#444444"
-					detailRightBorderStyle = lipgloss.NormalBorder()
-					detailLeftBorder = "#ffffff"
-					detailLeftBorderStyle = lipgloss.ThickBorder()
-				}
-			} else {
-				if m.focusRight {
-					detailRightBorder = "#c084fc"
-					detailRightBorderStyle = lipgloss.ThickBorder()
-					detailLeftBorder = "#334155"
-					detailLeftBorderStyle = lipgloss.NormalBorder()
-				} else {
-					detailRightBorder = "#334155"
-					detailRightBorderStyle = lipgloss.NormalBorder()
-					detailLeftBorder = "#7dd3fc"
-					detailLeftBorderStyle = lipgloss.ThickBorder()
-				}
-			}
-			// apply left pane border styling explicitly so focus state is clear
-			leftStyle = leftStyle.BorderStyle(detailLeftBorderStyle).BorderForeground(lipgloss.Color(detailLeftBorder))
-			// ensure viewport sized for current layout so detail becomes scrollable
-			vpw := leftW - 4
-			vph := innerBodyH - 2
-			if vpw < 10 {
-				vpw = 10
-			}
-			if vph < 3 {
-				vph = 3
-			}
-			m.detail = strings.TrimRight(m.detail, "\n")
-			m.ensureViewportSize(vpw, vph)
-			// Only set the main detail content when left pane is focused. If the
-			// right pane (versions) is focused, we should display the preview
-			// content which is set by setVersionsPreviewIndex.
-			if !m.focusRight {
-				m.vp.SetContent(m.detail)
-			}
-			left := leftStyle.Render(m.vp.View())
-			rightStyle := lipgloss.NewStyle().BorderStyle(detailRightBorderStyle).BorderForeground(lipgloss.Color(detailRightBorder)).Padding(1).Width(rightW).Height(bodyH)
-			right := rightStyle.Render(m.renderVersions(innerRightW, innerBodyH))
-			if m.width < 80 {
-				body = lipgloss.JoinVertical(lipgloss.Left, left, right)
-			} else {
-				body = lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-			}
-		} else {
-			// no versions pane; render detail inside a viewport so it can scroll
-			// to match the behavior/responsiveness of the main page.
-			m.detail = strings.TrimRight(m.detail, "\n")
-			// ensure viewport sized for full-screen detail
-			vpw := m.width - 8
-			vph := bodyH - 4
-			if vpw < 10 {
-				vpw = 10
-			}
-			if vph < 3 {
-				vph = 3
-			}
-			m.ensureViewportSize(vpw, vph)
-			m.vp.SetContent(m.detail)
-			body = contentStyle.Render(m.vp.View())
-		}
+func (m *TuiModel) renderDetailView() string {
+	rightBorder, bottomBg, bottomFg := m.detailColors()
 
-		status := fmt.Sprintf("Viewing: %s", m.detailName)
-		if m.runInProgress {
-			status += " • RUNNING"
-		}
-		bottom := lipgloss.NewStyle().
-			Background(lipgloss.Color(bottomBg)).
-			Foreground(lipgloss.Color(bottomFg)).
-			Padding(0, 1).
-			Width(m.width).
-			Render(" " + status + " ")
-
-		var footer string
-		if m.editingMeta {
-			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(Tab) next - (Ctrl+A) add command - (Ctrl+D) del command - (Ctrl+S) save - (Esc) cancel")
-		} else {
-			base := "(e) Edit - (d) Delete - (s) Export - (r) Run - (T) Toggle Theme - (b) Back - (q) Quit"
-			if len(m.versions) > 0 {
-				base = base + " - (R) Rollback"
-			}
-			// When showing details, add a scroll hint and indicator so users can
-			// discover navigation and their current position inside the detail.
-			if m.showDetail {
-				base = base + " - (↑/↓ scroll detail)"
-				if ind := m.detailScrollIndicator(); ind != "" {
-					base = base + " • " + ind
-				}
-			}
-			footer = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(base)
-		}
-		// If there's a transient notification show it prominently in the footer
-		m.mu.RLock()
-		notif := m.notification
-		m.mu.RUnlock()
-		if notif != "" {
-			footer = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f43f5e")).Render(notif)
-		}
-		return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
+	headH := 0 // removed top title box; inner detail contains its own title
+	footerH := 1
+	bottomH := 1
+	// Account for footer and bottom bar when computing the available body height
+	bodyH := m.height - headH - footerH - bottomH - 2
+	if bodyH < 3 {
+		bodyH = 3
 	}
 
+	contentStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color(rightBorder)).
+		Padding(1).
+		Width(m.width - 2).
+		Height(bodyH)
+	var body string
+	// choose appropriate body content
+	if m.editingMeta {
+		body = contentStyle.Render(m.renderEditor())
+	} else if len(m.versions) > 0 {
+		body = m.renderDetailWithVersions(bodyH)
+	} else {
+		// no versions pane; render detail inside a viewport so it can scroll
+		// to match the behavior/responsiveness of the main page.
+		m.detail = strings.TrimRight(m.detail, "\n")
+		// ensure viewport sized for full-screen detail
+		vpw := m.width - 8
+		vph := bodyH - 4
+		if vpw < 10 {
+			vpw = 10
+		}
+		if vph < 3 {
+			vph = 3
+		}
+		m.ensureViewportSize(vpw, vph)
+		m.vp.SetContent(m.detail)
+		body = contentStyle.Render(m.vp.View())
+	}
+
+	status := fmt.Sprintf("Viewing: %s", m.detailName)
+	if m.runInProgress {
+		status += " • RUNNING"
+	}
+	bottom := lipgloss.NewStyle().
+		Background(lipgloss.Color(bottomBg)).
+		Foreground(lipgloss.Color(bottomFg)).
+		Padding(0, 1).
+		Width(m.width).
+		Render(" " + status + " ")
+
+	var footer string
+	footer = m.detailFooter()
+	// If there's a transient notification show it prominently in the footer
+	m.mu.RLock()
+	notif := m.notification
+	m.mu.RUnlock()
+	if notif != "" {
+		footer = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f43f5e")).Render(notif)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
+}
+
+func (m *TuiModel) detailColors() (string, string, string) {
+	if m.themeHighContrast {
+		return "#ffffff", "#000000", "#ffffff"
+	}
+	return "#c084fc", "#0b1226", "#cbd5e1"
+}
+
+func (m *TuiModel) detailFooter() string {
+	if m.editingMeta {
+		return lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render("(Tab) next - (Ctrl+A) add command - (Ctrl+D) del command - (Ctrl+S) save - (Esc) cancel")
+	}
+	base := "(e) Edit - (d) Delete - (s) Export - (r) Run - (T) Toggle Theme - (b) Back - (q) Quit"
+	if len(m.versions) > 0 {
+		base = base + " - (R) Rollback"
+	}
+	// When showing details, add a scroll hint and indicator so users can
+	// discover navigation and their current position inside the detail.
+	if m.showDetail {
+		base = base + " - (↑/↓ scroll detail)"
+		if ind := m.detailScrollIndicator(); ind != "" {
+			base = base + " • " + ind
+		}
+	}
+	return lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(base)
+}
+
+func (m *TuiModel) renderDetailWithVersions(bodyH int) string {
+	// split the content region into main detail (left) and versions (right)
+	rightW := 30
+	if rightW > m.width/3 {
+		rightW = m.width / 3
+	}
+	leftW := m.width - rightW - 6 // account for borders and padding
+	if leftW < 20 {
+		leftW = 20
+	}
+	leftStyle := lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#000000")).Padding(1)
+	leftStyle = leftStyle.Width(leftW).Height(bodyH)
+	// compute inner sizes for the right pane and pass them to the renderer
+	innerRightW := rightW - 2
+	if innerRightW < 10 {
+		innerRightW = 10
+	}
+	innerBodyH := bodyH - 2
+	if innerBodyH < 1 {
+		innerBodyH = 1
+	}
+	// Determine border color and thickness to match main page focus styling
+	detailRightBorder, detailRightBorderStyle, detailLeftBorder, detailLeftBorderStyle := computeDetailPaneStyles(m)
+	// apply left pane border styling explicitly so focus state is clear
+	leftStyle = leftStyle.BorderStyle(detailLeftBorderStyle).BorderForeground(lipgloss.Color(detailLeftBorder))
+
+	// ensure viewport sized for current layout so detail becomes scrollable
+	vpw := leftW - 4
+	vph := innerBodyH - 2
+	if vpw < 10 {
+		vpw = 10
+	}
+	if vph < 3 {
+		vph = 3
+	}
+	m.detail = strings.TrimRight(m.detail, "\n")
+	m.ensureViewportSize(vpw, vph)
+	// Only set the main detail content when left pane is focused. If the
+	// right pane (versions) is focused, we should display the preview
+	// content which is set by setVersionsPreviewIndex.
+	if !m.focusRight {
+		m.vp.SetContent(m.detail)
+	}
+	left := leftStyle.Render(m.vp.View())
+	rightStyle := lipgloss.NewStyle().BorderStyle(detailRightBorderStyle).BorderForeground(lipgloss.Color(detailRightBorder)).Padding(1).Width(rightW).Height(bodyH)
+	right := rightStyle.Render(m.renderVersions(innerRightW, innerBodyH))
+	if m.width < 80 {
+		return lipgloss.JoinVertical(lipgloss.Left, left, right)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+}
+
+func computeDetailPaneStyles(m *TuiModel) (string, lipgloss.Border, string, lipgloss.Border) {
+	var detailRightBorder string
+	var detailRightBorderStyle lipgloss.Border
+	var detailLeftBorder string
+	var detailLeftBorderStyle lipgloss.Border
+	if m.themeHighContrast {
+		if m.focusRight {
+			detailRightBorder = "#ffffff"
+			detailRightBorderStyle = lipgloss.ThickBorder()
+			detailLeftBorder = "#444444"
+			detailLeftBorderStyle = lipgloss.NormalBorder()
+		} else {
+			detailRightBorder = "#444444"
+			detailRightBorderStyle = lipgloss.NormalBorder()
+			detailLeftBorder = "#ffffff"
+			detailLeftBorderStyle = lipgloss.ThickBorder()
+		}
+	} else {
+		if m.focusRight {
+			detailRightBorder = "#c084fc"
+			detailRightBorderStyle = lipgloss.ThickBorder()
+			detailLeftBorder = "#334155"
+			detailLeftBorderStyle = lipgloss.NormalBorder()
+		} else {
+			detailRightBorder = "#334155"
+			detailRightBorderStyle = lipgloss.NormalBorder()
+			detailLeftBorder = "#7dd3fc"
+			detailLeftBorderStyle = lipgloss.ThickBorder()
+		}
+	}
+	return detailRightBorder, detailRightBorderStyle, detailLeftBorder, detailLeftBorderStyle
+}
+
+func (m *TuiModel) renderMainView() string {
 	headH := 1 // reserve a 1-line top spacer so borders don't touch the terminal edge
 	footerH := 1
 	bodyH := m.height - headH - footerH - 2
@@ -716,31 +813,9 @@ func (m *TuiModel) View() string {
 		body = lipgloss.JoinHorizontal(lipgloss.Top, sidebar, right)
 	}
 
-	status := "Items: " + fmt.Sprintf("%d", len(m.list.Items()))
-	if m.focusRight {
-		status += " • FOCUS: PREVIEW/LOGS"
-	} else {
-		status += " • FOCUS: COMMAND LIST"
-	}
-	if m.filterMode || m.list.FilterState() == list.Filtering {
-		status += " • FILTER MODE"
-	}
-	if m.runInProgress {
-		status += " - RUNNING"
-	}
-	bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + status + " ")
+	bottom := lipgloss.NewStyle().Background(lipgloss.Color(bottomBg)).Foreground(lipgloss.Color(bottomFg)).Padding(0, 1).Width(m.width).Render(" " + m.mainStatus() + " ")
 
-	var footerText string
-	if m.filterMode || m.list.FilterState() == list.Filtering {
-		// In filter mode keep the footer minimal and only show how to quit filter
-		footerText = "(esc) quit filter"
-	} else {
-		// Use simple ASCII-friendly footer to ensure compatibility across
-		// environments and avoid encoding issues with exotic characters.
-		footerText = "(<-) / (->) / (Tab) switch focus - (Up)/(Down) scroll focused pane"
-		footerText += " - (Enter) details - (r) run - (T) theme - (C) New Entry - (m) Menu - (q) quit - (?) help"
-	}
-	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(footerText)
+	footer := lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#94a3b8")).Render(m.mainFooterText())
 	// If there's a transient notification show it prominently in the footer
 	m.mu.RLock()
 	notif := m.notification
@@ -753,6 +828,34 @@ func (m *TuiModel) View() string {
 	topSpacer := lipgloss.NewStyle().Height(headH).Width(m.width).Render("")
 
 	return lipgloss.JoinVertical(lipgloss.Left, topSpacer, body, footer, bottom)
+}
+
+func (m *TuiModel) mainStatus() string {
+	status := "Items: " + fmt.Sprintf("%d", len(m.list.Items()))
+	if m.focusRight {
+		status += " • FOCUS: PREVIEW/LOGS"
+	} else {
+		status += " • FOCUS: COMMAND LIST"
+	}
+	if m.filterMode || m.list.FilterState() == list.Filtering {
+		status += " • FILTER MODE"
+	}
+	if m.runInProgress {
+		status += " - RUNNING"
+	}
+	return status
+}
+
+func (m *TuiModel) mainFooterText() string {
+	if m.filterMode || m.list.FilterState() == list.Filtering {
+		// In filter mode keep the footer minimal and only show how to quit filter
+		return "(esc) quit filter"
+	}
+	// Use simple ASCII-friendly footer to ensure compatibility across
+	// environments and avoid encoding issues with exotic characters.
+	footerText := "(<-) / (->) / (Tab) switch focus - (Up)/(Down) scroll focused pane"
+	footerText += " - (Enter) details - (r) run - (T) theme - (C) New Entry - (m) Menu - (q) quit - (?) help"
+	return footerText
 }
 
 // csItem adapts adapters.CommandSetSummary for the list component

@@ -38,18 +38,7 @@ func TestMenuInstallInteractive(t *testing.T) {
 	m = m1.(*TuiModel)
 
 	// open menu and navigate to Install
-	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
-	m = m2.(*TuiModel)
-	// move to Install item
-	for i := 0; i < len(m.menuItems) && m.menuItems[m.menuIndex] != "Install"; i++ {
-		m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-		m = m3.(*TuiModel)
-	}
-	if m.menuItems[m.menuIndex] != "Install" {
-		t.Fatalf("Install menu item not found: %v", m.menuItems)
-	}
-	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = m4.(*TuiModel)
+	m = selectMenuItem(t, m, "Install")
 	if !m.menuInputMode || m.menuAction != "install-scope" {
 		t.Fatalf("expected install-scope prompt, got %v %q", m.menuInputMode, m.menuAction)
 	}

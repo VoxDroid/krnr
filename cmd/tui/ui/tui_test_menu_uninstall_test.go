@@ -9,6 +9,21 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func selectMenuItem(t *testing.T, m *TuiModel, name string) *TuiModel {
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	m = m2.(*TuiModel)
+	for i := 0; i < len(m.menuItems) && m.menuItems[m.menuIndex] != name; i++ {
+		m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = m3.(*TuiModel)
+	}
+	if m.menuItems[m.menuIndex] != name {
+		t.Fatalf("menu item %q not found: %v", name, m.menuItems)
+	}
+	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m4.(*TuiModel)
+	return m
+}
+
 func TestMenuUninstallConfirmation(t *testing.T) {
 	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one"}}}
 	fi := &fakeInstaller{}
@@ -20,17 +35,7 @@ func TestMenuUninstallConfirmation(t *testing.T) {
 	m = m1.(*TuiModel)
 
 	// open menu and navigate to Uninstall
-	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
-	m = m2.(*TuiModel)
-	for i := 0; i < len(m.menuItems) && m.menuItems[m.menuIndex] != "Uninstall"; i++ {
-		m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-		m = m3.(*TuiModel)
-	}
-	if m.menuItems[m.menuIndex] != "Uninstall" {
-		t.Fatalf("Uninstall menu item not found: %v", m.menuItems)
-	}
-	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = m4.(*TuiModel)
+	m = selectMenuItem(t, m, "Uninstall")
 	if !m.menuInputMode || m.menuAction != "uninstall-confirm" {
 		t.Fatalf("expected uninstall-confirm prompt, got %v %q", m.menuInputMode, m.menuAction)
 	}
@@ -46,14 +51,7 @@ func TestMenuUninstallConfirmation(t *testing.T) {
 	}
 
 	// now confirm yes
-	m2, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
-	m = m2.(*TuiModel)
-	for i := 0; i < len(m.menuItems) && m.menuItems[m.menuIndex] != "Uninstall"; i++ {
-		m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-		m = m3.(*TuiModel)
-	}
-	m4, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = m4.(*TuiModel)
+	m = selectMenuItem(t, m, "Uninstall")
 	m.menuInput = "y"
 	m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = m6.(*TuiModel)

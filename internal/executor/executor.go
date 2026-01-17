@@ -96,19 +96,11 @@ func sanitizeCommand(s string) string {
 // the command, validates it for illegal characters or newlines, and then
 // executes it writing stdout/stderr to the provided writers.
 func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
-	// First sanitize common unicode punctuation and invisible characters
-	// (e.g., smart quotes, NBSP, zero-width spaces, and NUL bytes) before
-	// validation so the TUI editor becomes forgiving for accidental insertions.
-	command = sanitizeCommand(command)
-
-	// After sanitization, reject multiline commands (newlines are not allowed)
-	if strings.Contains(command, "\n") {
-		return fmt.Errorf("invalid command: contains newline characters; each command must be a single line")
-	}
-
-	// If any control characters remain (other than tab), fail with a helpful message
-	if strings.IndexFunc(command, func(r rune) bool { return r == 0 || (r < 32 && r != '\t') || r == 0x7f }) != -1 {
-		return fmt.Errorf("invalid command: contains control characters; remove non-printable characters")
+	// validate and sanitize command
+	var err error
+	command, err = validateAndSanitize(command)
+	if err != nil {
+		return err
 	}
 
 	if e.DryRun {
@@ -119,15 +111,8 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 	}
 
 	shell, args := shellInvocation(command, e.Shell)
-	// Validate shell + args for obvious issues to avoid opaque CreateProcess errors
-	if p, err := exec.LookPath(shell); err == nil {
-		shell = p
-	}
-	// ensure args don't contain NUL or control chars that are likely to break CreateProcess
-	for i, a := range args {
-		if strings.IndexFunc(a, func(r rune) bool { return r == 0 || (r < 32 && r != '\t') || r == 0x7f }) != -1 {
-			return fmt.Errorf("invalid shell arg[%d]: contains control characters", i)
-		}
+	if err := validateShellAndArgs(shell, args); err != nil {
+		return err
 	}
 
 	cmd := exec.CommandContext(ctx, shell, args...)
@@ -190,11 +175,43 @@ func shellInvocation(command string, overrideShell string) (string, []string) {
 	return "bash", []string{"-c", command}
 }
 
+func validateShellAndArgs(shell string, args []string) error {
+	// Validate shell + args for obvious issues to avoid opaque CreateProcess errors
+	// Ensure shell is available on PATH; we only need to check that it exists.
+	if _, err := exec.LookPath(shell); err != nil {
+		return fmt.Errorf("shell not found in PATH: %s", shell)
+	}
+	// ensure args don't contain NUL or control chars that are likely to break CreateProcess
+	for i, a := range args {
+		if strings.IndexFunc(a, func(r rune) bool { return r == 0 || (r < 32 && r != '\t') || r == 0x7f }) != -1 {
+			return fmt.Errorf("invalid shell arg[%d]: contains control characters", i)
+		}
+	}
+	return nil
+}
+
 // Sanitize normalizes common unicode characters and removes embedded
 // null and other invisible runes. Exported for use by callers (e.g., the
 // TUI) that want to sanitize user-edited commands at save time.
 func Sanitize(s string) string {
 	return sanitizeCommand(s)
+}
+func validateAndSanitize(command string) (string, error) {
+	// First sanitize common unicode punctuation and invisible characters
+	// (e.g., smart quotes, NBSP, zero-width spaces, and NUL bytes) before
+	// validation so the TUI editor becomes forgiving for accidental insertions.
+	command = sanitizeCommand(command)
+
+	// After sanitization, reject multiline commands (newlines are not allowed)
+	if strings.Contains(command, "\n") {
+		return "", fmt.Errorf("invalid command: contains newline characters; each command must be a single line")
+	}
+
+	// If any control characters remain (other than tab), fail with a helpful message
+	if strings.IndexFunc(command, func(r rune) bool { return r == 0 || (r < 32 && r != '\t') || r == 0x7f }) != -1 {
+		return "", fmt.Errorf("invalid command: contains control characters; remove non-printable characters")
+	}
+	return command, nil
 }
 
 // ValidateCommand checks for remaining problematic characters that will

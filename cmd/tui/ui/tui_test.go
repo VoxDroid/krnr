@@ -77,6 +77,56 @@ func TestTuiInitialRender_Headless(t *testing.T) {
 	}
 }
 
+func assertDescriptionPosition(t *testing.T, view string) {
+	posDesc := strings.Index(view, "Description:")
+	posParam := strings.Index(view, "Param demo")
+	if posDesc == -1 || posParam == -1 || posParam <= posDesc {
+		t.Fatalf("expected Param demo to appear after Description:, got:\n%s", view)
+	}
+	between := view[posDesc+len("Description:") : posParam]
+	if strings.TrimSpace(between) != "" {
+		t.Fatalf("expected only whitespace between Description: and Param demo, got %q", between)
+	}
+}
+
+func assertDescriptionIndentation(t *testing.T, view string, commands []string) {
+	maxPrefix := 0
+	for i := range commands {
+		p := fmt.Sprintf("%d) ", i+1)
+		if l := len(p); l > maxPrefix {
+			maxPrefix = l
+		}
+	}
+	expectedDelta := 2 + maxPrefix + 1
+	lines := strings.Split(view, "\n")
+	headIdx := -1
+	for i, ln := range lines {
+		if strings.Contains(ln, "Description:") {
+			headIdx = i
+			break
+		}
+	}
+	if headIdx == -1 || headIdx+1 >= len(lines) {
+		t.Fatalf("couldn't locate Description header and line in view:\n%s", view)
+	}
+	paramLine := lines[headIdx+1]
+	if strings.TrimSpace(paramLine) == "" && headIdx+2 < len(lines) {
+		paramLine = lines[headIdx+2]
+	}
+	leadingHeader := len(lines[headIdx]) - len(strings.TrimLeft(lines[headIdx], " "))
+	leadingParam := len(paramLine) - len(strings.TrimLeft(paramLine, " "))
+	delta := leadingParam - leadingHeader
+	if delta < expectedDelta {
+		t.Fatalf("expected param to be indented at least %d spaces relative to header, got %d (view:\n%s)", expectedDelta, delta, view)
+	}
+}
+
+func assertCommandPrefixesPresent(t *testing.T, view string) {
+	if !strings.Contains(view, "1)  echo") || !strings.Contains(view, "2)  echo") {
+		t.Fatalf("expected both command lines to include '1)  echo' and '2)  echo', got:\n%s", view)
+	}
+}
+
 func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	// create a set with a multi-line description and two commands
 	full := adapters.CommandSetSummary{
@@ -92,55 +142,10 @@ func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	m := NewModel(ui)
 	m.Init()()
 	view := m.vp.View()
-	// description should appear on the line after the header and be whitespace-only prefixed
-	posDesc := strings.Index(view, "Description:")
-	posParam := strings.Index(view, "Param demo")
-	t.Logf("posDesc=%d posParam=%d", posDesc, posParam)
-	if posDesc == -1 || posParam == -1 || posParam <= posDesc {
-		t.Fatalf("expected Param demo to appear after Description:, got:\n%s", view)
-	}
-	between := view[posDesc+len("Description:") : posParam]
-	if strings.TrimSpace(between) != "" {
-		t.Fatalf("expected only whitespace between Description: and Param demo, got %q", between)
-	}
 
-	// also assert description is indented by the same base offset used for commands
-	maxPrefix := 0
-	for i := range full.Commands {
-		p := fmt.Sprintf("%d) ", i+1)
-		if l := len(p); l > maxPrefix {
-			maxPrefix = l
-		}
-	}
-	expectedDelta := 2 + maxPrefix + 1 // the formatter indents by 2 + maxPrefix + 1 spaces relative to the header
-	// find header line and the following non-empty line
-	lines := strings.Split(view, "\n")
-	headIdx := -1
-	for i, ln := range lines {
-		if strings.Contains(ln, "Description:") {
-			headIdx = i
-			break
-		}
-	}
-	if headIdx == -1 || headIdx+1 >= len(lines) {
-		t.Fatalf("couldn't locate Description header and line in view:\n%s", view)
-	}
-	// skip empty lines after header
-	paramLine := lines[headIdx+1]
-	if strings.TrimSpace(paramLine) == "" && headIdx+2 < len(lines) {
-		paramLine = lines[headIdx+2]
-	}
-	leadingHeader := len(lines[headIdx]) - len(strings.TrimLeft(lines[headIdx], " "))
-	leadingParam := len(paramLine) - len(strings.TrimLeft(paramLine, " "))
-	delta := leadingParam - leadingHeader
-	if delta < expectedDelta {
-		t.Fatalf("expected param to be indented at least %d spaces relative to header, got %d (view:\n%s)", expectedDelta, delta, view)
-	}
-
-	// ensure both command lines show the prefix and a small gap before the echoed text
-	if !strings.Contains(view, "1)  echo") || !strings.Contains(view, "2)  echo") {
-		t.Fatalf("expected both command lines to include '1)  echo' and '2)  echo', got:\n%s", view)
-	}
+	assertDescriptionPosition(t, view)
+	assertDescriptionIndentation(t, view, full.Commands)
+	assertCommandPrefixesPresent(t, view)
 }
 
 func TestFilterModeIgnoresControlsAndEscCancels(t *testing.T) {
@@ -339,11 +344,9 @@ func TestDetailScrollIndicatorUpdates(t *testing.T) {
 	if !m.showDetail {
 		t.Fatalf("expected showDetail true")
 	}
+	assertScrollFooterHasIndicator(t, m)
+	// parse "n/total"
 	view := m.View()
-	if !strings.Contains(view, "(↑/↓ scroll detail)") {
-		t.Fatalf("expected scroll hint in footer, got:\n%s", view)
-	}
-	// find indicator after the scroll hint
 	hintIdx := strings.Index(view, "(↑/↓ scroll detail)")
 	if hintIdx == -1 {
 		t.Fatalf("couldn't find scroll hint in view:\n%s", view)
@@ -353,7 +356,6 @@ func TestDetailScrollIndicatorUpdates(t *testing.T) {
 	if dotIdx == -1 {
 		t.Fatalf("expected indicator dot in footer, got:\n%s", view)
 	}
-	// parse "n/total"
 	frag := strings.TrimSpace(sub[dotIdx+len("•"):])
 	parts := strings.SplitN(frag, " ", 2)
 	if len(parts) == 0 {
@@ -380,8 +382,28 @@ func TestDetailScrollIndicatorUpdates(t *testing.T) {
 	parts2 := strings.SplitN(frag2, " ", 2)
 	indicator2 := parts2[0]
 	if indicator2 == indicator {
-		t.Fatalf("expected indicator to change after scrolling down; was %q, still %q", indicator, indicator2)
+		t.Fatalf("expected indicator to advance after scroll: %q -> %q", indicator, indicator2)
 	}
+}
+
+// assertScrollFooterHasIndicator checks the presence of the scroll hint and the indicator dot
+func assertScrollFooterHasIndicator(t *testing.T, m *TuiModel) {
+	view := m.View()
+	if !strings.Contains(view, "(↑/↓ scroll detail)") {
+		t.Fatalf("expected scroll hint in footer, got:\n%s", view)
+	}
+	hintIdx := strings.Index(view, "(↑/↓ scroll detail)")
+	if hintIdx == -1 {
+		t.Fatalf("couldn't find scroll hint in view:\n%s", view)
+	}
+	sub := view[hintIdx:]
+	dotIdx := strings.Index(sub, "•")
+	if dotIdx == -1 {
+		t.Fatalf("expected indicator dot in footer, got:\n%s", view)
+	}
+	// expose dotIdx and sub via logs for callers wanting to parse the fragment
+	_ = dotIdx
+	_ = sub
 }
 
 func TestDetailViewShowsTitle(t *testing.T) {
@@ -477,6 +499,27 @@ func TestEditReplacesCommands(t *testing.T) {
 	}
 }
 
+// helper to move to the commands field, add runes, and save
+func addRunesToCommandsAndSave(t *testing.T, m *TuiModel, runes []rune) *TuiModel {
+	t.Helper()
+	// cycle to commands field (tab until commands)
+	for i := 0; i < 10 && m.editor.field != 5; i++ {
+		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		m = m4.(*TuiModel)
+	}
+	// add a new command (Ctrl+A)
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlA})
+	m = m5.(*TuiModel)
+	for _, r := range runes {
+		m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = m6.(*TuiModel)
+	}
+	// save with Ctrl+S
+	m7, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = m7.(*TuiModel)
+	return m
+}
+
 func TestEditorSaveSanitizesCommands(t *testing.T) {
 	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
 	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
@@ -494,21 +537,7 @@ func TestEditorSaveSanitizesCommands(t *testing.T) {
 	if !m.editingMeta {
 		t.Fatalf("expected editor to be open")
 	}
-	// cycle to commands field (tab until commands)
-	for i := 0; i < 10 && m.editor.field != 5; i++ {
-		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-		m = m4.(*TuiModel)
-	}
-	// add a new command (Ctrl+A) and type 'echo “quoted”' using smart quotes
-	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlA})
-	m = m5.(*TuiModel)
-	for _, r := range []rune{'e', 'c', 'h', 'o', ' ', '\u201C', 'q', 'u', 'o', 't', 'e', 'd', '\u201D'} {
-		m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
-		m = m6.(*TuiModel)
-	}
-	// save with Ctrl+S
-	m7, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
-	m = m7.(*TuiModel)
+	m = addRunesToCommandsAndSave(t, m, []rune{'e', 'c', 'h', 'o', ' ', '\u201C', 'q', 'u', 'o', 't', 'e', 'd', '\u201D'})
 	if reg.lastName != "one" {
 		t.Fatalf("expected UpdateCommandSet called with name 'one', got %q", reg.lastName)
 	}

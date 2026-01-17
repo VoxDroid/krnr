@@ -169,49 +169,68 @@ func formatCSFullScreen(cs adapters.CommandSetSummary, width int, _ int) string 
 	// Name inline
 	b.WriteString(h.Render("Name:") + " " + cs.Name + "\n")
 
-	// Description header + wrapped lines
-	if cs.Description != "" {
-		lines := wrapText(cs.Description, valueW)
-		b.WriteString("\n")
-		b.WriteString(h.Render("Description:") + "\n")
-		b.WriteString(renderTableBlockHeader("", strings.Join(lines, "\n"), labelW))
-	}
+	// Description
+	appendDescription(&b, cs.Description, valueW, labelW, h)
 
-	// Commands: render inner two-column block then place under Commands: header
-	if len(cs.Commands) > 0 {
-		b.WriteString("\n")
-		b.WriteString(h.Render("Commands:") + "\n")
-		maxPrefix := 0
-		for i := range cs.Commands {
-			p := fmt.Sprintf("%d) ", i+1)
-			if l := utf8.RuneCountInString(p); l > maxPrefix {
-				maxPrefix = l
-			}
-		}
-		// inner text width for commands inside value column
-		innerTextW := valueW - maxPrefix - 1
-		if innerTextW < 10 {
-			innerTextW = 10
-		}
-		var cb strings.Builder
-		for i, c := range cs.Commands {
-			p := fmt.Sprintf("%d) ", i+1)
-			cb.WriteString(renderTwoCol(p, c, maxPrefix, innerTextW))
-		}
-		b.WriteString(renderTableBlockHeader("", strings.TrimSuffix(cb.String(), "\n"), labelW))
-	}
+	// Commands
+	appendCommands(&b, cs.Commands, valueW, labelW, h)
 
-	// Dry-run preview — show simulated output where possible
-	if len(cs.Commands) > 0 {
-		b.WriteString("\n")
-		b.WriteString(h.Render("Dry-run preview:") + "\n")
-		for _, c := range cs.Commands {
-			out := simulateOutput(c)
-			b.WriteString(dryStyle.Render(out) + "\n")
-		}
-	}
+	// Dry-run preview
+	appendDryRunPreview(&b, cs.Commands, dryStyle)
 
 	// Metadata
+	appendMetadata(&b, cs, h, k)
+	return b.String()
+}
+
+func appendDescription(b *strings.Builder, desc string, valueW, labelW int, h lipgloss.Style) {
+	if desc == "" {
+		return
+	}
+	lines := wrapText(desc, valueW)
+	b.WriteString("\n")
+	b.WriteString(h.Render("Description:") + "\n")
+	b.WriteString(renderTableBlockHeader("", strings.Join(lines, "\n"), labelW))
+}
+
+func appendCommands(b *strings.Builder, commands []string, valueW, labelW int, h lipgloss.Style) {
+	if len(commands) == 0 {
+		return
+	}
+	b.WriteString("\n")
+	b.WriteString(h.Render("Commands:") + "\n")
+	maxPrefix := 0
+	for i := range commands {
+		p := fmt.Sprintf("%d) ", i+1)
+		if l := utf8.RuneCountInString(p); l > maxPrefix {
+			maxPrefix = l
+		}
+	}
+	innerTextW := valueW - maxPrefix - 1
+	if innerTextW < 10 {
+		innerTextW = 10
+	}
+	var cb strings.Builder
+	for i, c := range commands {
+		p := fmt.Sprintf("%d) ", i+1)
+		cb.WriteString(renderTwoCol(p, c, maxPrefix, innerTextW))
+	}
+	b.WriteString(renderTableBlockHeader("", strings.TrimSuffix(cb.String(), "\n"), labelW))
+}
+
+func appendDryRunPreview(b *strings.Builder, commands []string, dryStyle lipgloss.Style) {
+	if len(commands) == 0 {
+		return
+	}
+	b.WriteString("\n")
+	b.WriteString(dryStyle.Render("Dry-run preview:") + "\n")
+	for _, c := range commands {
+		out := simulateOutput(c)
+		b.WriteString(dryStyle.Render(out) + "\n")
+	}
+}
+
+func appendMetadata(b *strings.Builder, cs adapters.CommandSetSummary, h, k lipgloss.Style) {
 	meta := []string{}
 	if cs.AuthorName != "" {
 		meta = append(meta, "Author: "+cs.AuthorName)
@@ -235,7 +254,6 @@ func formatCSFullScreen(cs adapters.CommandSetSummary, width int, _ int) string 
 			b.WriteString(k.Render("  "+m) + "\n")
 		}
 	}
-	return b.String()
 }
 
 func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
@@ -262,55 +280,17 @@ func formatCSDetails(cs adapters.CommandSetSummary, width int) string {
 	// Name inline
 	b.WriteString(renderTableInline("Name:", cs.Name, labelW, valueW))
 
-	// Description as header + lines
+	// Description
 	if cs.Description != "" {
-		lines := wrapText(cs.Description, valueW)
-		b.WriteString("\n")
-		b.WriteString(renderTableBlockHeader("Description:", strings.Join(lines, "\n"), labelW))
+		appendDescription(&b, cs.Description, valueW, labelW, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")))
 	}
 
 	// Commands
-	if len(cs.Commands) > 0 {
-		b.WriteString("\n")
-		maxPrefix := 0
-		for i := range cs.Commands {
-			p := fmt.Sprintf("%d) ", i+1)
-			if l := utf8.RuneCountInString(p); l > maxPrefix {
-				maxPrefix = l
-			}
-		}
-		innerTextW := valueW - maxPrefix - 1
-		if innerTextW < 10 {
-			innerTextW = 10
-		}
-		var cb strings.Builder
-		for i, c := range cs.Commands {
-			p := fmt.Sprintf("%d) ", i+1)
-			cb.WriteString(renderTwoCol(p, c, maxPrefix, innerTextW))
-		}
-		b.WriteString(renderTableBlockHeader("Commands:", strings.TrimSuffix(cb.String(), "\n"), labelW))
-	}
+	appendCommands(&b, cs.Commands, valueW, labelW, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4")))
 
 	// Metadata
-	meta := []string{}
-	if cs.AuthorName != "" {
-		meta = append(meta, "Author: "+cs.AuthorName)
-	}
-	if cs.AuthorEmail != "" {
-		meta = append(meta, "Email: "+cs.AuthorEmail)
-	}
-	if cs.CreatedAt != "" {
-		meta = append(meta, "Created: "+cs.CreatedAt)
-	}
-	if cs.LastRun != "" {
-		meta = append(meta, "Last run: "+cs.LastRun)
-	}
-	if len(cs.Tags) > 0 {
-		meta = append(meta, "Tags: "+strings.Join(cs.Tags, ", "))
-	}
-	if len(meta) > 0 {
-		b.WriteString("\n")
-		b.WriteString(renderTableBlockHeader("Metadata:", strings.TrimSuffix(strings.Join(meta, "\n"), "\n"), labelW))
-	}
+	k := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#94a3b8"))
+	h := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#0ea5a4"))
+	appendMetadata(&b, cs, h, k)
 	return b.String()
 }

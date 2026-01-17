@@ -2,6 +2,7 @@
 package install
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -193,19 +194,20 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	if opts.DryRun {
 		return actions, nil
 	}
-	// Prepare result messages to return to callers
-	result := []string{}
+	return executeInstallNow(opts, targetPath)
+}
 
-	// Ensure the directory exists (report whether we created it or it already existed)
+func executeInstallNow(opts Options, targetPath string) ([]string, error) {
+	result := []string{}
+	// Ensure the directory exists (report whether we created it or it already existed).
+	// Pass the System flag so we can surface a helpful error when a system
+	// install cannot write to an existing directory.
 	targetDir := filepath.Dir(targetPath)
-	if stat, err := os.Stat(targetDir); err == nil && stat.IsDir() {
-		result = append(result, fmt.Sprintf("directory exists: %s", targetDir))
-	} else {
-		if err := os.MkdirAll(targetDir, 0o755); err != nil {
-			return nil, fmt.Errorf("create target dir: %w", err)
-		}
-		result = append(result, fmt.Sprintf("created directory: %s", targetDir))
+	msgs, err := ensureDirExists(targetDir, opts.System)
+	if err != nil {
+		return nil, err
 	}
+	result = append(result, msgs...)
 
 	// resolve source executable
 	src, err := resolveSourceExecutable(opts.From)
@@ -219,9 +221,7 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	}
 	result = append(result, fmt.Sprintf("copied %s -> %s", src, targetPath))
 
-	// Attempt to add to PATH if requested. For system installs on Unix this may fail
-	// due to lack of privileges; in that case we do not abort the install but record a
-	// warning in actions and still persist metadata so uninstall can locate the binary.
+	// Attempt to add to PATH and gather actions/metadata
 	pathFile, oldPath, addedToPath, addActions, err := handleAddToPath(opts, targetPath)
 	if err != nil {
 		return nil, err
@@ -241,7 +241,41 @@ func ExecuteInstall(opts Options) ([]string, error) {
 	result = append(result, "saved install metadata")
 
 	return result, nil
+}
 
+func ensureDirExists(targetDir string, system bool) ([]string, error) {
+	// If the directory already exists, verify it's writable. For system
+	// installs a non-writable directory should return a helpful error
+	// recommending elevated privileges rather than proceeding silently.
+	if stat, err := os.Stat(targetDir); err == nil && stat.IsDir() {
+		// Quick writable check: attempt to create a temporary file inside the
+		// directory. If that succeeds we can proceed normally.
+		tmpF, terr := os.CreateTemp(targetDir, ".krnr_write_test_*")
+		if terr == nil {
+			_ = tmpF.Close()
+			_ = os.Remove(tmpF.Name())
+			return []string{fmt.Sprintf("directory exists: %s", targetDir)}, nil
+		}
+		// If creation failed and this is a system install, return a clear
+		// permission-denied style error suggesting administrative rights.
+		if system {
+			if os.IsPermission(terr) {
+				return nil, fmt.Errorf("target directory %s exists but is not writable: %v; system installs often require administrative privileges to write to this location", targetDir, terr)
+			}
+			// Other errors when attempting to probe the directory
+			return nil, fmt.Errorf("target directory %s exists but could not be used: %v", targetDir, terr)
+		}
+		// For non-system installs be lenient and report existence.
+		return []string{fmt.Sprintf("directory exists: %s", targetDir)}, nil
+	}
+	// Directory does not exist: attempt to create it.
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		if system && os.IsPermission(err) {
+			return nil, fmt.Errorf("cannot create directory %s: permission denied; system installs require administrative privileges", targetDir)
+		}
+		return nil, fmt.Errorf("create target dir: %w", err)
+	}
+	return []string{fmt.Sprintf("created directory: %s", targetDir)}, nil
 }
 
 // handleAddToPath centralizes add-to-PATH behavior for ExecuteInstall to reduce
@@ -396,15 +430,13 @@ func GetStatus() (*Status, error) {
 // and updates the Status accordingly.
 func checkWindowsPathMembership(st *Status) {
 	// Check Machine and User PATH for system / user installs
-	getCmd := exec.Command("powershell", "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','Machine')")
-	if out, err := getCmd.Output(); err == nil {
-		if ContainsPath(strings.TrimSpace(string(out)), filepath.Dir(st.SystemPath)) {
+	if out, err := runPowerShellWithTimeout(3*time.Second, "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','Machine')"); err == nil {
+		if ContainsPath(strings.TrimSpace(out), filepath.Dir(st.SystemPath)) {
 			st.SystemOnPath = true
 		}
 	}
-	getCmd2 := exec.Command("powershell", "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','User')")
-	if out2, err := getCmd2.Output(); err == nil {
-		if ContainsPath(strings.TrimSpace(string(out2)), filepath.Dir(st.UserPath)) {
+	if out2, err := runPowerShellWithTimeout(3*time.Second, "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','User')"); err == nil {
+		if ContainsPath(strings.TrimSpace(out2), filepath.Dir(st.UserPath)) {
 			st.UserOnPath = true
 		}
 	}
@@ -464,11 +496,10 @@ func addToPathWindows(dir string, system bool) (string, string, error) {
 		pathLabel = "MachineEnv"
 	}
 	// Retrieve current PATH for scope
-	getCmd := exec.Command("powershell", "-NoProfile", "-Command", fmt.Sprintf("[Environment]::GetEnvironmentVariable('Path','%s')", scope))
-	out, err := getCmd.Output()
+	out, err := runPowerShellWithTimeout(3*time.Second, "-NoProfile", "-Command", fmt.Sprintf("[Environment]::GetEnvironmentVariable('Path','%s')", scope))
 	old := ""
 	if err == nil {
-		old = strings.TrimSpace(string(out))
+		old = strings.TrimSpace(out)
 	}
 	// If already present in that PATH or current process PATH, nothing to do
 	if ContainsPath(old, dir) || ContainsPath(os.Getenv("PATH"), dir) {
@@ -488,9 +519,8 @@ func addToPathWindows(dir string, system bool) (string, string, error) {
 	// Build an encoded PowerShell command to set the PATH safely (avoids quoting/escaping issues)
 	script := fmt.Sprintf("[Environment]::SetEnvironmentVariable('Path', %s, '%s')", toPowerShellString(newPath), scope)
 	enc := encodePowerShellCommand(script)
-	setCmd := exec.Command("powershell", "-NoProfile", "-EncodedCommand", enc)
-	if out, err := setCmd.CombinedOutput(); err != nil {
-		return "", old, fmt.Errorf("set %s PATH: %v (%s)", scope, err, string(out))
+	if out, err := runPowerShellWithTimeout(10*time.Second, "-NoProfile", "-EncodedCommand", enc); err != nil {
+		return "", old, fmt.Errorf("set %s PATH: %v (%s)", scope, err, strings.TrimSpace(out))
 	}
 	// Attempt to correct doubled backslashes if they appear after setting
 	if fixMsg, fixed, err := ensureNoDoubleBackslashes(scope, false); err != nil {
@@ -499,6 +529,18 @@ func addToPathWindows(dir string, system bool) (string, string, error) {
 		_ = fixMsg // caller can log if needed; we return pathLabel
 	}
 	return pathLabel, old, nil
+}
+
+// runPowerShellWithTimeout runs PowerShell with the provided args and returns combined output trimmed and an error if command failed or timed out.
+func runPowerShellWithTimeout(timeout time.Duration, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "powershell", args...)
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return strings.TrimSpace(string(out)), ctx.Err()
+	}
+	return strings.TrimSpace(string(out)), err
 }
 
 // addToPathUnix appends a PATH export to the appropriate shell rc file and returns the file path

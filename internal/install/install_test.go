@@ -215,6 +215,28 @@ func TestSystemInstall_SavesMetadataEvenWithoutAddToPath(t *testing.T) {
 	}
 }
 
+func TestSystemInstallDirectoryNotWritable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission semantics differ on Windows; skip on Windows")
+	}
+	// Create a directory and remove write permission to simulate a protected system dir
+	tmp := t.TempDir()
+	installDir := filepath.Join(tmp, "krnr")
+	if err := os.MkdirAll(installDir, 0o555); err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+	src := filepath.Join(tmp, "srcbin")
+	_ = os.WriteFile(src, []byte("binstuff"), 0o644)
+	opts := Options{User: false, System: true, Path: installDir, From: src, DryRun: false}
+	_, err := ExecuteInstall(opts)
+	if err == nil {
+		t.Fatalf("expected permission error when installing to non-writable system dir")
+	}
+	if !strings.Contains(err.Error(), "not writable") && !strings.Contains(err.Error(), "permission") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
 func TestDetectBothScopes(t *testing.T) {
 	// Simulate both user and system installs and ensure Status detects both
 	tmp := t.TempDir()

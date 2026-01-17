@@ -14,15 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestMenuImportDatabaseOverwrite_RealDB(t *testing.T) {
-	// sandbox DB path
-	tmp := t.TempDir()
-	dst := filepath.Join(tmp, "krnr.db")
-	src := filepath.Join(tmp, "src.db")
-	_ = os.Setenv("KRNR_DB", dst)
-	defer func() { _ = os.Unsetenv("KRNR_DB") }()
-
-	// create source DB and populate a command set
+func createAndPopulateSrcDB(t *testing.T, src string) {
 	srcConn, err := sql.Open("sqlite", src)
 	if err != nil {
 		t.Fatalf("open src db: %v", err)
@@ -35,6 +27,34 @@ func TestMenuImportDatabaseOverwrite_RealDB(t *testing.T) {
 	if _, err := srcRepo.CreateCommandSet("db-imported", nil, nil, nil, []string{"echo hi"}); err != nil {
 		t.Fatalf("create command set src: %v", err)
 	}
+}
+
+func performImportDBOverwriteRealDB(t *testing.T, m *TuiModel, src string) {
+	m = selectMenuItem(t, m, "Import database")
+	if !m.menuInputMode || m.menuAction != "import-db" {
+		t.Fatalf("expected import-db prompt mode, got %v %q", m.menuInputMode, m.menuAction)
+	}
+	m.menuInput = src
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = m5
+	if m.menuAction != "import-db-overwrite" {
+		t.Fatalf("expected overwrite prompt stage, got %q", m.menuAction)
+	}
+	m.menuInput = "y"
+	m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = m6
+}
+
+func TestMenuImportDatabaseOverwrite_RealDB(t *testing.T) {
+	// sandbox DB path
+	tmp := t.TempDir()
+	dst := filepath.Join(tmp, "krnr.db")
+	src := filepath.Join(tmp, "src.db")
+	_ = os.Setenv("KRNR_DB", dst)
+	defer func() { _ = os.Unsetenv("KRNR_DB") }()
+
+	// create source DB and populate a command set
+	createAndPopulateSrcDB(t, src)
 
 	// ensure active DB exists and is open
 	activeConn, err := db.InitDB()
@@ -57,28 +77,7 @@ func TestMenuImportDatabaseOverwrite_RealDB(t *testing.T) {
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 
-	// open menu and select Import database (move down once)
-	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
-	m = m2.(*TuiModel)
-	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = m3.(*TuiModel)
-	m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = m4.(*TuiModel)
-	if !m.menuInputMode || m.menuAction != "import-db" {
-		t.Fatalf("expected import-db prompt mode, got %v %q", m.menuInputMode, m.menuAction)
-	}
-
-	// set path and confirm -> advances to overwrite prompt
-	m.menuInput = src
-	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = m5.(*TuiModel)
-	if m.menuAction != "import-db-overwrite" {
-		t.Fatalf("expected overwrite prompt stage, got %q", m.menuAction)
-	}
-	// answer overwrite: yes
-	m.menuInput = "y"
-	m6, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m = m6.(*TuiModel)
+	performImportDBOverwriteRealDB(t, m, src)
 
 	found := false
 	for _, it := range m.list.Items() {

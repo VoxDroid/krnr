@@ -15,7 +15,21 @@ import (
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
 )
 
-// Test that ImportDB + ReopenDB causes the model to see imported command sets
+func createAndPopulateSrcDB(t *testing.T, src string) {
+	srcConn2, err := sql.Open("sqlite", src)
+	if err != nil {
+		t.Fatalf("open src2: %v", err)
+	}
+	defer func() { _ = srcConn2.Close() }()
+	if err := db.ApplyMigrations(srcConn2); err != nil {
+		t.Fatalf("apply migrations src: %v", err)
+	}
+	srcRepo := registry.NewRepository(srcConn2)
+	if _, err := srcRepo.CreateCommandSet("imported-db", nil, nil, nil, []string{"echo hi"}); err != nil {
+		t.Fatalf("create command set src: %v", err)
+	}
+}
+
 func TestImportDatabaseReopen(t *testing.T) {
 	// set a temp DB path
 	tmp := t.TempDir()
@@ -36,19 +50,8 @@ func TestImportDatabaseReopen(t *testing.T) {
 		t.Fatalf("init src db: %v", err)
 	}
 	_ = srcConn.Close()
-	// Instead of re-using InitDB (which uses config.EnvKRNRDB), open and populate src directly
-	srcConn2, err := sql.Open("sqlite", src)
-	if err != nil {
-		t.Fatalf("open src2: %v", err)
-	}
-	defer func() { _ = srcConn2.Close() }()
-	if err := db.ApplyMigrations(srcConn2); err != nil {
-		t.Fatalf("apply migrations src: %v", err)
-	}
-	srcRepo := registry.NewRepository(srcConn2)
-	if _, err := srcRepo.CreateCommandSet("imported-db", nil, nil, nil, []string{"echo hi"}); err != nil {
-		t.Fatalf("create command set src: %v", err)
-	}
+
+	createAndPopulateSrcDB(t, src)
 
 	// ensure initial active DB exists (empty)
 	activeConn, err := db.InitDB()

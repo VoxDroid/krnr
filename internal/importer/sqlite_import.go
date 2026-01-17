@@ -82,56 +82,60 @@ func ensureUniqueName(dst *sql.DB, orig string) (string, error) {
 // ImportCommandSet imports all command sets from srcPath into the active DB.
 // Options control how name conflicts are handled.
 func ImportCommandSet(srcPath string, opts ImportOptions) error {
-	src, err := sql.Open("sqlite", srcPath)
+	src, dst, rows, r, err := openImportResources(srcPath)
 	if err != nil {
-		return fmt.Errorf("open src: %w", err)
+		return err
 	}
 	defer func() { _ = src.Close() }()
-
-	dstPath, err := config.DBPath()
-	if err != nil {
-		return err
-	}
-	dst, err := sql.Open("sqlite", dstPath)
-	if err != nil {
-		return fmt.Errorf("open dst: %w", err)
-	}
 	defer func() { _ = dst.Close() }()
-
-	// ensure destination DB has the latest migrations (triggers/indexes)
-	if err := dbpkg.ApplyMigrations(dst); err != nil {
-		return fmt.Errorf("apply migrations to destination DB: %w", err)
-	}
-
-	rows, err := src.Query("SELECT id, name, description, created_at, last_run FROM command_sets")
-	if err != nil {
-		return err
-	}
 	defer func() { _ = rows.Close() }()
 
-	r := registry.NewRepository(dst)
-
-	// map policies to handler closures to reduce complexity
-	handlers := map[string]func(int64, string, sql.NullString, string, sql.NullString) error{
-		"rename": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
-			return importWithRename(dst, src, id, name, desc, created, lastRun)
-		},
-		"skip": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
-			return importWithSkip(dst, src, id, name, desc, created, lastRun)
-		},
-		"overwrite": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
-			return importWithOverwrite(dst, src, id, name, desc, created, lastRun)
-		},
-		"merge": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
-			return importWithMerge(r, dst, src, id, name, desc, created, lastRun, opts)
-		},
-	}
+	handlers := createImportHandlers(dst, src, r, opts)
 
 	policy := opts.OnConflict
 	if policy == "" {
 		policy = "rename"
 	}
 
+	return processImportRows(rows, handlers, policy)
+}
+
+func openImportResources(srcPath string) (*sql.DB, *sql.DB, *sql.Rows, *registry.Repository, error) {
+	src, err := sql.Open("sqlite", srcPath)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("open src: %w", err)
+	}
+
+	dstPath, err := config.DBPath()
+	if err != nil {
+		_ = src.Close()
+		return nil, nil, nil, nil, err
+	}
+	dst, err := sql.Open("sqlite", dstPath)
+	if err != nil {
+		_ = src.Close()
+		return nil, nil, nil, nil, fmt.Errorf("open dst: %w", err)
+	}
+
+	// ensure destination DB has the latest migrations (triggers/indexes)
+	if err := dbpkg.ApplyMigrations(dst); err != nil {
+		_ = src.Close()
+		_ = dst.Close()
+		return nil, nil, nil, nil, fmt.Errorf("apply migrations to destination DB: %w", err)
+	}
+
+	rows, err := src.Query("SELECT id, name, description, created_at, last_run FROM command_sets")
+	if err != nil {
+		_ = src.Close()
+		_ = dst.Close()
+		return nil, nil, nil, nil, err
+	}
+
+	r := registry.NewRepository(dst)
+	return src, dst, rows, r, nil
+}
+
+func processImportRows(rows *sql.Rows, handlers map[string]func(int64, string, sql.NullString, string, sql.NullString) error, policy string) error {
 	for rows.Next() {
 		var id int64
 		var name string
@@ -150,6 +154,23 @@ func ImportCommandSet(srcPath string, opts ImportOptions) error {
 		}
 	}
 	return nil
+}
+
+func createImportHandlers(dst *sql.DB, src *sql.DB, r *registry.Repository, opts ImportOptions) map[string]func(int64, string, sql.NullString, string, sql.NullString) error {
+	return map[string]func(int64, string, sql.NullString, string, sql.NullString) error{
+		"rename": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
+			return importWithRename(dst, src, id, name, desc, created, lastRun)
+		},
+		"skip": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
+			return importWithSkip(dst, src, id, name, desc, created, lastRun)
+		},
+		"overwrite": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
+			return importWithOverwrite(dst, src, id, name, desc, created, lastRun)
+		},
+		"merge": func(id int64, name string, desc sql.NullString, created string, lastRun sql.NullString) error {
+			return importWithMerge(r, dst, src, id, name, desc, created, lastRun, opts)
+		},
+	}
 }
 
 func insertCommandSet(dst *sql.DB, name string, desc sql.NullString, created string, lastRun sql.NullString) (int64, error) {
