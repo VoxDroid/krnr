@@ -52,6 +52,33 @@ func TestFilterTypingUpdatesList(t *testing.T) {
 	}
 }
 
+func TestFilterModeSpaceKeyAppendsSpace(t *testing.T) {
+	reg := &fakeRegistry{items: []adapters.CommandSetSummary{{Name: "alpha", Description: "A"}, {Name: "beta", Description: "B"}}}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	// enter filter mode
+	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	m = m1.(*TuiModel)
+	if !m.filterMode {
+		t.Fatalf("expected filter mode to be active")
+	}
+	// type 'b'
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	m = m2.(*TuiModel)
+	// press SPACE key (KeySpace)
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = m3.(*TuiModel)
+	if m.listFilter != "b " {
+		t.Fatalf("expected listFilter to be 'b ' after pressing KeySpace, got %q", m.listFilter)
+	}
+	// the list Title should include the space
+	if m.list.Title != "Filter: b " {
+		t.Fatalf("expected title to include space, got %q", m.list.Title)
+	}
+}
+
 func TestFilterMatchesTags(t *testing.T) {
 	reg := &fakeRegistry{items: []adapters.CommandSetSummary{{Name: "s1", Description: "", Tags: []string{"db", "alpha"}}, {Name: "s2", Description: "", Tags: []string{"net"}}}}
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)

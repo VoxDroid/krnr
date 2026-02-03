@@ -46,6 +46,10 @@ Accessibility & theming
 - High-contrast mode: toggle with `T` inside the TUI. This switches to a high-contrast color scheme to improve readability in low-vision or busy terminal themes.
 - Menu modal: press `m` to open the **Menu** modal which contains actions like `Export database`, `Import database`, `Import set`, `Install`, `Uninstall`, and `Status`. Export/Import invoke the existing adapter-backed logic so the TUI delegates to the same exporter/importer paths as the CLI.
 
+Key handling and spaces
+- Note: different terminals may report the spacebar as either a `KeyRunes` event with a single `' '` rune or as a `KeySpace` event. The TUI now handles both forms consistently for editor input and the list filter so pressing the spacebar reliably inserts a space character regardless of environment. Tests were added to prevent regressions.
+
+
 CI
 - We added a GitHub Actions workflow `.github/workflows/tui-ci.yml` to run `go test ./... -v` across Ubuntu, Windows and macOS. The workflow validates headless UI tests and the rest of the test suite on PRs and pushes to `main`.
 Accessibility

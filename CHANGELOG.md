@@ -3,6 +3,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.3 - 2026-02-03
+
+- **Bugfix (TUI):** Fix spacebar handling in the TUI editor and filter. Some terminals emit `tea.KeySpace` instead of `tea.KeyRunes` for the spacebar; the TUI now treats `KeySpace` as a typed space so spaces are inserted into editor commands and list filters consistently. Added headless tests `TestEditorTypingSpaceKeyInCommands` and `TestFilterModeSpaceKeyAppendsSpace` to prevent regressions.
+- **Quality:** Ran `gocyclo` (no functions with complexity > 10 found) and `golangci-lint` (0 issues).
+- **Docs:** Update `docs/tui.md` and add release notes for the fix.
+
 ## v1.2.2 - 2026-01-17
 
 - Bugfix: Preserve comma-containing commands passed via a single `-c` flag (e.g., PowerShell `Select-Object` usage such as `Get-ComputerInfo | Select-Object OsName, OsVersion, OsArchitecture`). The CLI no longer splits a single `-c` value on commas — instead we use repeatable `-c` flags (`StringArray`) and ensure a single quoted `-c` is preserved literally.

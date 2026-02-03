@@ -21,13 +21,13 @@ _Record. Automate. Run._
 
 ---
 
-### Why not just an alias or a shell script? 
+### Why not just an alias or a shell script?
 
 - **Aliases** - Fast to add, but per‑shell and per‑machine. They live in whichever RC file you edited and are invisible to others unless you share your dotfiles manually. Hard to discover across many short‑lived aliases.
 - **Shell scripts / dotfiles** - Flexible and shareable, but scattered. To share you need a repo, copy instructions, or a package. Scripts don’t include author/metadata, versioned history for the command itself, or a simple, interactive discovery UI.
 - **git** - Excellent for source control and team collaboration, but file‑centric: commits operate on files, not on discoverable, runnable command sets. Git workflows require manual commits and searches; they aren’t optimized for quick ad hoc rollbacks or interactive discovery of hundreds of tiny workflows.
 
-### How krnr helps 
+### How krnr helps
 
 - **Global (per‑user, per‑machine)** - krnr stores a single, versioned SQLite registry in your user config path (see `KRNR_HOME`), so any shell on your machine (bash, zsh, PowerShell, TUI, CI sessions) can access the same saved workflows without per‑shell setup.
 - **Cross‑machine** — Use `krnr export` to produce a portable SQLite file (whole DB or selected sets) and `krnr import` on another machine. Exports are single files with metadata, timestamps, authorship, and configurable conflict policies (`--on-conflict` rename|skip|overwrite|merge) to avoid clobbering local setups.

@@ -51,7 +51,7 @@ func applyListFilterKey(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 	// update the live filter text and apply filtering only when the filter
 	// text actually changed (typing/backspace/esc). Navigation keys should
 	// not reapply the items and reset the selection.
-	if msg.Type == tea.KeyRunes || msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete || msg.Type == tea.KeyEsc {
+	if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace || msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete || msg.Type == tea.KeyEsc {
 		updateListFilterText(m, msg)
 		applyFilterItems(m)
 	}
@@ -67,6 +67,8 @@ func updateListFilterText(m *TuiModel, msg tea.KeyMsg) {
 		for _, ru := range msg.Runes {
 			m.listFilter += string(ru)
 		}
+	case tea.KeySpace:
+		m.listFilter += " "
 	case tea.KeyBackspace, tea.KeyDelete:
 		if len(m.listFilter) > 0 {
 			r := []rune(m.listFilter)
@@ -139,7 +141,7 @@ func applyFilterItems(m *TuiModel) {
 
 func handleDispatchFilterMode(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	switch msg.Type {
-	case tea.KeyRunes:
+	case tea.KeyRunes, tea.KeySpace:
 		return handleFilterModeRunes(m, msg)
 	case tea.KeyBackspace, tea.KeyDelete:
 		return handleFilterModeBackspace(m, msg)
@@ -162,8 +164,12 @@ func handleDispatchFilterMode(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, 
 }
 
 func handleFilterModeRunes(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
-	for _, ru := range msg.Runes {
-		m.listFilter += string(ru)
+	if msg.Type == tea.KeySpace {
+		m.listFilter += " "
+	} else {
+		for _, ru := range msg.Runes {
+			m.listFilter += string(ru)
+		}
 	}
 	applyFilterItems(m)
 	return m, nil, false

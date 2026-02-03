@@ -41,6 +41,12 @@ func (m *TuiModel) handleEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete {
 		return m.handleEditorBackspace()
 	}
+	// Treat KeySpace like typing a rune ' ' so real terminals that produce
+	// a KeySpace are handled the same as test harnesses that use KeyRunes.
+	if msg.Type == tea.KeySpace {
+		// synthesize a KeyRunes message with a single space rune
+		return m.handleEditorRunes(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	}
 	if msg.Type == tea.KeyRunes {
 		return m.handleEditorRunes(msg)
 	}

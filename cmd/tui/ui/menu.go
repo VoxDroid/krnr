@@ -351,8 +351,6 @@ func (m *TuiModel) renderMenu() string {
 	return b.String()
 }
 
-
-
 func (m *TuiModel) renderMenuSingleCol() string {
 	var b strings.Builder
 	// Compute maximum item width so we can pad items to a consistent length

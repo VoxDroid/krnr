@@ -646,6 +646,48 @@ func TestEditorTypingKAndSpaceInCommands(t *testing.T) {
 	}
 }
 
+func TestEditorTypingSpaceKeyInCommands(t *testing.T) {
+	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{""}}
+	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}
+	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m.Init()()
+	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	m = m1.(*TuiModel)
+	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = m2.(*TuiModel)
+	// open in-TUI editor
+	m3, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	m = m3.(*TuiModel)
+	if !m.editingMeta {
+		t.Fatalf("expected editor to be open")
+	}
+	// cycle to commands field (tab until commands)
+	for i := 0; i < 10 && m.editor.field != 5; i++ {
+		m4, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+		m = m4.(*TuiModel)
+	}
+	// ensure we're editing the first command
+	if m.editor.cmdIndex != 0 {
+		t.Fatalf("expected cmdIndex 0, got %d", m.editor.cmdIndex)
+	}
+	// type 'k', then SPACE using KeySpace, then 'x'
+	m5, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m = m5.(*TuiModel)
+	m6, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = m6.(*TuiModel)
+	m7, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = m7.(*TuiModel)
+	if m.editor.commands[m.editor.cmdIndex] != "k x" {
+		t.Fatalf("expected command to contain typed runes 'k x', got %q", m.editor.commands[m.editor.cmdIndex])
+	}
+	// ensure cmdIndex didn't move due to 'k'
+	if m.editor.cmdIndex != 0 {
+		t.Fatalf("expected cmdIndex to remain 0 after typing 'k', got %d", m.editor.cmdIndex)
+	}
+}
+
 func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
 	full := adapters.CommandSetSummary{Name: "one", Description: "First", Commands: []string{"echo hi"}}
 	reg := &replaceFakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}, full: full}

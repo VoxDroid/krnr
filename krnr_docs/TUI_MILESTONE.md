@@ -67,4 +67,3 @@ The target scope of `krnr tui` is parity for interactive workflows that the CLI 
 - Implementation: `cmd/tui` (Bubble Tea model), `internal/tui` (UIModel & adapters)
 - Tests: `cmd/tui/ui/tui_test.go` (headless), `cmd/tui/ui/pty_e2e_test.go` (PTY E2E)
 - Docs: `docs/cli.md` (TUI section), `docs/releases/v1.2.0.md`
-
