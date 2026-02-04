@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/VoxDroid/krnr/internal/executor"
+	"github.com/VoxDroid/krnr/internal/tui/sanitize"
 )
 
 // executorAdapter implements ExecutorAdapter using an executor.Runner.
@@ -43,7 +44,8 @@ func (e *executorAdapter) Run(ctx context.Context, _ string, commands []string) 
 					_ = r.Close()
 					return
 				default:
-					rchan <- RunEvent{Line: s.Text()}
+					line := sanitize.RunOutput(s.Text())
+					rchan <- RunEvent{Line: line}
 				}
 			}
 			if err := s.Err(); err != nil {

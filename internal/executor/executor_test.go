@@ -66,6 +66,43 @@ func TestUnescapeWriter(t *testing.T) {
 	}
 }
 
+func TestUnescapeWriter_PreservesANSI(t *testing.T) {
+	// Test that ANSI escape sequences pass through unmodified (not processed by unescapeWriter).
+	// This is critical for tools like fastfetch, htop, etc. that use ANSI codes.
+	var buf bytes.Buffer
+	uw := &unescapeWriter{w: &buf}
+	// Simulate colored output with ANSI escape code: ESC[1;32m GREEN ESC[0m
+	ansiGreen := "\x1b[1;32mGREEN\x1b[0m\n"
+	in := []byte(ansiGreen)
+	if n, err := uw.Write(in); err != nil {
+		t.Fatalf("write failed: %v", err)
+	} else if n != len(in) {
+		t.Fatalf("expected write len %d, got %d", len(in), n)
+	}
+	// Verify ANSI sequence passed through unchanged
+	if buf.String() != ansiGreen {
+		t.Fatalf("expected ANSI to pass through unchanged, got: %q", buf.String())
+	}
+}
+
+func TestUnescapeWriter_ANSIWithQuotes(t *testing.T) {
+	// Test that output containing both ANSI codes and quotes preserves both.
+	var buf bytes.Buffer
+	uw := &unescapeWriter{w: &buf}
+	// Mix ANSI codes with quoted text: "message" with color codes
+	mixedOutput := "\x1b[1;36m\"ANSI with quotes\"\x1b[0m\n"
+	in := []byte(mixedOutput)
+	if n, err := uw.Write(in); err != nil {
+		t.Fatalf("write failed: %v", err)
+	} else if n != len(in) {
+		t.Fatalf("expected write len %d, got %d", len(in), n)
+	}
+	// ANSI-containing output must pass through unchanged (quotes should NOT be stripped)
+	if buf.String() != mixedOutput {
+		t.Fatalf("expected ANSI+quotes to pass through unchanged, got: %q", buf.String())
+	}
+}
+
 func TestShellInvocationOverride(t *testing.T) {
 	// pwsh should use -Command
 	shell, args := shellInvocation("echo hi", "pwsh")

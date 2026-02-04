@@ -3,6 +3,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.4 - 2026-02-04
+
+- **Bugfix (TUI):** Prevent TUI deformation when running commands that emit control sequences (e.g., `fastfetch`, `htop`, or other terminal programs that use alternate screen or cursor controls). We now sanitize run output shown in the TUI so destructive control sequences (alternate-screen, clear-screen, cursor movement, OSC sequences) are removed while preserving SGR color sequences so colored output still renders in the output pane.
+  - Added `internal/tui/sanitize.RunOutput` to perform conservative sanitization and normalization.
+  - Wire sanitizer into streaming path: `internal/tui/adapters/executor_adapter.go` and `cmd/tui/ui/tui.go` so run output cannot escape the output viewport.
+  - Add tests: headless TUI test `TestRunStreamsSanitizesControlSequences`, and unit tests for the sanitizer (`internal/tui/adapters/executor_adapter_test.go`).
+- **Quality:** Ran `gocyclo` and addressed high complexity issues (split large headless test). Fixed `golangci-lint` findings. All tests pass locally.
+- **Docs:** Note about sanitized run output added to `docs/tui.md` and release notes added for v1.2.4.
+
 ## v1.2.3 - 2026-02-03
 
 - **Bugfix (TUI):** Fix spacebar handling in the TUI editor and filter. Some terminals emit `tea.KeySpace` instead of `tea.KeyRunes` for the spacebar; the TUI now treats `KeySpace` as a typed space so spaces are inserted into editor commands and list filters consistently. Added headless tests `TestEditorTypingSpaceKeyInCommands` and `TestFilterModeSpaceKeyAppendsSpace` to prevent regressions.

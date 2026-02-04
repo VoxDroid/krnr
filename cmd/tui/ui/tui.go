@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
+	"github.com/VoxDroid/krnr/internal/tui/sanitize"
 )
 
 // TuiModel is the Bubble Tea model used by cmd/tui.
@@ -253,7 +254,10 @@ func (m *TuiModel) handleRunEvent(ev adapters.RunEvent) (tea.Model, tea.Cmd) {
 		m.runCh = nil
 		return m, nil
 	}
-	m.logs = append(m.logs, ev.Line)
+	// Sanitize run output to ensure control sequences cannot escape the
+	// output viewport and affect the surrounding UI (e.g., borders). This
+	// also preserves SGR color codes while stripping destructive sequences.
+	m.logs = append(m.logs, sanitize.RunOutput(ev.Line))
 	// keep viewport scrolled to bottom
 	m.vp.SetContent(strings.Join(m.logs, "\n"))
 	m.vp.GotoBottom()

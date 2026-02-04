@@ -38,7 +38,17 @@ func (u *unescapeWriter) Write(p []byte) (int, error) {
 		return 0, nil
 	}
 	s := string(p)
-	// Unescape backslash-escaped quotes
+	// ANSI escape sequences start with ESC (0x1b) followed by [ or other control chars.
+	// If the output contains ANSI sequences (used by tools like fastfetch, htop, etc.),
+	// skip normalization to avoid corrupting terminal rendering.
+	if strings.Contains(s, "\x1b") {
+		// Output contains ANSI escape sequences; pass through unchanged
+		if _, err := u.w.Write(p); err != nil {
+			return 0, err
+		}
+		return len(p), nil
+	}
+	// Unescape backslash-escaped quotes only when ANSI-free
 	s = strings.ReplaceAll(s, "\\\"", "\"")
 	// Normalize newlines for inspection
 	trimmed := strings.TrimRight(s, "\r\n")

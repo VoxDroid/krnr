@@ -5,6 +5,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/VoxDroid/krnr/internal/tui/sanitize"
 )
 
 // fakeRunner writes provided lines to stdout and returns
@@ -40,5 +42,29 @@ func TestExecutorAdapter_RunStreamsOutput(t *testing.T) {
 	}
 	if len(got) != 3 {
 		t.Fatalf("expected 3 lines got %d", len(got))
+	}
+}
+
+func TestSanitizeRunOutput_PreservesSGR(t *testing.T) {
+	in := "\x1b[1;32mGREEN\x1b[0m"
+	out := sanitize.RunOutput(in)
+	if out != in {
+		t.Fatalf("expected SGR to be preserved, got %q", out)
+	}
+}
+
+func TestSanitizeRunOutput_RemoveAltScreenAndClear(t *testing.T) {
+	in := "\x1b[?1049h\x1b[2JHello\x1b[?1049l"
+	out := sanitize.RunOutput(in)
+	if out != "Hello" {
+		t.Fatalf("expected alt/clear removed, got %q", out)
+	}
+}
+
+func TestSanitizeRunOutput_NormalizesCR(t *testing.T) {
+	in := "line1\rline2\r\nline3"
+	out := sanitize.RunOutput(in)
+	if out != "line1\nline2\nline3" {
+		t.Fatalf("expected CR normalized to LF, got %q", out)
 	}
 }

@@ -49,6 +49,9 @@ Accessibility & theming
 Key handling and spaces
 - Note: different terminals may report the spacebar as either a `KeyRunes` event with a single `' '` rune or as a `KeySpace` event. The TUI now handles both forms consistently for editor input and the list filter so pressing the spacebar reliably inserts a space character regardless of environment. Tests were added to prevent regressions.
 
+Sanitizing run output
+- The TUI now sanitizes streaming command output shown inside the output viewport to remove control sequences that affect global terminal state (e.g., alternate screen, clear-screen, cursor movements, and OSC sequences) while preserving SGR color codes. This prevents external commands like `fastfetch` from deforming the TUI layout. The sanitizer is conservative and tested; see `internal/tui/sanitize` for details.
+
 
 CI
 - We added a GitHub Actions workflow `.github/workflows/tui-ci.yml` to run `go test ./... -v` across Ubuntu, Windows and macOS. The workflow validates headless UI tests and the rest of the test suite on PRs and pushes to `main`.
