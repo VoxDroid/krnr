@@ -37,6 +37,13 @@ type TuiModel struct {
 	menuInputMode  bool   // whether the menu is in input mode
 	menuAction     string // action to perform on input confirmation
 
+	// when a run is in progress we can capture typed keys and forward them
+	// into the running process stdin via `runInputWriter` when available.
+	runCapturesInput bool
+	runInputWriter   interface {
+		WriteInput([]byte) (int, error)
+	}
+
 	showDetail bool
 	detail     string
 	detailName string
@@ -96,11 +103,25 @@ type TuiModel struct {
 	pendingRollback        bool
 	pendingRollbackVersion int
 	pendingRollbackName    string
+	// delete version confirmation state
+	pendingDeleteVersion     bool
+	pendingDeleteVersionNum  int
+	pendingDeleteVersionName string
 }
 
 // Messages
 type runEventMsg adapters.RunEvent
 type runDoneMsg struct{}
+
+// initDoneMsg is sent by Init() after loading the initial data.
+// Bubble Tea runs Init commands asynchronously, so we must return a
+// proper message and process it in Update() to trigger a re-render;
+// mutating the model inside the Cmd alone would race with View().
+type initDoneMsg struct {
+	items       []list.Item
+	previewName string
+	preview     string
+}
 
 // saveNowMsg schedules an editor save after a short delay to allow PTY input
 // to be processed before committing the edit. This helps make PTY end-to-end
@@ -194,6 +215,8 @@ func (m *TuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *TuiModel) handleUpdateMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case initDoneMsg:
+		return m.handleInitDone(msg)
 	case saveNowMsg:
 		return m.handleSaveNowWrapped()
 	case clearNotificationMsg:
@@ -206,6 +229,8 @@ func (m *TuiModel) handleUpdateMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case runDoneMsg:
 		m.runInProgress = false
 		m.runCh = nil
+		m.runCapturesInput = false
+		m.runInputWriter = nil
 		return m, nil
 	case tea.WindowSizeMsg:
 		return m.handleWindowSizeWrapped(msg)
@@ -239,6 +264,29 @@ func (m *TuiModel) handleRunEventWrapped(ev adapters.RunEvent) (tea.Model, tea.C
 	return m, cmd
 }
 
+// handleInitDone processes the data loaded by Init(). It populates the list
+// and preview viewport so the UI renders content on the first frame.
+func (m *TuiModel) handleInitDone(msg initDoneMsg) (tea.Model, tea.Cmd) {
+	// Ensure the list and viewport have reasonable defaults so the UI shows
+	// content on first render (before a WindowSizeMsg arrives).
+	if m.list.Height() == 0 {
+		m.list.SetSize(30, 10)
+	}
+	if m.vp.Width == 0 || m.vp.Height == 0 {
+		m.vp = viewport.New(40, 12)
+	}
+
+	m.list.SetItems(msg.items)
+
+	if len(msg.items) > 0 {
+		m.list.Select(0)
+		m.lastSelectedName = msg.previewName
+		m.vp.SetContent(msg.preview)
+		m.logPreviewUpdate(msg.previewName)
+	}
+	return m, nil
+}
+
 func (m *TuiModel) handleWindowSizeWrapped(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	dm, cmd := m.handleWindowSize(msg)
 	if newM, ok := dm.(*TuiModel); ok {
@@ -252,6 +300,8 @@ func (m *TuiModel) handleRunEvent(ev adapters.RunEvent) (tea.Model, tea.Cmd) {
 		m.logs = append(m.logs, "err: "+ev.Err.Error())
 		m.runInProgress = false
 		m.runCh = nil
+		m.runCapturesInput = false
+		m.runInputWriter = nil
 		return m, nil
 	}
 	// Sanitize run output to ensure control sequences cannot escape the
@@ -272,6 +322,9 @@ func (m *TuiModel) handleRunEvent(ev adapters.RunEvent) (tea.Model, tea.Cmd) {
 func (m *TuiModel) processKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	// handlers in prioritized order
 	handlers := []func(tea.KeyMsg) (tea.Model, tea.Cmd, bool){
+		// If a run is in progress and we're capturing input, prioritize
+		// forwarding keys into the running process.
+		func(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) { return m.handleRunInputKeys(msg) },
 		m.handleEditorOrMenuKeys,
 		m.handleFilterModeKeys,
 		func(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
@@ -305,6 +358,27 @@ func (m *TuiModel) handleEditorOrMenuKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, b
 	if m.showMenu {
 		dm, cmd := m.handleMenuKey(msg)
 		return dm, cmd, true
+	}
+	return m, nil, false
+}
+
+// handleRunInputKeys consumes printable keys and forwards them to the
+// running process stdin when a run is in progress and we are capturing input.
+func (m *TuiModel) handleRunInputKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if !m.runCapturesInput || m.runInputWriter == nil {
+		return m, nil, false
+	}
+	// Prefer runes (printable) keys; also forward Enter and backspace
+	switch msg.Type {
+	case tea.KeyRunes:
+		_, _ = m.runInputWriter.WriteInput([]byte(msg.String()))
+		return m, nil, true
+	case tea.KeyEnter:
+		_, _ = m.runInputWriter.WriteInput([]byte("\n"))
+		return m, nil, true
+	case tea.KeyBackspace, tea.KeyDelete:
+		_, _ = m.runInputWriter.WriteInput([]byte{0x7f})
+		return m, nil, true
 	}
 	return m, nil, false
 }
@@ -608,21 +682,7 @@ func (m *TuiModel) renderDetailView() string {
 	} else if len(m.versions) > 0 {
 		body = m.renderDetailWithVersions(bodyH)
 	} else {
-		// no versions pane; render detail inside a viewport so it can scroll
-		// to match the behavior/responsiveness of the main page.
-		m.detail = strings.TrimRight(m.detail, "\n")
-		// ensure viewport sized for full-screen detail
-		vpw := m.width - 8
-		vph := bodyH - 4
-		if vpw < 10 {
-			vpw = 10
-		}
-		if vph < 3 {
-			vph = 3
-		}
-		m.ensureViewportSize(vpw, vph)
-		m.vp.SetContent(m.detail)
-		body = contentStyle.Render(m.vp.View())
+		body = m.renderDetailNoVersions(contentStyle, bodyH)
 	}
 
 	status := fmt.Sprintf("Viewing: %s", m.detailName)
@@ -648,6 +708,50 @@ func (m *TuiModel) renderDetailView() string {
 	return lipgloss.JoinVertical(lipgloss.Left, body, footer, bottom)
 }
 
+// renderDetailNoVersions renders the detail body when there are no versions.
+func (m *TuiModel) renderDetailNoVersions(contentStyle lipgloss.Style, bodyH int) string {
+	vpw := m.width - 8
+	vph := bodyH - 4
+	if vpw < 10 {
+		vpw = 10
+	}
+	if vph < 3 {
+		vph = 3
+	}
+	m.ensureViewportSize(vpw, vph)
+	m.applyRunOrDetailContent()
+	return contentStyle.Render(m.vp.View())
+}
+
+// applyRunOrDetailContent sets the viewport content to run logs (if any)
+// or the static detail text. When a run is actively in progress it
+// auto-scrolls to the bottom.
+func (m *TuiModel) applyRunOrDetailContent() {
+	if m.runInProgress || len(m.logs) > 0 {
+		m.vp.SetContent(strings.Join(m.logs, "\n"))
+		if m.runInProgress {
+			m.vp.GotoBottom()
+		}
+	} else {
+		m.detail = strings.TrimRight(m.detail, "\n")
+		m.vp.SetContent(m.detail)
+	}
+}
+
+// applyRunOrDetailViewport sets viewport content for the versions-pane layout.
+// Run logs take priority; otherwise the static detail is set only when the
+// left pane is focused (the right-pane preview is managed by setVersionsPreviewIndex).
+func (m *TuiModel) applyRunOrDetailViewport() {
+	if m.runInProgress || len(m.logs) > 0 {
+		m.vp.SetContent(strings.Join(m.logs, "\n"))
+		if m.runInProgress {
+			m.vp.GotoBottom()
+		}
+	} else if !m.focusRight {
+		m.vp.SetContent(m.detail)
+	}
+}
+
 func (m *TuiModel) detailColors() (string, string, string) {
 	if m.themeHighContrast {
 		return "#ffffff", "#000000", "#ffffff"
@@ -661,7 +765,7 @@ func (m *TuiModel) detailFooter() string {
 	}
 	base := "(e) Edit - (d) Delete - (s) Export - (r) Run - (T) Toggle Theme - (b) Back - (q) Quit"
 	if len(m.versions) > 0 {
-		base = base + " - (R) Rollback"
+		base = base + " - (R) Rollback - (D) Delete Version"
 	}
 	// When showing details, add a scroll hint and indicator so users can
 	// discover navigation and their current position inside the detail.
@@ -711,12 +815,10 @@ func (m *TuiModel) renderDetailWithVersions(bodyH int) string {
 	}
 	m.detail = strings.TrimRight(m.detail, "\n")
 	m.ensureViewportSize(vpw, vph)
-	// Only set the main detail content when left pane is focused. If the
-	// right pane (versions) is focused, we should display the preview
-	// content which is set by setVersionsPreviewIndex.
-	if !m.focusRight {
-		m.vp.SetContent(m.detail)
-	}
+	// When a run is in progress or has produced output, show the run
+	// logs in the viewport instead of the static detail text — same
+	// logic as the no-versions branch so output is always visible.
+	m.applyRunOrDetailViewport()
 	left := leftStyle.Render(m.vp.View())
 	rightStyle := lipgloss.NewStyle().BorderStyle(detailRightBorderStyle).BorderForeground(lipgloss.Color(detailRightBorder)).Padding(1).Width(rightW).Height(bodyH)
 	right := rightStyle.Render(m.renderVersions(innerRightW, innerBodyH))

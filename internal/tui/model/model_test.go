@@ -117,7 +117,8 @@ func (s *saveRecorder) UpdateCommandSetAndReplaceCommands(_ context.Context, _ s
 func (s *saveRecorder) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return nil, nil
 }
-func (s *saveRecorder) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
+func (s *saveRecorder) ApplyVersionByName(_ context.Context, _ string, _ int) error  { return nil }
+func (s *saveRecorder) DeleteVersionByName(_ context.Context, _ string, _ int) error { return nil }
 
 // test helpers
 type testRegistry struct{ items []adapters.CommandSetSummary }
@@ -159,6 +160,9 @@ func (t *testRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapte
 	return nil, nil
 }
 func (t *testRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error {
+	return nil
+}
+func (t *testRegistry) DeleteVersionByName(_ context.Context, _ string, _ int) error {
 	return nil
 }
 

@@ -15,7 +15,7 @@ func setupCreateModel() (*TuiModel, *saveFakeRegistry) {
 	ui := modelpkg.New(f, nil, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	return m, f
 }
 

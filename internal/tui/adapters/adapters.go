@@ -48,6 +48,9 @@ type RunHandle interface {
 	Events() <-chan RunEvent
 	// Cancel requests termination of the running command.
 	Cancel()
+	// WriteInput writes raw bytes into the running command's stdin. Returns
+	// the number of bytes written or an error if the run does not accept input.
+	WriteInput(p []byte) (int, error)
 }
 
 // RegistryAdapter describes the minimal subset of registry operations used by the UI.
@@ -69,6 +72,8 @@ type RegistryAdapter interface {
 	ListVersionsByName(ctx context.Context, name string) ([]Version, error)
 	// ApplyVersionByName applies the specified historic version to the named command set (rollback)
 	ApplyVersionByName(ctx context.Context, name string, versionNum int) error
+	// DeleteVersionByName deletes a specific version record for the named command set
+	DeleteVersionByName(ctx context.Context, name string, versionNum int) error
 }
 
 // ExecutorAdapter describes running and streaming commandset executions.

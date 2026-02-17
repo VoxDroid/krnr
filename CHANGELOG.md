@@ -3,6 +3,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.5 - 2026-02-17
+
+- **Feature (TUI/Executor):** Interactive commands (e.g., `sudo`, `pacman`) now work correctly in the TUI. Prompts appear inside the run output viewport (not the footer) and user input is forwarded to the running process.
+  - **Hybrid PTY:** The executor uses a hybrid PTY approach — the child's stdin and controlling terminal use a PTY (so programs that open `/dev/tty` like `sudo` work), while stdout/stderr remain as pipes (so programs like `fastfetch` detect pipe mode and produce simple, viewport-friendly output).
+  - **Live streaming:** The non-PTY executor path now streams output live via `io.MultiWriter` instead of buffering until command completion. Output appears immediately in the viewport without requiring a keypress.
+  - **Viewport fix:** The detail view now shows run logs during/after a run instead of unconditionally rendering static detail text, which was overwriting live output on every render frame. Logs are cleared on navigation back.
+  - `Executor.Execute` accepts an explicit `stdin io.Reader`; the TUI adapter wraps it with the host terminal fd to trigger hybrid PTY mode.
+- **Bugfix (TUI):** Fix doubled output when stdout and stderr point to the same writer in PTY mode. Added `copyPTYOutput` helper (later replaced by hybrid PTY).
+- **Bugfix (TUI):** Fix UI border corruption caused by escape sequences split across read boundaries. Added `trailingIncompleteEscape` buffering across chunk reads.
+- **Bugfix (Executor):** Fix `panic: nil pointer dereference` in `writeOutputs`/`checkExecutionError` when the PTY starter returned nil buffers. Now returns `&bytes.Buffer{}` on error and guards nil buffers.
+- **Bugfix (TUI):** Fix truncated output for commands like `fastfetch` — increased read buffer from 256 to 4096 bytes and flush the escape-sequence carry buffer on EOF.
+- **Bugfix (Sanitizer):** Improved CSI sequence handling — cursor-forward (`CUF`/`\x1b[nC`) is converted to spaces, cursor-horizontal-absolute (`CHA`/`\x1b[nG`) to a separator, and SGR color codes are preserved. Other destructive CSI sequences are stripped.
+- **Bugfix (TUI):** Fix command list appearing empty on launch until a resize or keypress. `Init()` was mutating the model inside an async `tea.Cmd` and returning `nil` instead of a proper `tea.Msg`, so `Update()` never triggered a re-render. Now returns an `initDoneMsg` processed by `Update()` to populate the list on the first frame.
+- **Bugfix (TUI):** Fix run output not visible in detail view when command has version history — the versions-panel rendering path unconditionally overwrote the viewport with static detail text, hiding run logs.
+- **Bugfix (TUI):** Fix inability to scroll run output after a run completes — `GotoBottom()` was called on every render frame when logs existed, resetting scroll position. Now only auto-scrolls while the run is actively in progress.
+- **Feature (TUI):** Enter on versions panel now loads the selected version's full detail into the left preview pane and switches focus there.
+- **Feature (TUI):** Delete version (`D`) — pressing `D` on a highlighted version in the versions panel prompts for confirmation and deletes that specific version record. Added `DeleteVersionByName` to registry, adapter, and model layers.
+- **Quality:** Added `gocyclo` (threshold >10) to pre-commit hooks; refactored `executorAdapter.Run` and `TestExecute_PTYInteractive` to reduce cyclomatic complexity below 10. All `golangci-lint` and `gocyclo` checks pass.
+- **Tests:** Added tests for escape-sequence splitting, EOF flush, fd-reader wrapping, non-terminal stdin, PTY simulated behavior, sanitizer (SGR, alt-screen, CR, CUF, CHA), and headless prompt-in-viewport tests.
+- **Docs:** Updated `docs/executor.md`, `docs/tui.md`, and `docs/cli.md` to describe hybrid PTY behavior, live streaming, and interactive prompt support.
+- **Version:** Bump to `v1.2.5`.
+
 ## v1.2.4 - 2026-02-04
 
 - **Bugfix (TUI):** Prevent TUI deformation when running commands that emit control sequences (e.g., `fastfetch`, `htop`, or other terminal programs that use alternate screen or cursor controls). We now sanitize run output shown in the TUI so destructive control sequences (alternate-screen, clear-screen, cursor movement, OSC sequences) are removed while preserving SGR color sequences so colored output still renders in the output pane.

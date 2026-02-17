@@ -50,7 +50,13 @@ Key handling and spaces
 - Note: different terminals may report the spacebar as either a `KeyRunes` event with a single `' '` rune or as a `KeySpace` event. The TUI now handles both forms consistently for editor input and the list filter so pressing the spacebar reliably inserts a space character regardless of environment. Tests were added to prevent regressions.
 
 Sanitizing run output
-- The TUI now sanitizes streaming command output shown inside the output viewport to remove control sequences that affect global terminal state (e.g., alternate screen, clear-screen, cursor movements, and OSC sequences) while preserving SGR color codes. This prevents external commands like `fastfetch` from deforming the TUI layout. The sanitizer is conservative and tested; see `internal/tui/sanitize` for details.
+- The TUI now sanitizes streaming command output shown inside the output viewport to remove control sequences that affect global terminal state (e.g., alternate screen, clear-screen, cursor movements, and OSC sequences) while preserving SGR color codes. Cursor-forward sequences are converted to spaces and cursor-horizontal-absolute to separators for readability. This prevents external commands like `fastfetch` from deforming the TUI layout. The sanitizer is conservative and tested; see `internal/tui/sanitize` for details.
+
+Interactive commands & hybrid PTY
+- The TUI supports running interactive commands that require user input (e.g., `sudo` password prompts, `pacman` confirmations). When a run is in progress, typed keys are forwarded to the process stdin.
+- The executor uses a **hybrid PTY** approach: stdin and the controlling terminal use a PTY so programs that read from `/dev/tty` work, while stdout/stderr remain as pipes for viewport-friendly output.
+- All prompts and output appear inside the **run output panel** (viewport), not in the footer or bottom bar.
+- Output streams live — no keypress required to see results.
 
 
 CI

@@ -141,11 +141,11 @@ var runCmd = &cobra.Command{
 			}
 			// For dry-run, pass redacted command to the executor so verbose dry-run output doesn't leak secrets
 			if dry {
-				if err := e.Execute(ctx, redactedCmd, "", os.Stdout, stderr); err != nil {
+				if err := e.Execute(ctx, redactedCmd, "", os.Stdin, os.Stdout, stderr); err != nil {
 					return err
 				}
 			} else {
-				if err := e.Execute(ctx, cmdText, "", os.Stdout, stderr); err != nil {
+				if err := e.Execute(ctx, cmdText, "", os.Stdin, os.Stdout, stderr); err != nil {
 					return err
 				}
 			}

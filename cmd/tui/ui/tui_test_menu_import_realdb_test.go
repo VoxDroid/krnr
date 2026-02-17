@@ -73,7 +73,7 @@ func TestMenuImportDatabaseOverwrite_RealDB(t *testing.T) {
 	defer func() { _ = ui.Close() }()
 
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 

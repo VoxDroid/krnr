@@ -113,6 +113,11 @@ func (m *UIModel) ApplyVersion(ctx context.Context, name string, versionNum int)
 	return m.registry.ApplyVersionByName(ctx, name, versionNum)
 }
 
+// DeleteVersion deletes a specific version record for the named command set
+func (m *UIModel) DeleteVersion(ctx context.Context, name string, versionNum int) error {
+	return m.registry.DeleteVersionByName(ctx, name, versionNum)
+}
+
 // Delete removes a named command set from the registry
 func (m *UIModel) Delete(ctx context.Context, name string) error {
 	return m.registry.DeleteCommandSet(ctx, name)
@@ -255,3 +260,4 @@ type fakeRunHandle struct{ ch <-chan adapters.RunEvent }
 
 func (f *fakeRunHandle) Events() <-chan adapters.RunEvent { return f.ch }
 func (f *fakeRunHandle) Cancel()                          {}
+func (f *fakeRunHandle) WriteInput(p []byte) (int, error) { return len(p), nil }

@@ -17,7 +17,7 @@ func TestExecuteEcho(t *testing.T) {
 	var out bytes.Buffer
 	var errb bytes.Buffer
 	e := &Executor{}
-	if err := e.Execute(ctx, "echo hello", "", &out, &errb); err != nil {
+	if err := e.Execute(ctx, "echo hello", "", nil, &out, &errb); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 	if !strings.Contains(out.String(), "hello") {
@@ -33,7 +33,7 @@ func TestExecuteFail(t *testing.T) {
 	var errb bytes.Buffer
 	e := &Executor{}
 	// 'exit 1' should return non-zero from shell
-	if err := e.Execute(ctx, "exit 1", "", &out, &errb); err == nil {
+	if err := e.Execute(ctx, "exit 1", "", nil, &out, &errb); err == nil {
 		t.Fatalf("expected error for failing command")
 	}
 }
@@ -43,7 +43,7 @@ func TestDryRun(t *testing.T) {
 	var out bytes.Buffer
 	var errb bytes.Buffer
 	e := &Executor{DryRun: true, Verbose: true}
-	if err := e.Execute(ctx, "echo hi", "", &out, &errb); err != nil {
+	if err := e.Execute(ctx, "echo hi", "", nil, &out, &errb); err != nil {
 		t.Fatalf("dry-run should not error: %v", err)
 	}
 	if !strings.Contains(out.String(), "dry-run:") {
@@ -153,7 +153,7 @@ func TestExecute_Exit1ButHasStdout_ShouldSucceed(t *testing.T) {
 
 	var out bytes.Buffer
 	var errb bytes.Buffer
-	if err := e.Execute(context.Background(), "echo hello; exit 1", "", &out, &errb); err != nil {
+	if err := e.Execute(context.Background(), "echo hello; exit 1", "", nil, &out, &errb); err != nil {
 		t.Fatalf("expected nil error for exit 1 with stdout, got: %v", err)
 	}
 	if !strings.Contains(out.String(), "hello") {
@@ -174,7 +174,7 @@ func TestExecute_Exit2WithStdout_ShouldReturnError(t *testing.T) {
 
 	var out bytes.Buffer
 	var errb bytes.Buffer
-	if err := e.Execute(context.Background(), "echo bye; exit 2", "", &out, &errb); err == nil {
+	if err := e.Execute(context.Background(), "echo bye; exit 2", "", nil, &out, &errb); err == nil {
 		t.Fatalf("expected error for exit 2 even with stdout")
 	}
 }
@@ -188,7 +188,7 @@ func TestExecute_FindstrPipeline_Windows(t *testing.T) {
 	var out, errb bytes.Buffer
 	// left side runs two echoes inside a cmd /C so we can produce two lines
 	command := "cmd /C \"echo OS Name & echo OS Version\" | findstr /C:\"OS Name\" /C:\"OS Version\""
-	if err := e.Execute(ctx, command, "", &out, &errb); err != nil {
+	if err := e.Execute(ctx, command, "", nil, &out, &errb); err != nil {
 		t.Fatalf("Execute pipeline failed: %v, stderr: %q", err, errb.String())
 	}
 	normalized := strings.ReplaceAll(strings.TrimSpace(out.String()), "\r\n", "\n")

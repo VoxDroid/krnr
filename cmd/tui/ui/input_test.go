@@ -69,7 +69,7 @@ func TestRunViaKeyStartsAndStreams(t *testing.T) {
 	ui := modelpkg.New(fakeReg, fakeExec, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// press 'r' to run
 	m1, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	m = m1.(*TuiModel)
@@ -98,7 +98,7 @@ func TestHandleListFiltering_DelegatedAndUpdatesFilter(t *testing.T) {
 	ui := modelpkg.New(fakeReg, &fakeExecAdapter{lines: []string{"ok"}}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// Directly apply the filtering key logic (test helper) — this avoids
 	// having to manipulate the internal list state to reach Filtering.
 	m2, _, handled := applyListFilterKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})

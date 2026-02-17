@@ -30,7 +30,8 @@ func (f *fakeRegistry) UpdateCommandSet(_ context.Context, _ string, _ CommandSe
 func (f *fakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]Version, error) {
 	return nil, nil
 }
-func (f *fakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
+func (f *fakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error  { return nil }
+func (f *fakeRegistry) DeleteVersionByName(_ context.Context, _ string, _ int) error { return nil }
 
 func TestFakeAdapters_List(t *testing.T) {
 	reg := &fakeRegistry{items: []CommandSetSummary{{Name: "a", Description: "A"}, {Name: "b", Description: "B"}}}

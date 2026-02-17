@@ -15,7 +15,7 @@ func TestThemeToggle(t *testing.T) {
 	ui := modelpkg.New(fakeReg, nil, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// default is off
 	if m.themeHighContrast {
 		t.Fatalf("expected theme default off")

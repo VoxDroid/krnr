@@ -9,8 +9,11 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"syscall"
 
+	"github.com/creack/pty"
 	"github.com/kballard/go-shellquote"
+	"golang.org/x/term"
 )
 
 // Executor runs shell commands in an OS-aware way.
@@ -67,8 +70,11 @@ func (u *unescapeWriter) Write(p []byte) (int, error) {
 
 // Runner is an interface for executing commands. It allows tests to inject
 // fake implementations without running real shell commands.
+//
+// Note: Execute now accepts an explicit stdin reader so callers (e.g., the TUI)
+// can provide input for interactive commands or PTY-backed sessions.
 type Runner interface {
-	Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error
+	Execute(ctx context.Context, command string, cwd string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 }
 
 // New returns a Runner backed by the real Executor implementation.
@@ -108,7 +114,7 @@ func sanitizeCommand(s string) string {
 // invocation (e.g., `bash -c` on Unix, `cmd /C` on Windows). It sanitizes
 // the command, validates it for illegal characters or newlines, and then
 // executes it writing stdout/stderr to the provided writers.
-func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
+func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	// validate and sanitize command
 	var err error
 	command, err = validateAndSanitize(command)
@@ -124,7 +130,7 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 	// On Windows try a specialized handler for `| findstr ...` pipelines
 	// to avoid cmd.exe's quoting pitfalls. If it succeeds, we're done.
 	if runtime.GOOS == "windows" {
-		if tryHandleWindowsFindstr(ctx, command, cwd, stdout, stderr) {
+		if tryHandleWindowsFindstr(ctx, command, cwd, stdin, stdout, stderr) {
 			return nil
 		}
 	}
@@ -134,9 +140,13 @@ func (e *Executor) Execute(ctx context.Context, command string, cwd string, stdo
 		return err
 	}
 
-	bout, berr, err := runShellCommand(ctx, shell, args, cwd)
+	bout, berr, streamed, err := runShellCommand(ctx, shell, args, cwd, stdin, stdout, stderr)
 
-	writeOutputs(bout, berr, stdout, stderr)
+	// If the child was run in a PTY, output has already been streamed
+	// directly to `stdout`/`stderr` and we should avoid re-writing it.
+	if !streamed {
+		writeOutputs(bout, berr, stdout, stderr)
+	}
 
 	if err != nil {
 		return checkExecutionError(err, bout, berr, shell, args)
@@ -162,12 +172,12 @@ func splitArgs(s string) []string {
 // `<left> | findstr <args...>` and executes them without invoking the
 // shell, piping stdout from the left command into the findstr process.
 // This avoids cmd.exe's tricky quoting behavior for /C:"..." patterns.
-func handleWindowsFindstrPipeline(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) error {
+func handleWindowsFindstrPipeline(ctx context.Context, command string, cwd string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	leftTokens, findstrExe, findstrArgs, err := parseFindstrPipeline(command)
 	if err != nil {
 		return err
 	}
-	return runFindstrPipeline(ctx, leftTokens, findstrExe, findstrArgs, cwd, stdout, stderr)
+	return runFindstrPipeline(ctx, leftTokens, findstrExe, findstrArgs, cwd, stdin, stdout, stderr)
 }
 
 func parseFindstrPipeline(command string) ([]string, string, []string, error) {
@@ -210,10 +220,15 @@ func normalizeFindstrArgs(tokens []string) []string {
 	return out
 }
 
-func runFindstrPipeline(ctx context.Context, leftTokens []string, findstrExe string, findstrArgs []string, cwd string, stdout io.Writer, stderr io.Writer) error {
+func runFindstrPipeline(ctx context.Context, leftTokens []string, findstrExe string, findstrArgs []string, cwd string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	leftCmd := exec.CommandContext(ctx, leftTokens[0], leftTokens[1:]...)
 	if cwd != "" {
 		leftCmd.Dir = cwd
+	}
+	// Attach provided stdin to the left command so pipelines reading from
+	// stdin still work under the specialized pipeline handling.
+	if stdin != nil {
+		leftCmd.Stdin = stdin
 	}
 	leftStdout, err := leftCmd.StdoutPipe()
 	if err != nil {
@@ -267,26 +282,109 @@ func reportPipelineResult(bout *bytes.Buffer, berr *bytes.Buffer, findErr error,
 	return nil
 }
 
+// isTerminal reports whether the given file descriptor refers to a terminal.
+// It is a package-level variable so unit tests can override it to simulate
+// terminal conditions without requiring a real TTY.
+var isTerminal = func(fd uintptr) bool {
+	return term.IsTerminal(int(fd))
+}
+
+// ptyStarter encapsulates starting a command with a hybrid PTY setup.
+// The child's stdin and controlling terminal use a PTY so programs like
+// sudo that open /dev/tty work correctly. Stdout and stderr remain as
+// pipes (via io.MultiWriter) so programs like fastfetch detect pipe mode
+// and produce simple, viewport-friendly output.
+//
+// It is a package-level variable so unit tests can override it.
+var ptyStarter = func(cmd *exec.Cmd, stdin io.Reader, stdout, stderr io.Writer) (*bytes.Buffer, *bytes.Buffer, error) {
+	ptmx, pts, err := pty.Open()
+	if err != nil {
+		return &bytes.Buffer{}, &bytes.Buffer{}, err
+	}
+
+	// Child's stdin is the PTY slave (terminal). Stdout/stderr are
+	// streamed to caller's writers AND captured in buffers.
+	cmd.Stdin = pts
+	var bout, berr bytes.Buffer
+	cmd.Stdout = io.MultiWriter(&bout, stdout)
+	if stderr == stdout {
+		cmd.Stderr = cmd.Stdout
+	} else {
+		cmd.Stderr = io.MultiWriter(&berr, stderr)
+	}
+
+	// Make the PTY slave the child's controlling terminal so /dev/tty
+	// refers to our PTY, not the real host terminal.
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.Setsid = true
+	cmd.SysProcAttr.Setctty = true
+
+	if err := cmd.Start(); err != nil {
+		_ = pts.Close()
+		_ = ptmx.Close()
+		return &bytes.Buffer{}, &bytes.Buffer{}, err
+	}
+	_ = pts.Close() // child has its own copy; close ours
+
+	// Forward user input from the caller's reader into the PTY master
+	// so interactive prompts (sudo password, etc.) receive keystrokes.
+	go func() { _, _ = io.Copy(ptmx, stdin) }()
+
+	// Read any output the child writes directly to /dev/tty (e.g.,
+	// sudo's password prompt) from the PTY master and forward it to
+	// the caller's stdout so it appears in the TUI viewport.
+	go func() { _, _ = io.Copy(stdout, ptmx) }()
+
+	err = cmd.Wait()
+	_ = ptmx.Close()
+	return &bout, &berr, err
+}
+
 // runShellCommand executes a command by running the given executable and
 // arguments, returning captured stdout/stderr buffers along with any error.
-func runShellCommand(ctx context.Context, shell string, args []string, cwd string) (*bytes.Buffer, *bytes.Buffer, error) {
+// It accepts explicit stdin/stdout/stderr writers so it can stream output
+// live when running the child in a PTY (interactive flows). It returns a
+// boolean indicating whether streaming to the provided writers occurred.
+func runShellCommand(ctx context.Context, shell string, args []string, cwd string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (*bytes.Buffer, *bytes.Buffer, bool, error) {
 	cmd := exec.CommandContext(ctx, shell, args...)
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
-	var bout, berr bytes.Buffer
-	cmd.Stdout = &bout
-	cmd.Stderr = &berr
-	if err := cmd.Run(); err != nil {
-		return &bout, &berr, err
+
+	// If stdin looks like a terminal and we're on Unix-like platforms, use
+	// the PTY starter (which can be simulated in tests).
+	if runtime.GOOS != "windows" {
+		if f, ok := stdin.(interface{ Fd() uintptr }); ok {
+			if isTerminal(f.Fd()) {
+				bout, berr, err := ptyStarter(cmd, stdin, stdout, stderr)
+				if err != nil {
+					return &bytes.Buffer{}, &bytes.Buffer{}, false, err
+				}
+				return bout, berr, true, nil
+			}
+		}
 	}
-	return &bout, &berr, nil
+
+	// Non-interactive path: stream output live to the callers writers
+	// while also capturing it in buffers for error reporting.
+	var bout, berr bytes.Buffer
+	cmd.Stdout = io.MultiWriter(&bout, stdout)
+	cmd.Stderr = io.MultiWriter(&berr, stderr)
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
+	if err := cmd.Run(); err != nil {
+		return &bout, &berr, true, err
+	}
+	return &bout, &berr, true, nil
 }
 
 // tryHandleWindowsFindstr inspects the command to see if it looks like a
 // `A | findstr ...` pipeline and, if so, tries to handle it. Returns true
 // if the pipeline was handled successfully.
-func tryHandleWindowsFindstr(ctx context.Context, command string, cwd string, stdout io.Writer, stderr io.Writer) bool {
+func tryHandleWindowsFindstr(ctx context.Context, command string, cwd string, stdin io.Reader, stdout io.Writer, stderr io.Writer) bool {
 	if !strings.Contains(command, "|") {
 		return false
 	}
@@ -294,7 +392,7 @@ func tryHandleWindowsFindstr(ctx context.Context, command string, cwd string, st
 	if !strings.HasPrefix(strings.ToLower(rhs), "findstr") {
 		return false
 	}
-	if err := handleWindowsFindstrPipeline(ctx, command, cwd, stdout, stderr); err == nil {
+	if err := handleWindowsFindstrPipeline(ctx, command, cwd, stdin, stdout, stderr); err == nil {
 		return true
 	}
 	return false
@@ -311,6 +409,9 @@ func (e *Executor) handleDryRunIfNeeded(command string, stdout io.Writer) bool {
 }
 
 func writeOutputs(bout, berr *bytes.Buffer, stdout io.Writer, stderr io.Writer) {
+	if bout == nil || berr == nil {
+		return
+	}
 	if runtime.GOOS == "windows" {
 		_, _ = (&unescapeWriter{w: stdout}).Write(bout.Bytes())
 		_, _ = (&unescapeWriter{w: stderr}).Write(berr.Bytes())
@@ -324,12 +425,17 @@ func checkExecutionError(err error, bout, berr *bytes.Buffer, shell string, args
 	// If the process exited with status 1 but produced stdout, treat
 	// that as a non-fatal condition.
 	if exitErr, ok := err.(*exec.ExitError); ok {
-		if exitErr.ExitCode() == 1 && bout.Len() > 0 {
+		if exitErr.ExitCode() == 1 && bout != nil && bout.Len() > 0 {
 			return nil
 		}
 	}
-	outStr := strings.TrimSpace(bout.String())
-	errStr := strings.TrimSpace(berr.String())
+	var outStr, errStr string
+	if bout != nil {
+		outStr = strings.TrimSpace(bout.String())
+	}
+	if berr != nil {
+		errStr = strings.TrimSpace(berr.String())
+	}
 	if outStr != "" || errStr != "" {
 		return fmt.Errorf("command failed: %w (shell=%s args=%q stdout=%q stderr=%q)", err, shell, args, outStr, errStr)
 	}

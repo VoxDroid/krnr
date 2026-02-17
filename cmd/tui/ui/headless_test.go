@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/VoxDroid/krnr/internal/tui/adapters"
@@ -16,7 +17,7 @@ func TestRunStreamsSanitizesControlSequences(t *testing.T) {
 	ui2 := modelpkg.New(fakeReg, fakeExecWithANSI, nil, nil)
 	_ = ui2.RefreshList(context.Background())
 	m2 := NewModel(ui2)
-	m2.Init()()
+	m2 = initTestModel(m2)
 
 	h2, err := m2.uiModel.Run(context.Background(), m2.list.Items()[0].(csItem).cs.Name, nil)
 	if err != nil {
@@ -61,7 +62,7 @@ func TestRunStreamsLinesHeadless(t *testing.T) {
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
 	// init
-	m.Init()()
+	m = initTestModel(m)
 	// ensure selected item exists
 	if len(m.list.Items()) == 0 {
 		t.Fatalf("no items")
@@ -109,4 +110,25 @@ type fakeExecAdapter struct{ lines []string }
 func (f *fakeExecAdapter) Run(_ context.Context, _ string, _ []string) (adapters.RunHandle, error) {
 	// use modelpkg FakeRunHandle to generate a handle
 	return modelpkg.FakeRunHandle(f.lines, 0), nil
+}
+
+func TestRun_PromptAppearsInViewportNotFooter(t *testing.T) {
+	// fakes
+	fakeReg := &fakeRegistry{items: []adapters.CommandSetSummary{{Name: "one", Description: "First"}}}
+	fakeExec := &fakeExecAdapter{lines: []string{}}
+	ui := modelpkg.New(fakeReg, fakeExec, nil, nil)
+	_ = ui.RefreshList(context.Background())
+	m := NewModel(ui)
+	m = initTestModel(m)
+	// Simulate receiving a prompt-like line from a running command
+	m.handleRunEventWrapped(adapters.RunEvent{Line: "Enter sudo password:"})
+	// The prompt should be present in the viewport Logs (use View to render)
+	view := m.vp.View()
+	if !strings.Contains(view, "Enter sudo password:") {
+		t.Fatalf("expected prompt in viewport, got vp: %q", view)
+	}
+	// Footer notification should remain empty (run output should not set it)
+	if m.notification != "" {
+		t.Fatalf("expected footer notification to be empty, got: %q", m.notification)
+	}
 }

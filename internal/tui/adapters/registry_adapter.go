@@ -183,6 +183,11 @@ func (r *RegistryAdapterImpl) ApplyVersionByName(_ context.Context, name string,
 	return r.repo.ApplyVersionByName(name, versionNum)
 }
 
+// DeleteVersionByName deletes a specific version for the named command set.
+func (r *RegistryAdapterImpl) DeleteVersionByName(_ context.Context, name string, versionNum int) error {
+	return r.repo.DeleteVersionByName(name, versionNum)
+}
+
 // Close closes the underlying repository database connection if present.
 func (r *RegistryAdapterImpl) Close() error {
 	if r.repo == nil {

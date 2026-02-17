@@ -74,7 +74,7 @@ func TestTuiInitialRender_Pty(t *testing.T) {
 	_ = ui.RefreshList(context.Background())
 
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 
 	master, tty, progDone := startPtyProgram(t, m)
 	defer func() {
@@ -330,7 +330,7 @@ func TestTui_EditSaveRun_Pty(t *testing.T) {
 	ui := modelpkg.New(reg, fe, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 
 	master, tty, progDone := startPtyProgram(t, m)
 	defer func() {

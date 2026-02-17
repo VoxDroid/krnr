@@ -346,7 +346,11 @@ func handleEnter(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		m.versionsList, _ = m.versionsList.Update(msg)
 		m.versionsSelected = m.versionsList.Index()
 		if m.versionsSelected >= 0 && m.versionsSelected < len(m.versions) {
-			m.setVersionsPreviewIndex(m.versionsSelected)
+			// Show the selected version's detail in the left panel
+			m.detail = formatVersionDetails(m.detailName, m.versions[m.versionsSelected], m.vp.Width)
+			m.vp.SetContent(m.detail)
+			m.vp.GotoTop()
+			m.focusRight = false
 		}
 		return m, nil, true
 	}
@@ -446,6 +450,9 @@ func setVersionsListSize(m *TuiModel) {
 func handleBack(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 	m.setShowDetail(false)
 	m.focusRight = false
+	// Clear run logs so returning to the detail view later shows the
+	// static detail content rather than stale run output.
+	m.logs = nil
 	if si := m.list.SelectedItem(); si != nil {
 		if it, ok := si.(csItem); ok {
 			if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
@@ -564,6 +571,9 @@ func handleConfirmYes(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 	if m.pendingRollback {
 		return confirmRollbackYes(m)
 	}
+	if m.pendingDeleteVersion {
+		return confirmDeleteVersionYes(m)
+	}
 	if m.pendingDelete {
 		return confirmDeleteYes(m)
 	}
@@ -657,6 +667,9 @@ func handleConfirmNo(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 	if m.pendingRollback {
 		return confirmRollbackNo(m)
 	}
+	if m.pendingDeleteVersion {
+		return confirmDeleteVersionNo(m)
+	}
 	if m.pendingDelete {
 		return confirmDeleteNo(m)
 	}
@@ -670,6 +683,56 @@ func confirmRollbackNo(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 	m.pendingRollback = false
 	m.pendingRollbackName = ""
 	m.pendingRollbackVersion = 0
+	name := m.detailName
+	if name == "" {
+		if si := m.list.SelectedItem(); si != nil {
+			if it, ok := si.(csItem); ok {
+				name = it.cs.Name
+			}
+		}
+	}
+	if name != "" {
+		if cs, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
+			m.detail = formatCSFullScreen(cs, m.width, m.height)
+			m.vp.SetContent(m.detail)
+		}
+	}
+	return m, nil, true
+}
+
+func confirmDeleteVersionYes(m *TuiModel) (tea.Model, tea.Cmd, bool) {
+	name := m.pendingDeleteVersionName
+	ver := m.pendingDeleteVersionNum
+	if err := m.uiModel.DeleteVersion(context.Background(), name, ver); err != nil {
+		m.logs = append(m.logs, "delete version error: "+err.Error())
+		m.detail = fmt.Sprintf("Delete version failed: %s", err.Error())
+		m.vp.SetContent(m.detail)
+	} else {
+		m.logs = append(m.logs, fmt.Sprintf("deleted version %d of '%s'", ver, name))
+		// refresh versions list
+		if vers, err := m.uiModel.ListVersions(context.Background(), name); err == nil {
+			m.versions = vers
+			if len(vers) > 0 {
+				m.versionsSelected = 0
+			} else {
+				m.versionsSelected = -1
+			}
+		}
+		if cs, err := m.uiModel.GetCommandSet(context.Background(), name); err == nil {
+			m.detail = formatCSFullScreen(cs, m.width, m.height)
+			m.vp.SetContent(m.detail)
+		}
+	}
+	m.pendingDeleteVersion = false
+	m.pendingDeleteVersionName = ""
+	m.pendingDeleteVersionNum = 0
+	return m, nil, true
+}
+
+func confirmDeleteVersionNo(m *TuiModel) (tea.Model, tea.Cmd, bool) {
+	m.pendingDeleteVersion = false
+	m.pendingDeleteVersionName = ""
+	m.pendingDeleteVersionNum = 0
 	name := m.detailName
 	if name == "" {
 		if si := m.list.SelectedItem(); si != nil {
@@ -743,14 +806,21 @@ func handleRun(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 	}
 	m.logs = nil
 	m.runInProgress = true
-	m.focusRight = true
+	m.focusRight = false
+	m.runCapturesInput = true
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelRun = cancel
 	h, err := m.uiModel.Run(ctx, name, nil)
 	if err != nil {
 		m.logs = append(m.logs, "run error: "+err.Error())
 		m.runInProgress = false
+		m.runCapturesInput = false
 		return m, nil, true
+	}
+	// If the returned handle supports WriteInput, store it so we can forward
+	// typed keys to the running process stdin.
+	if wi, ok := h.(interface{ WriteInput([]byte) (int, error) }); ok {
+		m.runInputWriter = wi
 	}
 	ch := make(chan adapters.RunEvent)
 	m.runCh = ch
@@ -861,6 +931,16 @@ func handleVersionsNav(m *TuiModel, s string, msg tea.KeyMsg) (tea.Model, tea.Cm
 			m.pendingRollbackVersion = v.Version
 			m.pendingRollbackName = m.detailName
 			m.detail = fmt.Sprintf("Rollback '%s' to version %d? [y/N]\n\nPress (y) to confirm, (n) to cancel", m.pendingRollbackName, m.pendingRollbackVersion)
+			m.vp.SetContent(m.detail)
+		}
+		return m, nil, true
+	case "D":
+		if m.versionsSelected >= 0 && m.versionsSelected < len(m.versions) {
+			v := m.versions[m.versionsSelected]
+			m.pendingDeleteVersion = true
+			m.pendingDeleteVersionNum = v.Version
+			m.pendingDeleteVersionName = m.detailName
+			m.detail = fmt.Sprintf("Delete version %d of '%s'? [y/N]\n\nPress (y) to confirm, (n) to cancel", v.Version, m.detailName)
 			m.vp.SetContent(m.detail)
 		}
 		return m, nil, true

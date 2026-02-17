@@ -109,6 +109,26 @@ func (r *Repository) GetVersion(commandSetID int64, versionNum int) (*Version, e
 	return &v, nil
 }
 
+// DeleteVersionByName deletes a specific version record for the named command set.
+func (r *Repository) DeleteVersionByName(name string, versionNum int) error {
+	cs, err := r.GetCommandSetByName(name)
+	if err != nil {
+		return err
+	}
+	if cs == nil {
+		return fmt.Errorf("command set not found: %s", name)
+	}
+	res, err := r.db.Exec("DELETE FROM command_set_versions WHERE command_set_id = ? AND version = ?", cs.ID, versionNum)
+	if err != nil {
+		return fmt.Errorf("delete version: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("version %d not found for %s", versionNum, name)
+	}
+	return nil
+}
+
 // ApplyVersionByName replaces the current commands for the named command set with the
 // specified version's commands and records a new 'rollback' version.
 func (r *Repository) ApplyVersionByName(name string, versionNum int) error {

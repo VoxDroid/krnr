@@ -61,7 +61,7 @@ func TestStatusRefreshAfterInstall(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, inst)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 
 	// ensure status initially renders
 	_ = openStatusView(t, m)

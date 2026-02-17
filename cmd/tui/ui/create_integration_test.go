@@ -49,7 +49,7 @@ func TestCreateEntryNoDuplicateVersions(t *testing.T) {
 	ui := modelpkg.New(regAdapter, nil, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 
 	// create Test1
 	_ = createAndSaveEntry(t, m, "Test1", "echo hi")
@@ -77,7 +77,7 @@ func TestCreateEntryNoDuplicateVersions(t *testing.T) {
 	// refresh UI cache and initialize list state
 	_ = ui.RefreshList(context.Background())
 	m2 := NewModel(ui)
-	m2.Init()()
+	m2 = initTestModel(m2)
 	// enter filter mode and type '#whathe'
 	m3, _ := m2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	m2 = m3.(*TuiModel)

@@ -41,7 +41,6 @@ func NewProgram(ui Model) *tea.Program {
 
 // Init initializes the model by refreshing the list and populating the preview.
 func (m *TuiModel) Init() tea.Cmd {
-	// load initial list
 	return func() tea.Msg {
 		_ = m.uiModel.RefreshList(context.Background())
 		items := make([]list.Item, 0, len(m.uiModel.ListCached()))
@@ -49,34 +48,18 @@ func (m *TuiModel) Init() tea.Cmd {
 			items = append(items, csItem{cs: s})
 		}
 
-		// Ensure the list and viewport have reasonable defaults so the UI shows
-		// content on first render (before a WindowSizeMsg arrives).
-		if m.list.Height() == 0 {
-			m.list.SetSize(30, 10)
-		}
-		if m.vp.Width == 0 || m.vp.Height == 0 {
-			m.vp = viewport.New(40, 12)
-		}
-
-		// Set items after sizing so the list delegate can render immediately
-		m.list.SetItems(items)
-
-		// If there are items, select the first and populate the preview
+		var previewName, preview string
 		if len(items) > 0 {
-			m.list.Select(0)
 			if it, ok := items[0].(csItem); ok {
-				m.lastSelectedName = it.cs.Name
-				// attempt to fetch full details, fall back to summary
+				previewName = it.cs.Name
 				if cs, err := m.uiModel.GetCommandSet(context.Background(), it.cs.Name); err == nil {
-					m.vp.SetContent(formatCSDetails(cs, m.vp.Width))
-					m.logPreviewUpdate(cs.Name)
+					preview = formatCSDetails(cs, 40)
 				} else {
-					m.vp.SetContent(formatCSDetails(it.cs, m.vp.Width))
-					m.logPreviewUpdate(it.cs.Name)
+					preview = formatCSDetails(it.cs, 40)
 				}
 			}
 		}
-		return nil
+		return initDoneMsg{items: items, previewName: previewName, preview: preview}
 	}
 }
 

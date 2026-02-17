@@ -20,7 +20,7 @@ func TestNewModelInitializesList(t *testing.T) {
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
 	// Init should populate items via the Init cmd
-	m.Init()()
+	m = initTestModel(m)
 	if len(m.list.Items()) != 2 {
 		t.Fatalf("expected 2 items got %d", len(m.list.Items()))
 	}
@@ -31,7 +31,7 @@ func TestInitPopulatesPreview(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	if m.vp.View() == "" {
 		t.Fatalf("expected preview content after Init")
 	}
@@ -56,7 +56,7 @@ func TestTuiInitialRender_Headless(t *testing.T) {
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
 	// run Init to populate list/preview
-	m.Init()()
+	m = initTestModel(m)
 	// simulate a terminal resize so view/layout code runs deterministically
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = m1.(*TuiModel)
@@ -140,7 +140,7 @@ func TestDescriptionIndentAndCommandAlignment(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	view := m.vp.View()
 
 	assertDescriptionPosition(t, view)
@@ -153,7 +153,7 @@ func TestFilterModeIgnoresControlsAndEscCancels(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// enter filter mode by sending '/'
 	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	m = m1.(*TuiModel)
@@ -188,7 +188,7 @@ func TestLeftPaneNavNoopsWhileDetailOpen(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// ensure first item selected
 	if m.list.Index() != 0 {
 		t.Fatalf("expected initial selection 0, got %d", m.list.Index())
@@ -229,7 +229,7 @@ func TestEnterShowsFullScreenWithDryRun(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// ensure viewport has a reasonable width so wrapping applies
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
 	m = m1.(*TuiModel)
@@ -256,7 +256,7 @@ func TestDetailResponsiveToWindowSize(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// large width
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = m1.(*TuiModel)
@@ -295,7 +295,7 @@ func TestDetailScrollable(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// small viewport to force scrolling
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})
 	m = m1.(*TuiModel)
@@ -335,7 +335,7 @@ func TestDetailScrollIndicatorUpdates(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// small viewport to force scrolling
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})
 	m = m1.(*TuiModel)
@@ -411,7 +411,7 @@ func TestDetailViewShowsTitle(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// give the UI a large width so title has space
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = m1.(*TuiModel)
@@ -439,7 +439,7 @@ func TestMainFooterShowsCreateKey(t *testing.T) {
 	ui := modelpkg.New(fakeReg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m = m1.(*TuiModel)
 	view := m.View()
@@ -457,7 +457,7 @@ func TestEditReplacesCommands(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -526,7 +526,7 @@ func TestEditorSaveSanitizesCommands(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -567,7 +567,7 @@ func TestEditorSaveRejectsControlCharacters(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -612,7 +612,7 @@ func TestEditorTypingKAndSpaceInCommands(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -652,7 +652,7 @@ func TestEditorTypingSpaceKeyInCommands(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -694,7 +694,7 @@ func TestDeleteFromDetailPromptsAndDeletesWhenConfirmed(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -762,7 +762,7 @@ func TestExportFromDetailPromptsAndExportsWhenConfirmed(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, imp, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -800,7 +800,7 @@ func TestDeleteConfirmUppercaseY(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -825,7 +825,7 @@ func TestExportConfirmUppercaseY(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, imp, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -853,7 +853,7 @@ func TestMenuOpens(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
@@ -872,7 +872,7 @@ func TestMenuExportDatabase(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, imp, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 	// open menu
@@ -919,7 +919,7 @@ func TestVersionsPanelAndRollback(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m = m1.(*TuiModel)
 	m2, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -962,7 +962,7 @@ func TestEnterOnVersionsDoesNotChangeDetail(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m = m1.(*TuiModel)
 	// open detail for the first (aset)
@@ -1048,6 +1048,16 @@ func (f *versionsFakeRegistry) ApplyVersionByName(_ context.Context, _ string, v
 	}
 	return fmt.Errorf("version not found")
 }
+func (f *versionsFakeRegistry) DeleteVersionByName(_ context.Context, _ string, versionNum int) error {
+	newVers := []adapters.Version{}
+	for _, v := range f.versions {
+		if v.Version != versionNum {
+			newVers = append(newVers, v)
+		}
+	}
+	f.versions = newVers
+	return nil
+}
 
 // minimal fakes for testing
 type fakeRegistry struct{ items []adapters.CommandSetSummary }
@@ -1100,7 +1110,8 @@ func (f *fakeRegistry) UpdateCommandSetAndReplaceCommands(_ context.Context, old
 func (f *fakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]adapters.Version, error) {
 	return nil, nil
 }
-func (f *fakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
+func (f *fakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error  { return nil }
+func (f *fakeRegistry) DeleteVersionByName(_ context.Context, _ string, _ int) error { return nil }
 
 type fakeExec struct{}
 
@@ -1152,6 +1163,9 @@ func (f *detailFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]
 	return nil, nil
 }
 func (f *detailFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
+func (f *detailFakeRegistry) DeleteVersionByName(_ context.Context, _ string, _ int) error {
+	return nil
+}
 
 // replaceFakeRegistry supports ReplaceCommands and records the last call
 // for assertions in tests.
@@ -1235,4 +1249,25 @@ func (f *replaceFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([
 }
 func (f *replaceFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error {
 	return nil
+}
+func (f *replaceFakeRegistry) DeleteVersionByName(_ context.Context, _ string, _ int) error {
+	return nil
+}
+
+// initTestModel runs Init(), feeds the resulting message through Update(),
+// and returns the updated model. This mirrors how Bubble Tea processes the
+// Init command at startup — the Cmd runs asynchronously and its result is
+// delivered to Update() as a tea.Msg. Tests must use this instead of the
+// old m.Init()() pattern to ensure the list is populated before assertions.
+func initTestModel(m *TuiModel) *TuiModel {
+	cmd := m.Init()
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if msg == nil {
+		return m
+	}
+	dm, _ := m.Update(msg)
+	return dm.(*TuiModel)
 }

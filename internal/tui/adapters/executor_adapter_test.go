@@ -12,12 +12,25 @@ import (
 // fakeRunner writes provided lines to stdout and returns
 type fakeRunner struct{ lines []string }
 
-func (f *fakeRunner) Execute(_ context.Context, _ string, _ string, stdout io.Writer, _ io.Writer) error {
+func (f *fakeRunner) Execute(_ context.Context, _ string, _ string, _ io.Reader, stdout io.Writer, _ io.Writer) error {
 	for _, l := range f.lines {
 		_, _ = io.WriteString(stdout, l+"\n")
 		// slight delay to simulate streaming
 		time.Sleep(10 * time.Millisecond)
 	}
+	return nil
+}
+
+// fakeNoNL writes a prompt without a trailing newline to simulate
+// interactive password prompts like `sudo`.
+type fakeNoNL struct{}
+
+func (f *fakeNoNL) Execute(_ context.Context, _ string, _ string, _ io.Reader, stdout io.Writer, _ io.Writer) error {
+	_, _ = io.WriteString(stdout, "Enter:")
+	// small delay then write the newline so the adapter must handle
+	// the prompt being emitted without a trailing newline
+	time.Sleep(20 * time.Millisecond)
+	_, _ = io.WriteString(stdout, "\n")
 	return nil
 }
 
@@ -61,10 +74,53 @@ func TestSanitizeRunOutput_RemoveAltScreenAndClear(t *testing.T) {
 	}
 }
 
+func TestSanitizeRunOutput_CursorForwardToSpaces(t *testing.T) {
+	// \x1b[5C should become 5 spaces
+	in := "ICON\x1b[5Cdetails"
+	out := sanitize.RunOutput(in)
+	if out != "ICON     details" {
+		t.Fatalf("expected cursor-forward replaced with spaces, got %q", out)
+	}
+}
+
+func TestSanitizeRunOutput_CursorHorizontalAbsoluteToSeparator(t *testing.T) {
+	// \x1b[38G should become "  " (separator)
+	in := "ICON\x1b[38Gdetails"
+	out := sanitize.RunOutput(in)
+	if out != "ICON  details" {
+		t.Fatalf("expected CHA replaced with separator, got %q", out)
+	}
+}
+
 func TestSanitizeRunOutput_NormalizesCR(t *testing.T) {
 	in := "line1\rline2\r\nline3"
 	out := sanitize.RunOutput(in)
 	if out != "line1\nline2\nline3" {
 		t.Fatalf("expected CR normalized to LF, got %q", out)
+	}
+}
+
+func TestExecutorAdapter_StreamsPromptWithoutNewline(t *testing.T) {
+	// fake runner writes a prompt without newline then completes
+	r := &fakeNoNL{}
+	a := NewExecutorAdapter(r)
+	h, err := a.Run(context.Background(), "set", []string{"run"})
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
+	var sawPrompt bool
+	for ev := range h.Events() {
+		if ev.Err != nil {
+			t.Fatalf("event error: %v", ev.Err)
+		}
+		if ev.Line == "-> run" {
+			continue
+		}
+		if ev.Line == "Enter:" {
+			sawPrompt = true
+		}
+	}
+	if !sawPrompt {
+		t.Fatalf("expected prompt to be streamed without newline")
 	}
 }

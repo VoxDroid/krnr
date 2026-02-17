@@ -27,7 +27,7 @@ f := &saveFakeRegistry{}
 ui := modelpkg.New(f, nil, nil, nil)
 _ = ui.RefreshList(context.Background())
 m := NewModel(ui)
-m.Init()()
+m = initTestModel(m)
 // Press 'c' to open create modal
 m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 m = m1.(*TuiModel)
@@ -51,7 +51,7 @@ if m.editor.field != 0 {
 	t.Fatalf("expected editor.field to be 0 (Name), got %d", m.editor.field)
 } // Press 'C' uppercase should also open create modal when starting fresh
 mFresh := NewModel(ui)
-mFresh.Init()()
+mFresh = initTestModel(mFresh)
 mU, _ := mFresh.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
 mU2 := mU.(*TuiModel)
 if !mU2.editingMeta || !mU2.editor.create {
@@ -271,3 +271,6 @@ func (s *saveFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([]ad
 	return nil, nil
 }
 func (s *saveFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error { return nil }
+func (s *saveFakeRegistry) DeleteVersionByName(_ context.Context, _ string, _ int) error {
+	return nil
+}

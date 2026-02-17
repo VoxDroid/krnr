@@ -64,6 +64,8 @@ Shortcuts:
 
 This implementation is built using Bubble Tea (`github.com/charmbracelet/bubbletea`) and focuses on reusing existing core packages to remain thin and testable.
 
+The TUI now forwards stdin to running commands when available so interactive prompts (e.g., `sudo` asking for a password) can be completed when `krnr tui` is running in a real terminal or PTY.
+
 Headless tests:
 
 Run `go test ./cmd/tui/... -v` to execute the headless TUI unit tests that simulate key presses and streaming behavior.

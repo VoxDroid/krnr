@@ -20,3 +20,12 @@ repos:
         entry: scripts/fmt.sh
         language: system
         files: \.go$
+
+  - repo: local
+    hooks:
+      - id: gocyclo
+        name: gocyclo (complexity > 10)
+        entry: gocyclo -over 10 .
+        language: system
+        files: \.go$
+        pass_filenames: true

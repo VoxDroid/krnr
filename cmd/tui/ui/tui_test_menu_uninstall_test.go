@@ -30,7 +30,7 @@ func TestMenuUninstallConfirmation(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, fi)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m1, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	m = m1.(*TuiModel)
 

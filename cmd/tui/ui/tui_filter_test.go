@@ -16,7 +16,7 @@ func TestFilterTypingUpdatesList(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// enter filter mode
 	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	m = m1.(*TuiModel)
@@ -57,7 +57,7 @@ func TestFilterModeSpaceKeyAppendsSpace(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// enter filter mode
 	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	m = m1.(*TuiModel)
@@ -84,7 +84,7 @@ func TestFilterMatchesTags(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// enter filter mode
 	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
 	m = m1.(*TuiModel)
@@ -107,7 +107,7 @@ func TestFilterHashTagOnly(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// show detail so preview updates are observable
 	m.setShowDetail(true)
 	m.setDetailName("")
@@ -140,7 +140,7 @@ func TestFilterUpdatesPreview(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// show detail so preview updates are observable
 	m.setShowDetail(true)
 	m.setDetailName("")
@@ -164,7 +164,7 @@ func TestFilterScrollUpdatesPreview(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// show detail so preview updates are observable
 	m.setShowDetail(true)
 	m.setDetailName("")
@@ -195,7 +195,7 @@ func TestApplyListFilterKey_NavigationUpdatesPreview(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// show detail so preview updates are observable
 	m.setShowDetail(true)
 	m.setDetailName("")
@@ -220,7 +220,7 @@ func TestFilterNavigationKeys_UpdatePreviewAcrossKeys(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m.setShowDetail(true)
 	m.setDetailName("")
 	// enter filter mode and type 'b' to match all
@@ -263,7 +263,7 @@ func TestFilterUpdatesPreviewWhenDetailHidden(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// ensure detail pane is hidden
 	m.setShowDetail(false)
 	m.setDetailName("")
@@ -295,7 +295,7 @@ func TestPreviewLoggingWhenDebugEnabled(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	m.setShowDetail(true)
 	m.setDetailName("")
 	// type 'b' to filter
@@ -348,5 +348,8 @@ func (p *previewFakeRegistry) ListVersionsByName(_ context.Context, _ string) ([
 	return nil, nil
 }
 func (p *previewFakeRegistry) ApplyVersionByName(_ context.Context, _ string, _ int) error {
+	return nil
+}
+func (p *previewFakeRegistry) DeleteVersionByName(_ context.Context, _ string, _ int) error {
 	return nil
 }

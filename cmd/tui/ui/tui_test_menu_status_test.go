@@ -15,7 +15,7 @@ func TestMenuStatusShowsDiagnostics(t *testing.T) {
 	ui := modelpkg.New(reg, &fakeExec{}, nil, nil)
 	_ = ui.RefreshList(context.Background())
 	m := NewModel(ui)
-	m.Init()()
+	m = initTestModel(m)
 	// open menu
 	m1, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
 	m = m1.(*TuiModel)

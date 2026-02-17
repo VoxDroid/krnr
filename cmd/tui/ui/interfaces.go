@@ -19,6 +19,7 @@ type Model interface {
 	GetCommandSet(ctx context.Context, name string) (adapters.CommandSetSummary, error)
 	ListVersions(ctx context.Context, name string) ([]adapters.Version, error)
 	ApplyVersion(ctx context.Context, name string, version int) error
+	DeleteVersion(ctx context.Context, name string, version int) error
 	Delete(ctx context.Context, name string) error
 	Export(ctx context.Context, name string, dest string) error
 	ImportSet(ctx context.Context, src string, policy string, dedupe bool) error

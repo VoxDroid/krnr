@@ -50,7 +50,7 @@ func TestRunIntegrationDryRun(t *testing.T) {
 	}
 
 	for _, c := range cs.Commands {
-		if err := e.Execute(ctx, c.Command, "", &out, &errb); err != nil {
+		if err := e.Execute(ctx, c.Command, "", nil, &out, &errb); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
 	}

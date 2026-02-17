@@ -20,7 +20,7 @@ type fakeRunner struct {
 	stderrWriter io.Writer
 }
 
-func (f *fakeRunner) Execute(_ context.Context, command, _ string, stdout io.Writer, stderr io.Writer) error {
+func (f *fakeRunner) Execute(_ context.Context, command, _ string, _ io.Reader, stdout io.Writer, stderr io.Writer) error {
 	f.lastCmd = command
 	f.stderrWriter = stderr
 	if stdout != nil {
