@@ -2,10 +2,13 @@ package model
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/VoxDroid/krnr/internal/config"
 	"github.com/VoxDroid/krnr/internal/db"
 	"github.com/VoxDroid/krnr/internal/install"
 	"github.com/VoxDroid/krnr/internal/registry"
@@ -55,6 +58,12 @@ func TestSaveRejectsDuplicateName(t *testing.T) {
 
 func TestConcurrentSavesDoNotCreateDuplicates(t *testing.T) {
 	// use a real repository-backed adapter to simulate real DB behavior
+	tmp := t.TempDir()
+	tdb := filepath.Join(tmp, "krnr_test.db")
+	old := os.Getenv(config.EnvKRNRDB)
+	_ = os.Setenv(config.EnvKRNRDB, tdb)
+	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
+
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)

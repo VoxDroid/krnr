@@ -2,18 +2,10 @@ package registry
 
 import (
 	"testing"
-
-	"github.com/VoxDroid/krnr/internal/db"
 )
 
 func TestCreateRecordsSingleVersion(t *testing.T) {
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	// cleanup
 	_ = r.DeleteCommandSet("create-vtest")
 	desc := "create version test"

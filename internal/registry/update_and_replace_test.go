@@ -2,19 +2,12 @@ package registry
 
 import (
 	"testing"
-
-	"github.com/VoxDroid/krnr/internal/db"
 )
 
 func TestUpdateCommandSetAndReplaceCommandsRecordsSingleUpdate(t *testing.T) {
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	_ = r.DeleteCommandSet("upvtest")
+	t.Cleanup(func() { _ = r.DeleteCommandSet("upvtest") })
 	desc := "up test"
 	id, err := r.CreateCommandSet("upvtest", &desc, nil, nil, []string{"a"})
 	if err != nil {

@@ -2,19 +2,10 @@ package registry
 
 import (
 	"testing"
-
-	"github.com/VoxDroid/krnr/internal/db"
 )
 
 func setupVersionRepo(t *testing.T) (*Repository, int64) {
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	// cleanup
-	t.Cleanup(func() { _ = dbConn.Close() })
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	// ensure clean state
 	_ = r.DeleteCommandSet("vtest")
 	desc := "version test"

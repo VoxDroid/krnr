@@ -11,23 +11,26 @@ import (
 	"github.com/VoxDroid/krnr/internal/db"
 )
 
-func setupDemoRepo(t *testing.T) (*Repository, int64) {
-	// Use a test-specific database file to avoid collisions when tests run concurrently
+// setupTestDB creates an isolated temp DB for a single test, returning a
+// ready-to-use *Repository. The DB and env var are cleaned up automatically.
+func setupTestDB(t *testing.T) *Repository {
+	t.Helper()
 	tmp := t.TempDir()
 	tdb := filepath.Join(tmp, "krnr_test.db")
 	old := os.Getenv(config.EnvKRNRDB)
 	_ = os.Setenv(config.EnvKRNRDB, tdb)
-	// restore env and close db on cleanup
 	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
 
 	dbConn, err := db.InitDB()
 	if err != nil {
 		t.Fatalf("InitDB(): %v", err)
 	}
-	// cleanup
 	t.Cleanup(func() { _ = dbConn.Close() })
+	return NewRepository(dbConn)
+}
 
-	r := NewRepository(dbConn)
+func setupDemoRepo(t *testing.T) (*Repository, int64) {
+	r := setupTestDB(t)
 	// ensure clean state
 	_ = r.DeleteCommandSet("demo")
 	desc := "demo"
@@ -73,14 +76,7 @@ func TestRepository_List(t *testing.T) {
 }
 
 func TestRepository_Delete(t *testing.T) {
-	// init DB
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 
 	// ensure clean state
 	_ = r.DeleteCommandSet("demo")
@@ -108,32 +104,18 @@ func TestRepository_Delete(t *testing.T) {
 }
 
 func TestRepository_CreateRejectsEmptyName(t *testing.T) {
-	// init DB
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
-	_, err = r.CreateCommandSet("   ", nil, nil, nil, nil)
+	r := setupTestDB(t)
+	_, err := r.CreateCommandSet("   ", nil, nil, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "invalid name") {
 		t.Fatalf("expected invalid name error, got %v", err)
 	}
 }
 
 func TestRepository_CreateRejectsDuplicateName(t *testing.T) {
-	// init DB
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	_ = r.DeleteCommandSet("dup")
 	d := "dup"
-	_, err = r.CreateCommandSet("dup", &d, nil, nil, nil)
+	_, err := r.CreateCommandSet("dup", &d, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected create error: %v", err)
 	}
@@ -144,14 +126,7 @@ func TestRepository_CreateRejectsDuplicateName(t *testing.T) {
 }
 
 func TestRepository_ConcurrentCreateDoesNotMakeDuplicates(t *testing.T) {
-	// init DB
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	_ = r.DeleteCommandSet("race")
 
 	var wg sync.WaitGroup
@@ -178,14 +153,7 @@ func TestRepository_ConcurrentCreateDoesNotMakeDuplicates(t *testing.T) {
 }
 
 func TestRepository_ConcurrentRejectEmptyNames(t *testing.T) {
-	// init DB
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	_ = r.DeleteCommandSet("")
 
 	var wg sync.WaitGroup
@@ -208,14 +176,7 @@ func TestRepository_ConcurrentRejectEmptyNames(t *testing.T) {
 }
 
 func TestRepository_Tags_Add(t *testing.T) {
-	// init DB
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 
 	// Create set alpha
 	_ = r.DeleteCommandSet("alpha")
@@ -250,21 +211,7 @@ func TestRepository_Tags_Add(t *testing.T) {
 }
 
 func TestRepository_Tags_Remove(t *testing.T) {
-	// Use a test-specific database file to avoid collisions when tests run concurrently
-	tmp := t.TempDir()
-	tdb := filepath.Join(tmp, "krnr_test.db")
-	old := os.Getenv(config.EnvKRNRDB)
-	_ = os.Setenv(config.EnvKRNRDB, tdb)
-	// restore env and close db on cleanup
-	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
-
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 
 	// Create set alpha
 	_ = r.DeleteCommandSet("alpha")
@@ -296,22 +243,7 @@ func TestRepository_Tags_Remove(t *testing.T) {
 }
 
 func setupAlphaBeta(t *testing.T) *Repository {
-	// Use a test-specific database file to avoid collisions when tests run concurrently
-	tmp := t.TempDir()
-	tdb := filepath.Join(tmp, "krnr_test.db")
-	old := os.Getenv(config.EnvKRNRDB)
-	_ = os.Setenv(config.EnvKRNRDB, tdb)
-	// restore env and close db on cleanup
-	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
-
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	// cleanup
-	t.Cleanup(func() { _ = dbConn.Close() })
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	// ensure clean state and create sets
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")
@@ -391,22 +323,7 @@ func TestRepository_Tags_GetIncludesTags(t *testing.T) {
 }
 
 func setupAlphaBetaForSearch(t *testing.T) *Repository {
-	// Use a test-specific database file to avoid collisions when tests run concurrently
-	tmp := t.TempDir()
-	tdb := filepath.Join(tmp, "krnr_test.db")
-	old := os.Getenv(config.EnvKRNRDB)
-	_ = os.Setenv(config.EnvKRNRDB, tdb)
-	// restore env and close db on cleanup
-	t.Cleanup(func() { _ = os.Setenv(config.EnvKRNRDB, old) })
-
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	// cleanup
-	t.Cleanup(func() { _ = dbConn.Close() })
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	// ensure clean state
 	_ = r.DeleteCommandSet("alpha")
 	_ = r.DeleteCommandSet("beta")

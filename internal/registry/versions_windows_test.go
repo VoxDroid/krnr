@@ -3,19 +3,10 @@ package registry
 import (
 	"strconv"
 	"testing"
-
-	"github.com/VoxDroid/krnr/internal/db"
 )
 
 func setupWinRepo(t *testing.T) (*Repository, int64, []string) {
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	// cleanup
-	t.Cleanup(func() { _ = dbConn.Close() })
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	_ = r.DeleteCommandSet("win-α")
 	desc := "win path and unicode test"
 	id, err := r.CreateCommandSet("win-α", &desc, nil, nil, nil)
@@ -69,13 +60,7 @@ func TestVersions_WindowsPathAndUnicode_ApplyVersion(t *testing.T) {
 }
 
 func TestVersions_LongHistory(t *testing.T) {
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	_ = r.DeleteCommandSet("longhist")
 	desc := "long history test"
 	id, err := r.CreateCommandSet("longhist", &desc, nil, nil, nil)

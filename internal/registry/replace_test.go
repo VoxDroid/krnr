@@ -2,18 +2,10 @@ package registry
 
 import (
 	"testing"
-
-	"github.com/VoxDroid/krnr/internal/db"
 )
 
 func TestReplaceCommands(t *testing.T) {
-	dbConn, err := db.InitDB()
-	if err != nil {
-		t.Fatalf("InitDB(): %v", err)
-	}
-	defer func() { _ = dbConn.Close() }()
-
-	r := NewRepository(dbConn)
+	r := setupTestDB(t)
 	// ensure a clean state if a previous run left artifacts
 	_ = r.DeleteCommandSet("rep-set")
 	desc := "replace"
