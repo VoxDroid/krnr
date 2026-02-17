@@ -28,14 +28,8 @@ func (m *TuiModel) setVersionsPreviewIndex(idx int) tea.Cmd {
 	if idx < 0 || idx >= len(m.versions) {
 		return nil
 	}
-	// If no change to the selection and we already have a preview set, no work needed
-	if idx == m.versionsSelected && m.versionsPreviewContent != "" {
-		return nil
-	}
-	oldIdx := m.versionsSelected
-	oldContent := m.versionsPreviewContent
 	content := formatVersionDetails(m.detailName, m.versions[idx], m.vp.Width)
-	changed := content != oldContent || idx != oldIdx
+	changed := content != m.versionsPreviewContent || idx != m.versionsSelected
 
 	// Update state
 	m.versionsSelected = idx

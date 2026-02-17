@@ -3,6 +3,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.6 - 2026-02-17
+
+- **Bugfix (Registry):** Fix rollback creating duplicate version entries — rolling back to a previous version was producing both an "update" and a "rollback" version record because `ApplyVersionByName` called `ReplaceCommands` (which records an "update") and then separately recorded a "rollback". Now uses a single transaction with `replaceCommandsTx` + `recordVersionTx` so only one "rollback" version is created.
+- **Bugfix (TUI):** Fix version preview not updating after a run — stale run logs were overriding the left panel content when switching panes or pressing Enter on a version. Now clears run logs on any pane navigation so: pressing Enter on a version shows its detail in the left panel, switching to the versions pane shows the version preview, and switching back restores the original command set detail.
+- **Bugfix (Tests):** Fix flaky test failures caused by SQLite lock contention when multiple test packages run in parallel against the same database file. Added `setupTestDB` helper that isolates each test to its own temporary database via `KRNR_DB` env var. Applied to all registry, model, and adapter tests.
+- **Portability:** Fix Windows cross-compilation — split Unix-only PTY code (`syscall.SysProcAttr.Setsid`/`Setctty`, `creack/pty`) into build-tagged files (`pty_unix.go`, `pty_windows.go`). Windows stubs return safe defaults. Added `!windows` build tags to PTY-dependent test files.
+- **Version:** Bump to `v1.2.6`.
+
 ## v1.2.5 - 2026-02-17
 
 - **Feature (TUI/Executor):** Interactive commands (e.g., `sudo`, `pacman`) now work correctly in the TUI. Prompts appear inside the run output viewport (not the footer) and user input is forwarded to the running process.

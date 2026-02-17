@@ -153,10 +153,19 @@ func (r *Repository) ApplyVersionByName(name string, versionNum int) error {
 			filtered = append(filtered, c)
 		}
 	}
-	// replace commands with filtered list
-	if err := r.ReplaceCommands(cs.ID, filtered); err != nil {
+	// Replace commands and record rollback in a single transaction so that
+	// only one new version entry ("rollback") is created instead of the
+	// spurious "update" + "rollback" pair that ReplaceCommands would produce.
+	trx, err := r.db.Begin()
+	if err != nil {
 		return err
 	}
-	// record rollback as a new version
-	return r.RecordVersion(cs.ID, nil, nil, nil, filtered, "rollback")
+	defer func() { _ = trx.Rollback() }()
+	if _, err := r.replaceCommandsTx(trx, cs.ID, filtered); err != nil {
+		return err
+	}
+	if err := r.recordVersionTx(trx, cs.ID, nil, nil, nil, filtered, "rollback"); err != nil {
+		return err
+	}
+	return trx.Commit()
 }

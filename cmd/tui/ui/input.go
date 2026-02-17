@@ -346,6 +346,8 @@ func handleEnter(m *TuiModel, msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		m.versionsList, _ = m.versionsList.Update(msg)
 		m.versionsSelected = m.versionsList.Index()
 		if m.versionsSelected >= 0 && m.versionsSelected < len(m.versions) {
+			// Clear stale run logs so the version preview is not overwritten
+			m.logs = nil
 			// Show the selected version's detail in the left panel
 			m.detail = formatVersionDetails(m.detailName, m.versions[m.versionsSelected], m.vp.Width)
 			m.vp.SetContent(m.detail)
@@ -849,6 +851,8 @@ func handlePaneNavigation(m *TuiModel, s string) (tea.Model, tea.Cmd, bool) {
 
 func handlePaneLeft(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 	m.focusRight = false
+	// Clear stale run logs so the detail view shows the current command set
+	m.logs = nil
 	if m.showDetail && m.detailName != "" {
 		if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
 			m.detail = formatCSFullScreen(cs, m.width, m.height)
@@ -864,6 +868,8 @@ func handlePaneLeft(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 
 func handlePaneRight(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 	m.focusRight = true
+	// Clear stale run logs so version previews are visible
+	m.logs = nil
 	if m.showDetail && len(m.versions) > 0 {
 		idx := m.versionsList.Index()
 		if idx < 0 {
@@ -883,6 +889,8 @@ func handlePaneTab(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 }
 
 func handlePaneTabLeft(m *TuiModel) (tea.Model, tea.Cmd, bool) {
+	// Clear stale run logs so the detail view shows the current command set
+	m.logs = nil
 	if m.showDetail && m.detailName != "" {
 		if cs, err := m.uiModel.GetCommandSet(context.Background(), m.detailName); err == nil {
 			m.detail = formatCSFullScreen(cs, m.width, m.height)
@@ -897,6 +905,8 @@ func handlePaneTabLeft(m *TuiModel) (tea.Model, tea.Cmd, bool) {
 }
 
 func handlePaneTabRight(m *TuiModel) (tea.Model, tea.Cmd, bool) {
+	// Clear stale run logs so version previews are visible
+	m.logs = nil
 	if m.showDetail && len(m.versions) > 0 {
 		idx := m.versionsList.Index()
 		if idx < 0 {
