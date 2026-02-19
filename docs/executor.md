@@ -24,6 +24,10 @@ Hybrid PTY mode:
   be answered while keeping output simple and viewport-friendly.
 - PTY output written to `/dev/tty` by the child (e.g., password prompts) is read
   from the PTY master and forwarded to the caller's stdout.
+- While a PTY-backed child is running, the executor temporarily disables the host
+  terminal's local echo so password input typed by the user is not visible on
+  the host terminal. Only the local echo flag is toggled (output post-processing
+  remains unchanged) to avoid affecting how child output is rendered.
 
 Notes:
 - By default, `Shell` is empty and the OS default shell is used. Set `Shell` to

@@ -8,6 +8,8 @@ import (
 	"io"
 	"os/exec"
 	"testing"
+
+	"golang.org/x/term"
 )
 
 // fakeReader simulates an io.Reader that also exposes a file descriptor.
@@ -47,5 +49,38 @@ func TestExecute_PTYSimulated(t *testing.T) {
 	}
 	if !bytes.Contains(out.Bytes(), []byte("Enter:")) {
 		t.Fatalf("expected prompt streamed to stdout, got: %q", out.String())
+	}
+}
+
+func TestExecute_SetsHostTerminalRaw(t *testing.T) {
+	// Ensure we call makeRaw/restoreTerminal when stdin is a terminal-like FD.
+	origIsTerminal := isTerminal
+	origMakeRaw := makeRaw
+	origRestore := restoreTerminal
+	defer func() { isTerminal = origIsTerminal; makeRaw = origMakeRaw; restoreTerminal = origRestore }()
+
+	isTerminal = func(fd uintptr) bool { return fd == 0xdead }
+
+	calledMake := false
+	calledRestore := false
+	makeRaw = func(_ int) (*term.State, error) {
+		calledMake = true
+		return &term.State{}, nil
+	}
+	restoreTerminal = func(_ int, _ *term.State) error {
+		calledRestore = true
+		return nil
+	}
+
+	ctx := context.Background()
+	e := &Executor{}
+	var out bytes.Buffer
+	var errb bytes.Buffer
+	stdin := &fakeReader{fd: 0xdead}
+	if err := e.Execute(ctx, "true", "", stdin, &out, &errb); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+	if !calledMake || !calledRestore {
+		t.Fatalf("expected makeRaw and restoreTerminal to be called; got make=%v restore=%v", calledMake, calledRestore)
 	}
 }

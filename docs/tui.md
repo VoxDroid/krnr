@@ -55,6 +55,7 @@ Sanitizing run output
 Interactive commands & hybrid PTY
 - The TUI supports running interactive commands that require user input (e.g., `sudo` password prompts, `pacman` confirmations). When a run is in progress, typed keys are forwarded to the process stdin.
 - The executor uses a **hybrid PTY** approach: stdin and the controlling terminal use a PTY so programs that read from `/dev/tty` work, while stdout/stderr remain as pipes for viewport-friendly output.
+- While a PTY-backed child runs, the host terminal's local echo is temporarily disabled so password input is not visible to observers of the host terminal; the TUI forwards keystrokes into the process while preserving how output renders in the viewport.
 - All prompts and output appear inside the **run output panel** (viewport), not in the footer or bottom bar.
 - Output streams live — no keypress required to see results.
 

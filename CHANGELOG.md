@@ -3,6 +3,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.7 - 2026-02-19
+
+- **Bugfix (Executor/TUI):** Prevent passwords from being visible when running interactive commands (e.g., `sudo`). When the executor runs a child in hybrid PTY mode we now temporarily disable *local echo* on the caller's terminal so typed passwords are not echoed back to the host terminal. Only the local ECHO flag is toggled (other terminal output processing is preserved) to avoid changing how child output is rendered.
+  - Added `makeRaw`/`restoreTerminal` hooks and OS-specific `setEcho` helpers to safely toggle host echo and make the behavior testable.
+  - Added `TestExecute_SetsHostTerminalRaw` and PTY-simulation helpers to prevent regressions.
+- **Quality:** Fixed revive lint warnings and kept `gocyclo` under the configured threshold; all `golangci-lint`, `gocyclo`, and unit tests pass locally.
+- **Docs:** Updated `docs/executor.md` and `docs/tui.md` to document the host-terminal echo behavior during interactive PTY-backed runs.
+- **Version:** Bump to `v1.2.7`.
+
+
 ## v1.2.6 - 2026-02-17
 
 - **Bugfix (Registry):** Fix rollback creating duplicate version entries — rolling back to a previous version was producing both an "update" and a "rollback" version record because `ApplyVersionByName` called `ReplaceCommands` (which records an "update") and then separately recorded a "rollback". Now uses a single transaction with `replaceCommandsTx` + `recordVersionTx` so only one "rollback" version is created.
