@@ -3,6 +3,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.9 - 2026-02-20
+
+- **Bugfix (TUI/Status):** Do not report `on PATH:true` for an installation scope simply because the directory appears on PATH — the `krnr` binary must exist at the expected location (or be resolvable) for `GetStatus`/TUI to report `on PATH:true`. This prevents false-positive status reporting in the TUI and CLI.
+- **Tests:** Added unit test to verify directories-on-PATH without the binary do not cause `on PATH` to be reported.
+- **Docs:** Clarified status semantics in `docs/install.md` and release notes.
+- **Version:** Bump to `v1.2.9`.
+
 ## v1.2.8 - 2026-02-20
 
 - **Bugfix (Installer):** Fix several sudo/user install edge-cases so installs recorded under `sudo` behave correctly for the original user:

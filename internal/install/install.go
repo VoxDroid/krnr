@@ -538,11 +538,20 @@ func GetStatus() (*Status, error) {
 		st.SystemInstalled = true
 	}
 	// Check PATH membership (current process PATH)
-	st.UserOnPath = ContainsPath(os.Getenv("PATH"), filepath.Dir(userPath))
+	// Only mark on-path for a scope when the corresponding binary is present
+	// at the expected location OR when exec.LookPath resolves to that path
+	// later in `adjustFromLookPath`.
+	st.UserOnPath = false
+	if st.UserInstalled && ContainsPath(os.Getenv("PATH"), filepath.Dir(userPath)) {
+		st.UserOnPath = true
+	}
 	if runtime.GOOS == "windows" {
 		checkWindowsPathMembership(st)
 	} else {
-		st.SystemOnPath = ContainsPath(os.Getenv("PATH"), filepath.Dir(sysPath))
+		st.SystemOnPath = false
+		if st.SystemInstalled && ContainsPath(os.Getenv("PATH"), filepath.Dir(sysPath)) {
+			st.SystemOnPath = true
+		}
 	}
 	// metadata presence — delegate to helper to reduce complexity here
 	applyMetadataToStatus(st)
@@ -555,14 +564,15 @@ func GetStatus() (*Status, error) {
 // checkWindowsPathMembership inspects Machine and User PATH environment variables
 // and updates the Status accordingly.
 func checkWindowsPathMembership(st *Status) {
-	// Check Machine and User PATH for system / user installs
+	// Check Machine and User PATH for system / user installs. Only mark on-path
+	// if the corresponding binary actually exists at the expected location.
 	if out, err := runPowerShellWithTimeout(3*time.Second, "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','Machine')"); err == nil {
-		if ContainsPath(strings.TrimSpace(out), filepath.Dir(st.SystemPath)) {
+		if ContainsPath(strings.TrimSpace(out), filepath.Dir(st.SystemPath)) && st.SystemInstalled {
 			st.SystemOnPath = true
 		}
 	}
 	if out2, err := runPowerShellWithTimeout(3*time.Second, "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path','User')"); err == nil {
-		if ContainsPath(strings.TrimSpace(out2), filepath.Dir(st.UserPath)) {
+		if ContainsPath(strings.TrimSpace(out2), filepath.Dir(st.UserPath)) && st.UserInstalled {
 			st.UserOnPath = true
 		}
 	}

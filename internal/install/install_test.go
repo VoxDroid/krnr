@@ -606,3 +606,32 @@ func TestComputeNewPathString_RemovesOnlyTargetAndKeepsOthers(t *testing.T) {
 		t.Fatalf("expected WindowsApps to remain, got: %s", newPath)
 	}
 }
+
+func TestSystemDirOnPathButNoBinary_NotReportedOnPath(t *testing.T) {
+	// Ensure that a system directory being present on PATH does not make
+	// GetStatus report SystemOnPath=true when the krnr binary is not installed
+	// in that system directory.
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix-style PATH semantics only")
+	}
+	// Create a fake system bin dir and place it on PATH
+	tmpSys := t.TempDir()
+	oldSys := os.Getenv("KRNR_TEST_SYSTEM_BIN")
+	_ = os.Setenv("KRNR_TEST_SYSTEM_BIN", tmpSys)
+	defer func() { _ = os.Setenv("KRNR_TEST_SYSTEM_BIN", oldSys) }()
+
+	oldPath := os.Getenv("PATH")
+	_ = os.Setenv("PATH", oldPath+string(os.PathListSeparator)+tmpSys)
+	defer func() { _ = os.Setenv("PATH", oldPath) }()
+
+	st, err := GetStatus()
+	if err != nil {
+		t.Fatalf("GetStatus: %v", err)
+	}
+	if st.SystemInstalled {
+		t.Fatalf("expected SystemInstalled to be false")
+	}
+	if st.SystemOnPath {
+		t.Fatalf("expected SystemOnPath to be false when binary missing, got true")
+	}
+}
