@@ -3,11 +3,11 @@ package install
 import (
 	"encoding/json"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
-	"os/user"
 )
 
 func TestDefaultUserBin(t *testing.T) {
@@ -207,7 +207,7 @@ func TestPlanInstallUsesSudoUserHomeAndStatusFromMetadata(t *testing.T) {
 	}
 }
 
-func TestExecuteInstallAsSudoWritesMetadataAndUninstallable(t *testing.T) {
+func TestExecuteInstallAsSudo_WritesMetadata(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Unix-style HOME/SUDO_USER semantics only")
 	}
@@ -215,9 +215,6 @@ func TestExecuteInstallAsSudoWritesMetadataAndUninstallable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("user.Current: %v", err)
 	}
-	// simulate running installer under sudo (HOME becomes root-like) but target
-	// and metadata should land in the original user's data dir. Use the
-	// KRNR_TEST_SUDO_HOME helper so tests don't touch the real home.
 	tmpRootHome := t.TempDir()
 	_ = os.Setenv("HOME", tmpRootHome)
 	_ = os.Setenv("SUDO_USER", cur.Username)
@@ -226,10 +223,8 @@ func TestExecuteInstallAsSudoWritesMetadataAndUninstallable(t *testing.T) {
 		_ = os.Setenv("HOME", os.Getenv("HOME"))
 	}()
 
-	// direct the SUDO user's home to an isolated tempdir for the test
 	sudoHome := t.TempDir()
 	_ = os.Setenv("KRNR_TEST_SUDO_HOME", sudoHome)
-	// install target under the fake sudo user's home
 	installDir := filepath.Join(sudoHome, "krnr", "bin")
 	_ = os.MkdirAll(installDir, 0o755)
 
@@ -240,8 +235,6 @@ func TestExecuteInstallAsSudoWritesMetadataAndUninstallable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExecuteInstall: %v", err)
 	}
-
-	// metadata must be present in the SUDO user's KRNR_HOME (test helper path)
 	metaPath := filepath.Join(sudoHome, ".krnr", "install_metadata.json")
 	b, err := os.ReadFile(metaPath)
 	if err != nil {
@@ -254,12 +247,39 @@ func TestExecuteInstallAsSudoWritesMetadataAndUninstallable(t *testing.T) {
 	if m.TargetPath == "" || !strings.Contains(m.TargetPath, installDir) {
 		t.Fatalf("unexpected metadata TargetPath: %v", m.TargetPath)
 	}
+}
 
-	// Now simulate running as the normal user (unset SUDO_USER, point KRNR_HOME)
+func TestExecuteInstallAsSudo_UninstallRemovesBinary(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix-style HOME/SUDO_USER semantics only")
+	}
+	cur, err := user.Current()
+	if err != nil {
+		t.Fatalf("user.Current: %v", err)
+	}
+	tmpRootHome := t.TempDir()
+	_ = os.Setenv("HOME", tmpRootHome)
+	_ = os.Setenv("SUDO_USER", cur.Username)
+	defer func() {
+		_ = os.Unsetenv("SUDO_USER")
+		_ = os.Setenv("HOME", os.Getenv("HOME"))
+	}()
+
+	sudoHome := t.TempDir()
+	_ = os.Setenv("KRNR_TEST_SUDO_HOME", sudoHome)
+	installDir := filepath.Join(sudoHome, "krnr", "bin")
+	_ = os.MkdirAll(installDir, 0o755)
+
+	src := filepath.Join(t.TempDir(), "srcbin")
+	_ = os.WriteFile(src, []byte("binstuff"), 0o644)
+	opts := Options{User: true, Path: installDir, From: src, DryRun: false, AddToPath: true}
+	_, err = ExecuteInstall(opts)
+	if err != nil {
+		t.Fatalf("ExecuteInstall: %v", err)
+	}
+
 	_ = os.Setenv("KRNR_HOME", filepath.Join(sudoHome, ".krnr"))
 	_ = os.Unsetenv("SUDO_USER")
-
-	// Status should reflect metadata (UserOnPath true) even if PATH is empty
 	_ = os.Setenv("PATH", "")
 	st, err := GetStatus()
 	if err != nil {
@@ -269,7 +289,6 @@ func TestExecuteInstallAsSudoWritesMetadataAndUninstallable(t *testing.T) {
 		t.Fatalf("expected UserOnPath true from metadata after sudo install: %+v", st)
 	}
 
-	// Uninstall (as non-sudo) should remove the installed binary
 	actions, err := Uninstall(false)
 	if err != nil {
 		t.Fatalf("Uninstall failed: %v", err)
@@ -280,17 +299,52 @@ func TestExecuteInstallAsSudoWritesMetadataAndUninstallable(t *testing.T) {
 	if len(actions) == 0 {
 		t.Fatalf("expected uninstall actions")
 	}
+}
 
-	// Re-install as sudo again into the same user home
+func TestExecuteInstallAsSudo_ReinstallAfterUninstall(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix-style HOME/SUDO_USER semantics only")
+	}
+	cur, err := user.Current()
+	if err != nil {
+		t.Fatalf("user.Current: %v", err)
+	}
+	tmpRootHome := t.TempDir()
 	_ = os.Setenv("HOME", tmpRootHome)
 	_ = os.Setenv("SUDO_USER", cur.Username)
-	// ensure KRNR_TEST_SUDO_HOME remains set to sudoHome
+	defer func() {
+		_ = os.Unsetenv("SUDO_USER")
+		_ = os.Setenv("HOME", os.Getenv("HOME"))
+	}()
+
+	sudoHome := t.TempDir()
+	_ = os.Setenv("KRNR_TEST_SUDO_HOME", sudoHome)
+	installDir := filepath.Join(sudoHome, "krnr", "bin")
+	_ = os.MkdirAll(installDir, 0o755)
+
+	src := filepath.Join(t.TempDir(), "srcbin")
+	_ = os.WriteFile(src, []byte("binstuff"), 0o644)
+	opts := Options{User: true, Path: installDir, From: src, DryRun: false, AddToPath: true}
+	// first install
+	_, err = ExecuteInstall(opts)
+	if err != nil {
+		t.Fatalf("ExecuteInstall: %v", err)
+	}
+	// uninstall as normal user
+	_ = os.Setenv("KRNR_HOME", filepath.Join(sudoHome, ".krnr"))
+	_ = os.Unsetenv("SUDO_USER")
+	_, err = Uninstall(false)
+	if err != nil {
+		t.Fatalf("Uninstall failed: %v", err)
+	}
+	// reinstall as sudo
+	_ = os.Setenv("HOME", tmpRootHome)
+	_ = os.Setenv("SUDO_USER", cur.Username)
 	_, err = ExecuteInstall(opts)
 	if err != nil {
 		t.Fatalf("ExecuteInstall (second): %v", err)
 	}
-
-	// Status as the normal user should again reflect metadata-added-to-PATH
+	// status should reflect metadata
 	_ = os.Unsetenv("SUDO_USER")
 	_ = os.Setenv("KRNR_HOME", filepath.Join(sudoHome, ".krnr"))
 	_ = os.Setenv("PATH", "")
