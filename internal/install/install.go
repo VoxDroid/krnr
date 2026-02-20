@@ -10,8 +10,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf16"
@@ -33,7 +35,16 @@ type Options struct {
 
 // DefaultUserBin returns a sensible per-user bin directory per OS.
 func DefaultUserBin() string {
-	// Use a per-application directory under the user's home for clarity and isolation.
+	// If the installer is being run under sudo, prefer the original user's home
+	// (SUDO_USER) so a "user" install under sudo still targets the intended
+	// user's directory instead of root's home. Fall back to the current user's
+	// home directory when SUDO_USER is not set or lookup fails.
+	if su := os.Getenv("SUDO_USER"); su != "" {
+		if u, err := user.Lookup(su); err == nil && u.HomeDir != "" {
+			return filepath.Join(u.HomeDir, "krnr", "bin")
+		}
+	}
+	// Default behavior: use the current user's home directory
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "krnr", "bin")
 }
@@ -153,7 +164,44 @@ func saveMetadata(target string, added bool, pathFile string, oldUserPath string
 	}
 	m := metadata{TargetPath: target, AddedToPath: added, PathFile: pathFile, OldUserPath: oldUserPath, InstalledAt: time.Now()}
 	b, _ := json.MarshalIndent(m, "", "  ")
-	return os.WriteFile(p, b, 0o600)
+	// Primary write: current user's data dir
+	if err := os.WriteFile(p, b, 0o600); err != nil {
+		return err
+	}
+	// If running under sudo and this looks like a user install targeting the
+	// original user's home, also write a copy of the metadata into that
+	// user's data dir so non-sudo commands (status/uninstall) can find it.
+	if su := os.Getenv("SUDO_USER"); su != "" {
+		// allow tests to override the SUDO user's home via KRNR_TEST_SUDO_HOME
+		sudoHome := os.Getenv("KRNR_TEST_SUDO_HOME")
+		if sudoHome == "" {
+			if u, err := user.Lookup(su); err == nil {
+				sudoHome = u.HomeDir
+			}
+		}
+		if sudoHome != "" {
+			// Only write into the sudo user's data dir if the installed target is
+			// inside that user's home (prevents accidental cross-user writes).
+			if strings.HasPrefix(filepath.Clean(target), filepath.Clean(sudoHome)+string(os.PathSeparator)) {
+				ud := filepath.Join(sudoHome, ".krnr")
+				_ = os.MkdirAll(ud, 0o755)
+				metaFile := filepath.Join(ud, "install_metadata.json")
+				if err2 := os.WriteFile(metaFile, b, 0o600); err2 == nil {
+					// If running as root, make the sudo user own the metadata file so
+					// later non-root `krnr status` / `krnr uninstall` can read it.
+					if os.Geteuid() == 0 {
+						if u2, uerr := user.Lookup(su); uerr == nil {
+							uid, _ := strconv.Atoi(u2.Uid)
+							gid, _ := strconv.Atoi(u2.Gid)
+							_ = os.Chown(ud, uid, gid)
+							_ = os.Chown(metaFile, uid, gid)
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func loadMetadata() (*metadata, error) {
@@ -220,6 +268,22 @@ func executeInstallNow(opts Options, targetPath string) ([]string, error) {
 		return nil, err
 	}
 	result = append(result, fmt.Sprintf("copied %s -> %s", src, targetPath))
+
+	// If running as root but performing a "user" install (sudo ./krnr install --user),
+	// ensure the installed binary (and its bin directory) are owned by the target user
+	// so later non-sudo operations (status/uninstall) work as expected.
+	if os.Geteuid() == 0 && opts.User {
+		if su := os.Getenv("SUDO_USER"); su != "" {
+			if u, err := user.Lookup(su); err == nil {
+				uid, _ := strconv.Atoi(u.Uid)
+				gid, _ := strconv.Atoi(u.Gid)
+				// chown the binary
+				_ = os.Chown(targetPath, uid, gid)
+				// chown the bin dir so uninstall by the normal user can remove it
+				_ = os.Chown(filepath.Dir(targetPath), uid, gid)
+			}
+		}
+	}
 
 	// Attempt to add to PATH and gather actions/metadata
 	pathFile, oldPath, addedToPath, addActions, err := handleAddToPath(opts, targetPath)
@@ -415,10 +479,51 @@ func GetStatus() (*Status, error) {
 	} else {
 		st.SystemOnPath = ContainsPath(os.Getenv("PATH"), filepath.Dir(sysPath))
 	}
-	// metadata presence
-	if p, err := metadataPath(); err == nil {
-		if _, err := os.Stat(p); err == nil {
-			st.MetadataFound = true
+	// metadata presence — load metadata (if present) and use recorded AddedToPath to
+	// infer on-PATH for the matching recorded target. This lets `krnr status`
+	// report PATH:true immediately after choosing to add-to-PATH during install.
+	if m, err := loadMetadata(); err == nil {
+		st.MetadataFound = true
+		if m.AddedToPath {
+			// Prefer exact matches when possible, but metadata in the current
+			// data-dir is authoritative for that user — treat AddedToPath as a
+			// user-scope flag so `krnr status` reports on-path even before a
+			// new shell picks up PATH changes.
+			metaTarget := filepath.Clean(m.TargetPath)
+			userTarget := filepath.Clean(st.UserPath)
+			sysTarget := filepath.Clean(st.SystemPath)
+			if runtime.GOOS == "windows" {
+				if strings.EqualFold(metaTarget, userTarget) {
+					st.UserOnPath = true
+					st.UserInstalled = true
+				} else if strings.EqualFold(metaTarget, sysTarget) {
+					st.SystemOnPath = true
+					st.SystemInstalled = true
+				} else {
+					// metadata present in this user's data dir -> assume user-scope
+					st.UserOnPath = true
+					st.UserInstalled = true
+				}
+			} else {
+				if metaTarget == userTarget {
+					st.UserOnPath = true
+					st.UserInstalled = true
+				} else if metaTarget == sysTarget {
+					st.SystemOnPath = true
+					st.SystemInstalled = true
+				} else {
+					// metadata present in this user's data dir -> assume user-scope
+					st.UserOnPath = true
+					st.UserInstalled = true
+				}
+			}
+		}
+	} else {
+		// fallback: preserve prior behavior of only detecting metadata file presence
+		if p, err := metadataPath(); err == nil {
+			if _, err := os.Stat(p); err == nil {
+				st.MetadataFound = true
+			}
 		}
 	}
 	// If PATH checks above didn't mark on-path, try resolving the command via LookPath/where

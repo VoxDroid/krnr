@@ -31,6 +31,12 @@ Follow these steps to install and verify `krnr` on your machine. These steps ass
 - To skip interactive prompts (for scripted installs), provide `--yes` (use with caution):
   - `./krnr install --user --from ./krnr --add-to-path --yes`
 
+#### Installing as `sudo` (user scope)
+- If you run `krnr install` under `sudo` but select a **user**-scope install, `krnr` will detect the invoking user via `SUDO_USER` and perform the install for that user (not `root`).
+  - The installer writes install metadata into the invoking user's `KRNR_HOME` and ensures the metadata file and installed binary are owned by that user so `krnr status` and `krnr uninstall` work without sudo.
+  - `krnr status` will reflect `on PATH: true` if you chose to add the target dir to PATH even before you start a new shell session (status uses recorded metadata to infer the intended state).
+  - This behavior keeps sudo->user installs predictable and allows later non-sudo maintenance (status/uninstall) by the original user.
+
 ### Verify installation
 - Start a new shell (or restart your terminal) so PATH changes take effect.
 - Run `krnr status` to confirm `krnr` is installed and whether its directory is on PATH.

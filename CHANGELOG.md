@@ -3,6 +3,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.2.8 - 2026-02-20
+
+- **Bugfix (Installer):** Fix several sudo/user install edge-cases so installs recorded under `sudo` behave correctly for the original user:
+  - Record install metadata into the invoking user's data directory (SUDO_USER) and ensure the metadata file is readable by that user so `krnr status` and `krnr uninstall` work without sudo.
+  - Treat recorded `AddedToPath` as authoritative for status reporting so `krnr status` shows `on PATH: true` immediately after an add-to-PATH install (even before a new shell session).
+  - When running a "user" install under `sudo`, chown the installed binary and the `bin` directory to the target user so later non-sudo `uninstall` succeeds.
+  - Fix reinstall-after-uninstall behavior for sudo→user installs so status and metadata remain consistent.
+- **Tests:** Added unit tests covering SUDO_USER install/uninstall/reinstall flows and metadata-based status inference.
+- **Docs:** Documented sudo→user installer semantics in `docs/install.md`.
+- **Version:** Bump to `v1.2.8`.
+
 ## v1.2.7 - 2026-02-19
 
 - **Bugfix (Executor/TUI):** Prevent passwords from being visible when running interactive commands (e.g., `sudo`). When the executor runs a child in hybrid PTY mode we now temporarily disable *local echo* on the caller's terminal so typed passwords are not echoed back to the host terminal. Only the local ECHO flag is toggled (other terminal output processing is preserved) to avoid changing how child output is rendered.
