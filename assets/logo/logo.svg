@@ -1,0 +1,68 @@
+<svg width="100%" height="100%" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Hyper Glow and Drop Shadow Combo Shader -->
+    <filter id="hyperGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <!-- Drop Shadow Pass -->
+      <feGaussianBlur in="SourceAlpha" stdDeviation="25" result="shadowBlur"/>
+      <feOffset in="shadowBlur" dx="0" dy="25" result="shadowOffset"/>
+      <feComponentTransfer in="shadowOffset" result="shadowAlpha">
+         <!-- Adjust shadow opacity -->
+         <feFuncA type="linear" slope="0.75"/>
+      </feComponentTransfer>
+
+      <!-- Glow Passes for Bloom Effect -->
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="glow1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="35" result="glow2"/>
+      
+      <!-- Merge passes from back to front -->
+      <feMerge>
+        <feMergeNode in="shadowAlpha"/>       <!-- Bottom: Dark drop shadow -->
+        <feMergeNode in="glow2"/>             <!-- Middle: Large soft colored glow -->
+        <feMergeNode in="glow1"/>             <!-- Top: Tight bright colored glow -->
+        <feMergeNode in="SourceGraphic"/>     <!-- Original crisp graphic -->
+      </feMerge>
+    </filter>
+
+    <!-- Deep Purple to Bright Blue gradient -->
+    <linearGradient id="mainGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d946ef"/> <!-- Neon Pink/Purple -->
+      <stop offset="50%" stop-color="#8b5cf6"/> <!-- Deep Violet -->
+      <stop offset="100%" stop-color="#3b82f6"/> <!-- Luminous Blue -->
+    </linearGradient>
+
+    <!-- Inner Core gradient, reversed direction -->
+    <linearGradient id="coreGrad" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Move to center of 1024x1024 canvas -->
+  <g transform="translate(512, 512)">
+    
+    <!-- Thin ambient outer echo ring (adds dimension to empty space) -->
+    <circle cx="0" cy="0" r="480" fill="none" stroke="url(#mainGrad)" stroke-width="4" stroke-opacity="0.25" filter="url(#hyperGlow)"/>
+
+    <!-- Exact Mathematical Squircle Outer Shell -->
+    <path d="M 0 -380 
+             C 230 -380 380 -230 380 0 
+             C 380 230 230 380 0 380 
+             C -230 380 -380 230 -380 0 
+             C -380 -230 -230 -380 0 -380 Z" 
+          fill="none" stroke="url(#mainGrad)" stroke-width="40" filter="url(#hyperGlow)"/>
+
+    <!-- Perfect Symmetrical Blooming Wave / Infinity Knot -->
+    <!-- Scaled appropriately to cross perfectly over the outer squircle edges -->
+    <path d="M 0 -220 
+             C 280 -550 550 -280 220 0 
+             C 550 280 280 550 0 220 
+             C -280 550 -550 280 -220 0 
+             C -550 -280 -280 -550 0 -220 Z" 
+          fill="none" stroke="#ffffff" stroke-width="22" stroke-opacity="0.95" 
+          stroke-linecap="round" stroke-linejoin="round" filter="url(#hyperGlow)"/>
+          
+    <!-- Core / Kernel Components -->
+    <circle cx="0" cy="0" r="60" fill="url(#coreGrad)" filter="url(#hyperGlow)"/>
+
+  </g>
+</svg>
